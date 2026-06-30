@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import JupyterPlayground from '../components/JupyterPlayground'
-import { downloadLumenOrders } from '../utils/generateDataset'
+import JupyterPlayground from './JupyterPlayground'
+import { downloadLumenOrders } from '../../shared/utils/generateDataset'
 
 // ── Lumen Commerce brand ──────────────────────────────────────────────────────
 function LumenLogo({ size = 'md' }) {

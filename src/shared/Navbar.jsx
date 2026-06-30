@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import logo from '../assets/logo.png'
-import { useAuth } from '../contexts/AuthContext'
+import { useAuth } from '../features/auth/AuthContext'
 
 // ── Simulations dropdown ──────────────────────────────────────────────────
 const simItems = [
@@ -76,9 +76,7 @@ const chevron = (
 
 export default function Navbar() {
   const navigate      = useNavigate()
-  const { user }      = useAuth()
-  const isMentor      = user?.role === 'class_mentor'
-  const isUniStudent  = user?.role === 'university_student'
+  const { user }       = useAuth()
   const avatarInitials = user?.name
     ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
     : 'R'
@@ -238,18 +236,6 @@ export default function Navbar() {
           ].map(item => (
             <NavLink key={item.to} to={item.to} className={navLink}>{item.label}</NavLink>
           ))}
-          {/* Mentor-only: My Class link */}
-          {isMentor && (
-            <NavLink to="/mentor" className={navLink}>
-              My Class
-            </NavLink>
-          )}
-          {/* University student badge */}
-          {isUniStudent && (
-            <span className="ml-1 text-xs text-on-surface-variant bg-surface-low border border-border px-2.5 py-1 rounded-full font-medium">
-              🏛 {user.institution}
-            </span>
-          )}
         </nav>
 
         {/* Right */}
