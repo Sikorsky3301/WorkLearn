@@ -1,386 +1,606 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
+import Editor from '@monaco-editor/react'
+import { useSubmitSandbox, useSandboxFiles, useSandboxFileRows } from '../../shared/api/hooks'
+import { downloadFile } from '../../shared/api/client'
 
-const PYODIDE_URL = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js'
-const PYODIDE_IDX = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/'
+const FILE_ROWS_PAGE_SIZE = 50
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024 // 20MB — matches the backend's cap
 
-// Generates the synthetic lumen_orders dataset and sets matplotlib to Agg
-const DATA_SETUP = `
-import numpy as np, pandas as pd, datetime, warnings, matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-warnings.filterwarnings('ignore')
-np.random.seed(42)
+// Uint8Array -> base64 without spreading the whole buffer into
+// String.fromCharCode (which blows the call stack for anything past ~100k
+// bytes) — chunk it instead.
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer)
+  let binary = ''
+  const chunkSize = 0x8000
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize))
+  }
+  return btoa(binary)
+}
 
-_end   = datetime.date.today()
-_start = _end - datetime.timedelta(days=548)
-_N     = 9600
-_custs = [f'CUST-{i:05d}' for i in range(1, 3001)]
-_cids  = [np.random.choice(_custs) if np.random.random() > 0.07 else None for _ in range(_N)]
+const MIN_HEIGHT = 280
+const MAX_HEIGHT = 900
+const DEFAULT_HEIGHT = 480
+const STARTUP_DELAY_MS = 900
 
-_cats_raw = np.random.choice(
-    ['Lighting', 'Décor', 'Furniture', 'Outdoor', 'Accessories'],
-    _N, p=[0.35, 0.25, 0.20, 0.12, 0.08]
-)
-_cats = []
-for _c in _cats_raw:
-    _r = np.random.random()
-    if   _c == 'Lighting'    and _r < 0.04: _cats.append('Lightng')
-    elif _c == 'Lighting'    and _r < 0.08: _cats.append('lighting')
-    elif _c == 'Accessories' and _r < 0.04: _cats.append('Accessoires')
-    else:                                    _cats.append(_c)
+function ExpandIcon(props) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3" />
+    </svg>
+  )
+}
+function CollapseIcon(props) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M8 3v3a2 2 0 0 1-2 2H3M16 3v3a2 2 0 0 0 2 2h3M21 16h-3a2 2 0 0 0-2 2v3M3 16h3a2 2 0 0 1 2 2v3" />
+    </svg>
+  )
+}
+function PlayIcon(props) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" {...props}>
+      <path d="M8 5v14l11-7z" />
+    </svg>
+  )
+}
+function UploadIcon(props) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M17 8l-5-5-5 5" /><path d="M12 3v12" />
+    </svg>
+  )
+}
+function XIcon(props) {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M18 6 6 18M6 6l12 12" />
+    </svg>
+  )
+}
+function DownloadIcon(props) {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M7 10l5 5 5-5" /><path d="M12 15V3" />
+    </svg>
+  )
+}
+function ContainerBadgeIcon(props) {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" />
+      <rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" />
+    </svg>
+  )
+}
+function PyFileIcon(props) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" />
+    </svg>
+  )
+}
+function CsvFileIcon(props) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" />
+      <path d="M8 13h8M8 17h8" />
+    </svg>
+  )
+}
+function FolderIcon(props) {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+    </svg>
+  )
+}
+function ChevronDownIcon(props) {
+  return (
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  )
+}
 
-_prices = np.round(np.clip(np.random.lognormal(3.8, 0.8, _N), 5, 800), 2).astype(float)
-_prices[np.random.choice(_N, 80, replace=False)] = 0.0
-_prices[np.random.randint(0, _N)] = 99999.0
+// Registers a Monaco theme that matches the site's own light design tokens
+// (primary indigo #312E81, surface white, on-surface text) instead of the
+// stock VS Code dark theme.
+function defineWorkLearnTheme(monaco) {
+  monaco.editor.defineTheme('worklearn-light', {
+    base: 'vs',
+    inherit: true,
+    rules: [
+      { token: 'comment', foreground: '8a8794', fontStyle: 'italic' },
+      { token: 'keyword', foreground: '312E81', fontStyle: 'bold' },
+      { token: 'string', foreground: '2f7d4f' },
+      { token: 'number', foreground: 'b45309' },
+      { token: 'identifier', foreground: '1b1b21' },
+      { token: 'type', foreground: '4b41e1' },
+    ],
+    colors: {
+      'editor.background': '#ffffff',
+      'editor.foreground': '#1b1b21',
+      'editor.lineHighlightBackground': '#f6f2fa',
+      'editor.lineHighlightBorder': '#00000000',
+      'editorLineNumber.foreground': '#c8c5d3',
+      'editorLineNumber.activeForeground': '#645efb',
+      'editorCursor.foreground': '#312E81',
+      'editor.selectionBackground': '#e5e1f5',
+      'editorIndentGuide.background': '#eae7ef',
+      'editorIndentGuide.activeBackground': '#c8c5d3',
+      'editorGutter.background': '#fcfbff',
+      'editorWidget.background': '#ffffff',
+      'editorWidget.border': '#e5e7eb',
+      'scrollbarSlider.background': '#e5e7eb80',
+      'scrollbarSlider.hoverBackground': '#c8c5d380',
+    },
+  })
+}
 
-_disc = np.random.choice(
-    [0, 0.05, 0.10, 0.15, 0.20, 0.25], _N,
-    p=[0.45, 0.20, 0.15, 0.10, 0.07, 0.03]
-).astype(float)
-_disc[np.random.random(_N) < 0.12] *= 100
+function fileIcon(kind) {
+  if (kind === 'python') return <PyFileIcon className="text-blue-500 shrink-0" />
+  if (kind === 'csv') return <CsvFileIcon className="text-green-600 shrink-0" />
+  return <CsvFileIcon className="text-amber-600 shrink-0" />
+}
 
-_qty = np.random.choice(list(range(1, 8)), _N, p=[0.45, 0.28, 0.12, 0.07, 0.04, 0.02, 0.02])
-_qty = np.where(np.random.random(_N) < 0.03, -_qty, _qty)
+// Read-only viewer for dataset.csv / output.csv / output.json entries from the
+// Explorer — real file contents, not a mock. CSVs page through the FULL
+// dataset (dataset.csv can be ~9,600 rows) via useSandboxFileRows; the file's
+// own `rows`/`columns` (a 10-row teaser from the files list) are only a
+// placeholder until the first page of real data arrives.
+function FileViewer({ file, enrollmentId, taskId }) {
+  const [page, setPage] = useState(1)
+  const [downloading, setDownloading] = useState(false)
+  const [downloadError, setDownloadError] = useState('')
+  const isCsv = file?.kind === 'csv'
 
-_dates = []
-for _ in range(_N):
-    _d = _start + datetime.timedelta(days=int(np.random.randint(0, 548)))
-    _dates.append(_d.strftime('%Y-%m-%d'))
-for _i in np.where(np.random.random(_N) < 0.15)[0]:
-    _p = _dates[_i].split('-')
-    _dates[_i] = f'{_p[2]}/{_p[1]}/{_p[0]}'
-for _i in np.where(np.random.random(_N) < 0.01)[0]:
-    _dates[_i] = ''
+  useEffect(() => { setPage(1) }, [file?.name])
 
-df = pd.DataFrame({
-    'order_id':         [f'ORD-{i:06d}' for i in range(1, _N + 1)],
-    'order_date':       _dates,
-    'customer_id':      _cids,
-    'customer_email':   [f'{(_c or "guest").lower()}@lumenmail.com' for _c in _cids],
-    'product_category': _cats,
-    'quantity':         _qty.tolist(),
-    'unit_price':       _prices.tolist(),
-    'discount_pct':     _disc.tolist(),
-    'channel':          np.random.choice(
-                            ['Paid Search','Email','Organic','Social',None],
-                            _N, p=[0.33,0.28,0.22,0.13,0.04]).tolist(),
-    'country':          np.random.choice(
-                            ['US','CA','UK','AU','ZZ'],
-                            _N, p=[0.65,0.15,0.12,0.05,0.03]).tolist(),
-    'experiment_group': np.random.choice(
-                            ['control','variant',None],
-                            _N, p=[0.30,0.30,0.40]).tolist(),
-})
+  const { data: pageData, isFetching } = useSandboxFileRows(
+    enrollmentId, taskId, isCsv ? file.name : null, page, FILE_ROWS_PAGE_SIZE
+  )
 
-_dupes = df.sample(250, random_state=42)
-df = pd.concat([df, _dupes], ignore_index=True).sample(frac=1, random_state=42).reset_index(drop=True)
+  if (!file) return null
 
-print(f"✅  lumen_orders loaded  |  {len(df):,} rows  ×  {df.shape[1]} columns")
-print(f"    columns: {', '.join(df.columns)}")
-`
+  if (file.kind === 'csv') {
+    const columns    = pageData?.columns ?? file.columns
+    const rows       = pageData?.rows ?? file.rows
+    const totalRows  = pageData?.row_count ?? file.row_count
+    const totalPages = pageData?.total_pages ?? 1
+    const rangeStart = (page - 1) * FILE_ROWS_PAGE_SIZE + 1
+    const rangeEnd   = Math.min(page * FILE_ROWS_PAGE_SIZE, totalRows)
 
-// Wraps user code: captures stdout/stderr, captures matplotlib figures as base64
-const RUN_WRAPPER = `
-import sys as __sys, io as __io
-__out = __io.StringIO()
-__err = __io.StringIO()
-__sys.stdout = __out
-__sys.stderr = __err
-
-try:
-    exec(compile(__user_code, '<notebook>', 'exec'))
-except Exception as __exc:
-    import traceback as __tb
-    print(__tb.format_exc(), file=__sys.stderr)
-finally:
-    __sys.stdout = __sys.__stdout__
-    __sys.stderr = __sys.__stderr__
-
-import matplotlib.pyplot as __mplt, base64 as __b64, io as __bio
-__figs = []
-for __fn in list(__mplt.get_fignums()):
-    __f   = __mplt.figure(__fn)
-    __tmp = __bio.BytesIO()
-    __f.savefig(__tmp, format='png', bbox_inches='tight', dpi=150, facecolor='white')
-    __mplt.close(__f)
-    __tmp.seek(0)
-    __figs.append(__b64.b64encode(__tmp.read()).decode('utf-8'))
-
-[__out.getvalue(), __err.getvalue(), __figs]
-`
-
-export default function JupyterPlayground({ starterCode, onEvaluate }) {
-  const [sandboxOpen, setSandboxOpen] = useState(false)
-  const [pyodide,   setPyodide]   = useState(null)
-  const [phase,     setPhase]     = useState('idle')   // idle | loading | ready | error
-  const [loadMsg,   setLoadMsg]   = useState('')
-  const [code,      setCode]      = useState(starterCode)
-  const [outputs,   setOutputs]   = useState([])
-  const [running,   setRunning]   = useState(false)
-  const outputRef   = useRef(null)
-  const textareaRef = useRef(null)
-
-  useEffect(() => {
-    if (!sandboxOpen) return
-
-    // Singleton: reuse Pyodide across tab switches
-    if (window.__worklearn_pyodide) {
-      setPyodide(window.__worklearn_pyodide)
-      setPhase('ready')
-      return
-    }
-    if (window.__worklearn_py_loading) {
-      const timer = setInterval(() => {
-        if (window.__worklearn_pyodide) {
-          setPyodide(window.__worklearn_pyodide)
-          setPhase('ready')
-          clearInterval(timer)
-        }
-      }, 400)
-      return () => clearInterval(timer)
-    }
-
-    window.__worklearn_py_loading = true
-    setPhase('loading')
-
-    const boot = async () => {
+    const handleDownload = async () => {
+      setDownloading(true)
+      setDownloadError('')
       try {
-        setLoadMsg('Downloading Python runtime (~8 MB)…')
-        if (!window.loadPyodide) {
-          await new Promise((resolve, reject) => {
-            const s   = document.createElement('script')
-            s.src     = PYODIDE_URL
-            s.onload  = resolve
-            s.onerror = () => reject(new Error('Could not load Pyodide — check your connection'))
-            document.head.appendChild(s)
-          })
-        }
-
-        setLoadMsg('Starting Python 3.12…')
-        const py = await window.loadPyodide({ indexURL: PYODIDE_IDX })
-
-        setLoadMsg('Installing pandas, numpy, matplotlib…')
-        await py.loadPackage(['pandas', 'numpy', 'matplotlib'])
-
-        setLoadMsg('Generating lumen_orders dataset…')
-        await py.runPythonAsync(DATA_SETUP)
-
-        window.__worklearn_pyodide  = py
-        window.__worklearn_py_loading = false
-        setPyodide(py)
-        setPhase('ready')
+        await downloadFile(`/api/sandbox/${enrollmentId}/tasks/${taskId}/files/${file.name}/download`, file.name)
       } catch (err) {
-        window.__worklearn_py_loading = false
-        setPhase('error')
-        setLoadMsg(err.message)
+        setDownloadError(err.message || 'Could not download this file.')
+      } finally {
+        setDownloading(false)
       }
     }
-    boot()
-  }, [sandboxOpen])
 
-  const runCode = async () => {
-    if (!pyodide || running) return
-    setRunning(true)
-    setOutputs([{ type: 'running' }])
-    try {
-      pyodide.globals.set('__user_code', code)
-      const result = await pyodide.runPythonAsync(RUN_WRAPPER)
-      const [stdout, stderr, figs] = result.toJs()
-      const figList = figs || []
-      const out = []
-      if (stdout) out.push({ type: 'text',  content: stdout })
-      if (stderr) out.push({ type: 'error', content: stderr })
-      figList.forEach(b64 => out.push({ type: 'image', content: b64 }))
-      if (!out.length) out.push({ type: 'text', content: '(no output)' })
-      setOutputs(out)
-      if (onEvaluate) onEvaluate({ stdout: stdout || '', stderr: stderr || '', figCount: figList.length })
-    } catch (err) {
-      setOutputs([{ type: 'error', content: String(err) }])
-    } finally {
-      setRunning(false)
-      setTimeout(() => outputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80)
-    }
-  }
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Tab') {
-      e.preventDefault()
-      const el    = e.target
-      const start = el.selectionStart
-      const end   = el.selectionEnd
-      const next  = code.slice(0, start) + '    ' + code.slice(end)
-      setCode(next)
-      requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = start + 4 })
-    }
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-      e.preventDefault()
-      runCode()
-    }
-  }
-
-  // ── Closed state — shown until user clicks "Open Sandbox" ──
-  if (!sandboxOpen) {
     return (
-      <div className="rounded-xl border border-primary/20 overflow-hidden shadow-sm">
-        {/* Faux toolbar */}
-        <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-950">
-          <div className="flex gap-1.5 shrink-0">
-            <span className="w-2.5 h-2.5 rounded-full bg-red-500/40" />
-            <span className="w-2.5 h-2.5 rounded-full bg-yellow-400/40" />
-            <span className="w-2.5 h-2.5 rounded-full bg-green-500/40" />
+      <div className="h-full flex flex-col bg-white">
+        <div className="flex items-center justify-between px-5 pt-4 pb-2 shrink-0 gap-3">
+          <p className="text-xs text-on-surface-variant shrink-0">
+            {isFetching
+              ? 'Loading…'
+              : `Showing rows ${rangeStart.toLocaleString()}–${rangeEnd.toLocaleString()} of ${totalRows.toLocaleString()}`}
+          </p>
+          <div className="flex items-center gap-2">
+            {downloadError && <span className="text-xs text-red-600">{downloadError}</span>}
+            <button
+              onClick={handleDownload}
+              disabled={downloading}
+              title={`Download ${file.name} to your computer`}
+              className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg border border-border text-on-surface-variant hover:text-on-surface hover:border-primary/40 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+            >
+              {downloading ? (
+                <span className="w-3 h-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+              ) : (
+                <DownloadIcon />
+              )}
+              Download
+            </button>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page <= 1 || isFetching}
+                  className="text-xs font-medium px-2.5 py-1 rounded-lg border border-border text-on-surface-variant hover:text-on-surface hover:border-primary/40 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                >
+                  ← Prev
+                </button>
+                <span className="text-xs text-on-surface-variant font-mono tabular-nums">Page {page} of {totalPages}</span>
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages || isFetching}
+                  className="text-xs font-medium px-2.5 py-1 rounded-lg border border-border text-on-surface-variant hover:text-on-surface hover:border-primary/40 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                >
+                  Next →
+                </button>
+              </div>
+            )}
           </div>
-          <span className="font-mono text-xs text-gray-600 flex-1 truncate">lumen_sales_report.py</span>
-          <span className="text-[11px] text-gray-600">Python 3.12 · pandas · matplotlib</span>
         </div>
+        <div className="flex-1 min-h-0 overflow-auto px-5 pb-5">
+          <table className="text-[13px] border-collapse">
+            <thead>
+              <tr className="border-b border-border">
+                {columns.map(c => (
+                  <th key={c} className="text-left px-2.5 py-1.5 font-semibold text-on-surface whitespace-nowrap sticky top-0 bg-white">{c}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, i) => (
+                <tr key={i} className={i % 2 === 0 ? '' : 'bg-surface-low/60'}>
+                  {columns.map(c => (
+                    <td key={c} className="px-2.5 py-1.5 whitespace-nowrap text-on-surface-variant">{String(row[c] ?? '')}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
 
-        {/* CTA */}
-        <div className="bg-gray-950 px-6 py-10 text-center">
-          <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center mx-auto mb-4 text-xl">🐍</div>
-          <p className="text-sm font-semibold text-gray-200 mb-1">Python Sandbox</p>
-          <p className="text-xs text-gray-500 mb-1">pandas · numpy · matplotlib — runs entirely in your browser</p>
-          <p className="text-xs text-gray-600 mb-6">
-            <span className="font-mono text-primary/70">lumen_orders</span> (~9,850 rows) pre-loaded · first launch ~15 s
+  if (file.kind === 'json') {
+    return (
+      <div className="h-full overflow-auto p-5 bg-white">
+        <pre className="text-[13px] font-mono text-on-surface leading-relaxed whitespace-pre-wrap">
+          {JSON.stringify(file.content, null, 2)}
+        </pre>
+      </div>
+    )
+  }
+
+  return null
+}
+
+export default function JupyterPlayground({ starterCode, enrollmentId, taskId, outputFilename, onGraded }) {
+  const [started, setStarted] = useState(false)
+  const [starting, setStarting] = useState(false)
+  const [code, setCode] = useState(starterCode)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [editorHeight, setEditorHeight] = useState(DEFAULT_HEIGHT)
+  const [lastRanDry, setLastRanDry] = useState(false)
+  const [activeFile, setActiveFile] = useState('submission.py')
+  const [uploadedOutput, setUploadedOutput] = useState(null) // { base64, filename } | null — an uploaded file, alternative to running code
+  const [uploadError, setUploadError] = useState('')
+  const resizingRef = useRef(false)
+  const fileInputRef = useRef(null)
+
+  const submitSandbox = useSubmitSandbox(enrollmentId, taskId)
+  const { data: filesData } = useSandboxFiles(enrollmentId, taskId)
+  const files = filesData?.files ?? [{ name: 'submission.py', kind: 'python', editable: true }]
+  const activeFileEntry = files.find(f => f.name === activeFile)
+  // Only CSV outputs (Task 1) support uploading a finished file directly —
+  // tasks 2-4 produce output.json, which isn't something a student hand-crafts.
+  const supportsUpload = outputFilename?.endsWith('.csv')
+
+  const execute = useCallback(async (dryRun) => {
+    if (!enrollmentId || submitSandbox.isPending) return
+    try {
+      setLastRanDry(dryRun)
+      const body = uploadedOutput
+        ? { output_csv: uploadedOutput.base64, dry_run: dryRun }
+        : { code, dry_run: dryRun }
+      const result = await submitSandbox.mutateAsync(body)
+      onGraded?.(result, { isSubmit: !dryRun })
+    } catch { /* surfaced via submitSandbox.isError below */ }
+  }, [code, uploadedOutput, enrollmentId, submitSandbox, onGraded])
+
+  const handleRun    = useCallback(() => execute(true), [execute])
+  const handleSubmit = useCallback(() => execute(false), [execute])
+
+  const handleUploadClick = () => fileInputRef.current?.click()
+  const clearUpload = () => { setUploadedOutput(null); setUploadError('') }
+
+  const handleFileSelected = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-selecting the same file
+    if (!file) return
+    setUploadError('')
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setUploadError(`File is too large (max ${Math.floor(MAX_UPLOAD_BYTES / 1024 / 1024)}MB).`)
+      return
+    }
+    const buf = await file.arrayBuffer()
+    const base64 = arrayBufferToBase64(buf)
+    setUploadedOutput({ base64, filename: file.name })
+    // Uploading immediately previews/verifies it, same as clicking Run.
+    if (!enrollmentId || submitSandbox.isPending) return
+    try {
+      setLastRanDry(true)
+      const result = await submitSandbox.mutateAsync({ output_csv: base64, dry_run: true })
+      onGraded?.(result, { isSubmit: false })
+    } catch { /* surfaced via submitSandbox.isError below */ }
+  }
+
+  // Monaco's addCommand captures whatever handler was current at mount time —
+  // keep a ref so the keyboard shortcut always calls the latest version.
+  const handleSubmitRef = useRef(handleSubmit)
+  useEffect(() => { handleSubmitRef.current = handleSubmit }, [handleSubmit])
+
+  function handleEditorMount(editor, monaco) {
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => handleSubmitRef.current())
+  }
+
+  const handleStart = () => {
+    setStarting(true)
+    setTimeout(() => {
+      setStarting(false)
+      setStarted(true)
+    }, STARTUP_DELAY_MS)
+  }
+
+  // Esc exits full screen
+  useEffect(() => {
+    if (!isFullscreen) return
+    const onKey = (e) => { if (e.key === 'Escape') setIsFullscreen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isFullscreen])
+
+  // Drag-to-resize handle (normal mode only)
+  const startResize = (e) => {
+    e.preventDefault()
+    resizingRef.current = true
+    const startY = e.clientY
+    const startHeight = editorHeight
+    const onMove = (moveEvent) => {
+      if (!resizingRef.current) return
+      const delta = moveEvent.clientY - startY
+      setEditorHeight(Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, startHeight + delta)))
+    }
+    const onUp = () => {
+      resizingRef.current = false
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
+  // ── Start gate — shown until the student explicitly boots the sandbox ──────
+  if (!started) {
+    return (
+      <div className="rounded-xl border border-border overflow-hidden shadow-sm">
+        <div className="flex items-center gap-3 px-4 py-3 bg-surface-low border-b border-border">
+          <div className="flex gap-1.5 shrink-0">
+            <span className="w-2.5 h-2.5 rounded-full bg-red-400/60" />
+            <span className="w-2.5 h-2.5 rounded-full bg-yellow-400/60" />
+            <span className="w-2.5 h-2.5 rounded-full bg-green-400/60" />
+          </div>
+          <span className="font-mono text-sm text-on-surface-variant">submission.py</span>
+        </div>
+        <div className="bg-white px-8 py-16 text-center">
+          <div className={`w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-5 transition-transform duration-500 ${starting ? 'scale-90 animate-pulse' : 'scale-100'}`}>
+            <ContainerBadgeIcon />
+          </div>
+          <p className="text-base font-semibold text-on-surface mb-1.5">
+            {starting ? 'Spinning up your sandbox…' : 'Ready when you are'}
+          </p>
+          <p className="text-sm text-on-surface-variant mb-7 max-w-[300px] mx-auto leading-relaxed">
+            {starting
+              ? 'Provisioning an isolated container with pandas, numpy, and scipy pre-installed.'
+              : 'Runs in an isolated Docker container — pandas, numpy, and scipy pre-installed, network disabled.'}
           </p>
           <button
-            onClick={() => setSandboxOpen(true)}
-            className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 active:scale-95 text-white text-sm font-semibold px-6 py-2.5 rounded-lg transition-all"
+            onClick={handleStart}
+            disabled={starting}
+            className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 active:scale-95 disabled:opacity-70 text-white text-sm font-semibold px-6 py-2.5 rounded-lg transition-all cursor-pointer shadow-sm"
           >
-            <span>▶</span> Open Sandbox
+            {starting ? (
+              <><span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />Starting…</>
+            ) : (
+              <><PlayIcon /> Start Sandbox</>
+            )}
           </button>
         </div>
       </div>
     )
   }
 
-  return (
-    <div className="rounded-xl border border-primary/20 overflow-hidden shadow-sm">
+  const content = (
+    <div className={
+      isFullscreen
+        ? 'fixed inset-0 z-[100] flex bg-white'
+        : 'rounded-xl border border-border overflow-hidden shadow-sm flex h-full animate-[fadeIn_0.35s_ease]'
+    }>
 
-      {/* ── Toolbar ── */}
-      <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-950">
-        {/* Traffic lights */}
-        <div className="flex gap-1.5 shrink-0">
-          <span className="w-2.5 h-2.5 rounded-full bg-red-500/80" />
-          <span className="w-2.5 h-2.5 rounded-full bg-yellow-400/80" />
-          <span className="w-2.5 h-2.5 rounded-full bg-green-500/80" />
+      {/* ── Explorer sidebar (VS Code-style) ── */}
+      <div className="w-[168px] shrink-0 bg-surface-low border-r border-border flex flex-col">
+        <div className="px-3 pt-3 pb-2 text-[11px] font-bold text-on-surface-variant tracking-wider uppercase">
+          Explorer
         </div>
-
-        {/* File label */}
-        <span className="font-mono text-xs text-gray-500 flex-1 truncate">
-          lumen_sales_report.py
-        </span>
-
-        {/* Status pill */}
-        {phase === 'ready' && (
-          <span className="flex items-center gap-1.5 text-[11px] text-green-400 shrink-0">
-            <span className="w-1.5 h-1.5 bg-green-400 rounded-full" />
-            Python 3.12 · pandas · matplotlib
-          </span>
-        )}
-        {phase === 'loading' && (
-          <span className="flex items-center gap-1.5 text-[11px] text-amber-400 shrink-0">
-            <span className="w-3 h-3 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
-            {loadMsg}
-          </span>
-        )}
-
-        {/* Actions */}
-        <button
-          onClick={() => { setCode(starterCode); setOutputs([]) }}
-          className="text-[11px] text-gray-500 hover:text-gray-200 transition-colors px-2 py-1 rounded hover:bg-white/10 shrink-0"
-        >
-          Reset
-        </button>
-        <button
-          onClick={() => setOutputs([])}
-          disabled={!outputs.length}
-          className="text-[11px] text-gray-500 hover:text-gray-200 disabled:opacity-30 transition-colors px-2 py-1 rounded hover:bg-white/10 shrink-0"
-        >
-          Clear
-        </button>
-        <button
-          onClick={runCode}
-          disabled={phase !== 'ready' || running}
-          className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded transition-all shrink-0 ${
-            phase === 'ready' && !running
-              ? 'bg-primary text-white hover:bg-primary/90 active:scale-95'
-              : 'bg-white/10 text-white/30 cursor-not-allowed'
-          }`}
-        >
-          {running ? (
-            <><span className="w-3 h-3 border-2 border-white/50 border-t-white rounded-full animate-spin" />Running…</>
-          ) : (
-            <>▶ Run <kbd className="ml-1 text-[9px] opacity-50 font-mono">⌘↵</kbd></>
-          )}
-        </button>
+        <div className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-on-surface">
+          <ChevronDownIcon className="text-on-surface-variant" />
+          <FolderIcon className="text-primary/70" />
+          <span>workspace</span>
+        </div>
+        <div className="mt-0.5 flex-1 overflow-y-auto">
+          {files.map(f => (
+            <button
+              key={f.name}
+              onClick={() => setActiveFile(f.name)}
+              className={`w-full flex items-center gap-2 pl-7 pr-3 py-1.5 text-[13px] text-left transition-colors cursor-pointer ${
+                activeFile === f.name ? 'bg-primary/10 text-primary font-medium' : 'text-on-surface-variant hover:bg-surface-high hover:text-on-surface'
+              }`}
+            >
+              {fileIcon(f.kind)}
+              <span className="truncate">{f.name}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* ── Loading / error banner ── */}
-      {phase === 'loading' && (
-        <div className="px-4 py-2.5 bg-amber-950/50 flex items-center gap-2.5 text-[11px] text-amber-300 border-b border-amber-500/20">
-          <span className="w-3 h-3 border-2 border-amber-400 border-t-transparent rounded-full animate-spin shrink-0" />
-          Setting up your in-browser Python environment — this only happens once per session.
-        </div>
-      )}
-      {phase === 'error' && (
-        <div className="px-4 py-2.5 bg-red-950/50 text-[11px] text-red-300 border-b border-red-500/20">
-          ⚠ {loadMsg}
-        </div>
-      )}
-
-      {/* ── Code editor ── */}
-      <textarea
-        ref={textareaRef}
-        value={code}
-        onChange={e => setCode(e.target.value)}
-        onKeyDown={handleKeyDown}
-        spellCheck={false}
-        rows={22}
-        className="w-full font-mono text-[13px] bg-gray-950 text-gray-100 px-5 py-4 resize-y focus:outline-none leading-[1.7] tracking-tight caret-primary"
-        style={{ tabSize: 4, minHeight: '340px' }}
-        placeholder="# Write Python here and press ▶ Run (or ⌘↵)"
-      />
-
-      {/* ── Output panel ── */}
-      {outputs.length > 0 && (
-        <div ref={outputRef} className="border-t border-white/10">
-          <div className="flex items-center gap-2 px-4 py-2 bg-gray-900 border-b border-white/5">
-            <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">Output</span>
+      {/* ── Main column: tabs, banners, editor/viewer, actions ── */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        {/* File tab bar */}
+        <div className="flex items-center bg-surface-low border-b border-border shrink-0">
+          <div className="flex items-center gap-2 px-4 py-3 bg-white border-r border-border border-t-2 border-t-primary">
+            {fileIcon(activeFileEntry?.kind)}
+            <span className="font-mono text-sm text-on-surface">{activeFile}</span>
           </div>
-          <div className="bg-gray-900 px-4 py-4 space-y-4 max-h-[560px] overflow-y-auto">
-            {outputs.map((out, i) => {
-              if (out.type === 'running') {
-                return (
-                  <div key={i} className="flex items-center gap-2 text-xs text-gray-500 font-mono">
-                    <span className="w-3 h-3 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
-                    Executing…
-                  </div>
-                )
-              }
-              if (out.type === 'image') {
-                return (
-                  <div key={i} className="rounded overflow-hidden border border-white/10">
-                    <img
-                      src={`data:image/png;base64,${out.content}`}
-                      alt="Plot output"
-                      className="max-w-full bg-white block"
-                    />
-                  </div>
-                )
-              }
-              return (
-                <pre
-                  key={i}
-                  className={`text-[12px] font-mono whitespace-pre-wrap leading-relaxed ${
-                    out.type === 'error' ? 'text-red-400' : 'text-gray-200'
-                  }`}
-                >
-                  {out.content}
-                </pre>
-              )
-            })}
-          </div>
+          <span className="flex-1" />
+          <span className="hidden md:flex items-center gap-1.5 text-xs text-on-surface-variant px-3 shrink-0">
+            pandas · numpy · scipy
+          </span>
+          {activeFile === 'submission.py' && (
+            <button
+              onClick={() => setCode(starterCode)}
+              className="text-xs font-medium text-on-surface-variant hover:text-on-surface transition-colors px-2.5 py-1 mr-1 rounded hover:bg-surface-high shrink-0 cursor-pointer"
+            >
+              Reset
+            </button>
+          )}
+          <button
+            onClick={() => setIsFullscreen(f => !f)}
+            title={isFullscreen ? 'Exit full screen (Esc)' : 'Full screen'}
+            className="text-on-surface-variant hover:text-on-surface transition-colors p-1.5 mr-2 rounded hover:bg-surface-high shrink-0 cursor-pointer"
+          >
+            {isFullscreen ? <CollapseIcon /> : <ExpandIcon />}
+          </button>
         </div>
-      )}
+
+        {/* Status banners */}
+        {submitSandbox.isPending && (
+          <div className="px-4 py-2.5 bg-blue-50 flex items-center gap-2.5 text-sm text-blue-700 border-b border-blue-100 shrink-0">
+            <span className="w-3.5 h-3.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin shrink-0" />
+            {lastRanDry ? 'Running your code in an isolated container…' : 'Submitting for grading…'}
+          </div>
+        )}
+        {submitSandbox.isError && (
+          <div className="px-4 py-2.5 bg-red-50 text-sm text-red-700 border-b border-red-100 shrink-0 animate-[fadeIn_0.2s_ease]">
+            ⚠ {submitSandbox.error?.message || 'Could not run this submission. Please try again.'}
+          </div>
+        )}
+        {uploadError && (
+          <div className="px-4 py-2.5 bg-red-50 text-sm text-red-700 border-b border-red-100 shrink-0 animate-[fadeIn_0.2s_ease]">
+            ⚠ {uploadError}
+          </div>
+        )}
+        {uploadedOutput && !submitSandbox.isPending && (
+          <div className="px-4 py-2.5 bg-violet-50 flex items-center gap-2.5 text-sm text-violet-800 border-b border-violet-100 shrink-0 animate-[fadeIn_0.2s_ease]">
+            <UploadIcon className="shrink-0" />
+            <span className="flex-1 min-w-0 truncate">
+              Using uploaded file <strong className="font-semibold">{uploadedOutput.filename}</strong> — Run/Submit will grade this file, not the code below.
+            </span>
+            <button
+              onClick={clearUpload}
+              title="Discard upload and use the code editor instead"
+              className="shrink-0 flex items-center gap-1 text-xs font-semibold text-violet-700 hover:text-violet-900 px-2 py-1 rounded hover:bg-violet-100 transition-colors cursor-pointer"
+            >
+              <XIcon /> Clear
+            </button>
+          </div>
+        )}
+
+        {/* Editor (submission.py) or read-only file viewer */}
+        <div style={isFullscreen ? undefined : { height: editorHeight }} className={isFullscreen ? 'flex-1 min-h-0' : ''}>
+          {activeFile === 'submission.py' ? (
+            <Editor
+              height="100%"
+              defaultLanguage="python"
+              theme="worklearn-light"
+              value={code}
+              onChange={(v) => { setCode(v ?? ''); if (uploadedOutput) clearUpload() }}
+              beforeMount={defineWorkLearnTheme}
+              onMount={handleEditorMount}
+              loading={<div className="w-full h-full bg-white flex items-center justify-center text-sm text-on-surface-variant">Loading editor…</div>}
+              options={{
+                fontSize: 14.5,
+                fontFamily: "'SF Mono', Monaco, Consolas, 'Courier New', monospace",
+                fontLigatures: true,
+                lineHeight: 24,
+                minimap: { enabled: isFullscreen },
+                scrollBeyondLastLine: false,
+                smoothScrolling: true,
+                cursorBlinking: 'smooth',
+                cursorSmoothCaretAnimation: 'on',
+                renderLineHighlight: 'gutter',
+                tabSize: 4,
+                wordWrap: 'on',
+                padding: { top: 18, bottom: 18 },
+                automaticLayout: true,
+                bracketPairColorization: { enabled: true },
+              }}
+            />
+          ) : (
+            <FileViewer file={activeFileEntry} enrollmentId={enrollmentId} taskId={taskId} />
+          )}
+        </div>
+
+        {/* Drag-to-resize handle (normal mode only) */}
+        {!isFullscreen && (
+          <div
+            onMouseDown={startResize}
+            title="Drag to resize"
+            className="h-2.5 bg-surface-low hover:bg-primary/10 active:bg-primary/20 cursor-ns-resize flex items-center justify-center border-t border-border transition-colors group shrink-0"
+          >
+            <div className="w-8 h-0.5 bg-outline-variant group-hover:bg-primary/60 rounded-full transition-colors" />
+          </div>
+        )}
+
+        {/* Upload + Run + Submit — bottom action bar */}
+        <div className="flex items-center gap-2.5 px-4 py-3.5 bg-white border-t border-border shrink-0">
+          {supportsUpload && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                onChange={handleFileSelected}
+                className="hidden"
+              />
+              <button
+                onClick={handleUploadClick}
+                disabled={!enrollmentId || submitSandbox.isPending}
+                title={`Upload a ready-made ${outputFilename} from your computer instead of writing code`}
+                className="shrink-0 flex items-center justify-center gap-1.5 text-sm font-semibold px-3 py-2.5 rounded-lg transition-all bg-surface-low text-on-surface border border-border hover:bg-surface-high active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+              >
+                <UploadIcon width={13} height={13} /> Upload
+              </button>
+            </>
+          )}
+          <button
+            onClick={handleRun}
+            disabled={!enrollmentId || submitSandbox.isPending}
+            className="flex-1 flex items-center justify-center gap-1.5 text-sm font-semibold px-3 py-2.5 rounded-lg transition-all bg-surface-low text-on-surface border border-border hover:bg-surface-high active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+          >
+            {submitSandbox.isPending && lastRanDry ? (
+              <><span className="w-3.5 h-3.5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />Running…</>
+            ) : (
+              <><PlayIcon width={13} height={13} /> Run</>
+            )}
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={!enrollmentId || submitSandbox.isPending}
+            className="flex-[2] flex items-center justify-center gap-1.5 text-sm font-semibold px-3 py-2.5 rounded-lg transition-all bg-green-600 text-white hover:bg-green-500 active:scale-[0.98] disabled:opacity-50 cursor-pointer shadow-sm"
+          >
+            {submitSandbox.isPending && !lastRanDry ? (
+              <><span className="w-3.5 h-3.5 border-2 border-white/50 border-t-white rounded-full animate-spin" />Grading…</>
+            ) : (
+              <>Submit for Grading <kbd className="ml-1 text-[10px] opacity-60 font-mono">⌘↵</kbd></>
+            )}
+          </button>
+        </div>
+      </div>
     </div>
   )
+
+  // Portal to <body> in full screen so no ancestor's stacking context
+  // (position/transform/filter) can trap it beneath the navbar or other UI.
+  return isFullscreen ? createPortal(content, document.body) : content
 }

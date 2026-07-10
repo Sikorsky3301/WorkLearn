@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worklearn-backend
+  namespace: worklearn
+spec:
+  # APScheduler runs in-process (app/main.py) — must stay single-replica or
+  # scheduled jobs would fire once per pod.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worklearn-backend
+  template:
+    metadata:
+      labels:
+        app: worklearn-backend
+    spec:
+      serviceAccountName: worklearn-backend
+      containers:
+        - name: backend
+          image: worklearn-backend:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 3001
+          envFrom:
+            - secretRef:
+                name: worklearn-backend-env
+          env:
+            - name: SANDBOX_RUNNER
+              value: "kubernetes"
+            - name: SANDBOX_NAMESPACE
+              value: "worklearn-sandbox"
+            - name: SANDBOX_SHARED_DIR
+              value: "/sandbox-work"
+            - name: SANDBOX_HOSTPATH_DIR
+              value: "/worklearn/sandbox-work"
+          volumeMounts:
+            - name: sandbox-work
+              mountPath: /sandbox-work
+            - name: data
+              mountPath: /app/data
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: sandbox-work
+          hostPath:
+            path: /worklearn/sandbox-work
+            type: DirectoryOrCreate
+        - name: data
+          persistentVolumeClaim:
+            claimName: worklearn-data

@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: worklearn-backend
+  namespace: worklearn
+spec:
+  # Docker Desktop's Kubernetes binds LoadBalancer services to localhost, so
+  # this matches the frontend's default VITE_API_URL of http://localhost:3001
+  # (src/shared/api/client.js) with no frontend changes. NodePort 30001 is a
+  # fallback for clusters without LoadBalancer support.
+  type: LoadBalancer
+  selector:
+    app: worklearn-backend
+  ports:
+    - port: 3001
+      targetPort: 3001

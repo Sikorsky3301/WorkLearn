@@ -1,59 +1,34 @@
 import { useState } from 'react'
+import { useAnalytics } from '../../shared/api/hooks'
 
-const weekActivity = [
-  { day: 'Mon', hours: 2.5, sims: 1, courses: 1 },
-  { day: 'Tue', hours: 1.8, sims: 0, courses: 2 },
-  { day: 'Wed', hours: 3.2, sims: 2, courses: 0 },
-  { day: 'Thu', hours: 0.5, sims: 0, courses: 1 },
-  { day: 'Fri', hours: 2.0, sims: 1, courses: 1 },
-  { day: 'Sat', hours: 4.1, sims: 2, courses: 2 },
-  { day: 'Sun', hours: 1.2, sims: 0, courses: 1 },
-]
+const intensityColors = ['bg-surface-high', 'bg-primary/30', 'bg-primary/60', 'bg-primary']
 
-const skillGrowth = [
-  { skill: 'Systems Arch', data: [72, 76, 80, 85, 88, 91, 94], color: '#312E81' },
-  { skill: 'Data Literacy', data: [60, 65, 70, 74, 80, 85, 88], color: '#0d9488' },
-  { skill: 'Agile PM', data: [78, 80, 82, 84, 87, 89, 90], color: '#7c3aed' },
-]
-
-const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul']
-
-const timeBreakdown = [
-  { label: 'Simulations', hours: 48, pct: 45, color: 'bg-primary' },
-  { label: 'Courses', hours: 32, pct: 30, color: 'bg-teal-500' },
-  { label: 'Mentor Sessions', hours: 18, pct: 17, color: 'bg-violet-500' },
-  { label: 'Quizzes', hours: 8, pct: 8, color: 'bg-amber-500' },
-]
-
-const streakGrid = (() => {
-  const rows = []
-  const today = new Date()
-  for (let week = 11; week >= 0; week--) {
-    const cols = []
-    for (let day = 6; day >= 0; day--) {
-      const d = new Date(today)
-      d.setDate(today.getDate() - (week * 7 + day))
-      const intensity = Math.random()
-      const level = intensity > 0.7 ? 4 : intensity > 0.5 ? 3 : intensity > 0.3 ? 2 : intensity > 0.1 ? 1 : 0
-      cols.push({ date: d.toDateString(), level })
-    }
-    rows.push(cols)
-  }
-  return rows
-})()
-
-const intensityColors = ['bg-surface-high', 'bg-primary/20', 'bg-primary/40', 'bg-primary/70', 'bg-primary']
-
-const topStats = [
-  { label: 'Total Hours Logged', value: '106 hrs', delta: '+12% vs last month', up: true },
-  { label: 'Current Streak', value: '14 days', delta: 'Personal best!', up: true },
-  { label: 'Simulations Completed', value: '124', delta: '+8 this week', up: true },
-  { label: 'Avg. Daily Study', value: '2.1 hrs', delta: '-0.3 vs last week', up: false },
-]
+const SKILL_LABELS = {
+  sql:        'SQL Queries',
+  python:     'Python & EDA',
+  analytics:  'Data Analytics',
+  statistics: 'Statistics',
+  communication: 'Communication',
+}
 
 export default function Analytics() {
   const [period, setPeriod] = useState('week')
-  const maxHours = Math.max(...weekActivity.map(d => d.hours))
+  const { data, isLoading } = useAnalytics(period)
+
+  const topStats   = data?.top_stats    ?? []
+  const weekAct    = data?.week_activity ?? []
+  const streakGrid = data?.streak_grid   ?? []
+  const skills     = data?.skills        ?? {}
+
+  const maxXp = weekAct.length ? Math.max(...weekAct.map(d => d.xp), 1) : 1
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-container mx-auto px-6 py-8">
@@ -75,12 +50,20 @@ export default function Analytics() {
 
       {/* Top stat cards */}
       <div className="grid grid-cols-4 gap-4 mb-6">
-        {topStats.map(s => (
+        {topStats.length === 0 ? (
+          Array(4).fill(0).map((_, i) => (
+            <div key={i} className="card">
+              <p className="text-xs text-on-surface-variant mb-1">—</p>
+              <p className="text-2xl font-bold text-primary mb-1">0</p>
+              <p className="text-xs font-semibold text-on-surface-variant">No data yet</p>
+            </div>
+          ))
+        ) : topStats.map(s => (
           <div key={s.label} className="card">
             <p className="text-xs text-on-surface-variant mb-1">{s.label}</p>
             <p className="text-2xl font-bold text-primary mb-1">{s.value}</p>
             <p className={`text-xs font-semibold flex items-center gap-1 ${s.up ? 'text-green-600' : 'text-red-500'}`}>
-              {s.up ? '↑' : '↓'} {s.delta}
+              {s.up ? '↑' : '↓'} {s.delta ?? ''}
             </p>
           </div>
         ))}
@@ -93,116 +76,53 @@ export default function Analytics() {
           <div className="flex items-center justify-between mb-5">
             <div>
               <span className="section-label">Daily Activity</span>
-              <p className="text-sm font-bold text-on-surface mt-0.5">Hours spent learning this week</p>
+              <p className="text-sm font-bold text-on-surface mt-0.5">XP earned per day</p>
             </div>
-            <div className="flex items-center gap-3 text-xs">
-              <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-primary inline-block"/>Simulations</span>
-              <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-teal-500 inline-block"/>Courses</span>
-            </div>
+            <span className="text-xs text-on-surface-variant">Tasks · XP</span>
           </div>
-          <div className="flex items-end gap-3 h-40">
-            {weekActivity.map(d => (
-              <div key={d.day} className="flex-1 flex flex-col items-center gap-1.5">
-                <span className="text-xs font-semibold text-primary">{d.hours}h</span>
-                <div className="w-full flex flex-col gap-0.5" style={{ height: `${(d.hours / maxHours) * 120}px` }}>
-                  <div className="bg-primary rounded-t w-full" style={{ flex: d.sims || 0.1, minHeight: d.sims ? 4 : 0 }} />
-                  <div className="bg-teal-500 w-full" style={{ flex: d.courses || 0.1, minHeight: d.courses ? 4 : 0 }} />
+          {weekAct.length === 0 ? (
+            <div className="h-40 flex items-center justify-center text-sm text-on-surface-variant">
+              No activity yet for this period.
+            </div>
+          ) : (
+            <div className="flex items-end gap-3 h-40">
+              {weekAct.map(d => (
+                <div key={d.day} className="flex-1 flex flex-col items-center gap-1.5">
+                  <span className="text-xs font-semibold text-primary">{d.xp > 0 ? `${d.xp}xp` : ''}</span>
+                  <div className="w-full bg-primary/80 rounded-t" style={{ height: `${Math.max((d.xp / maxXp) * 120, d.xp > 0 ? 4 : 0)}px` }} />
+                  <span className="text-xs text-on-surface-variant">{d.day}</span>
                 </div>
-                <span className="text-xs text-on-surface-variant">{d.day}</span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Time Breakdown Donut */}
+        {/* Skills Breakdown */}
         <div className="card">
-          <span className="section-label mb-4 block">Time Breakdown</span>
-          <div className="flex flex-col items-center mb-4">
-            <div className="relative w-28 h-28">
-              <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-                {(() => {
-                  let offset = 0
-                  return timeBreakdown.map((t, i) => {
-                    const dash = t.pct
-                    const elem = (
-                      <circle key={i} cx="18" cy="18" r="15.915"
-                        fill="none"
-                        stroke={['#312E81', '#0d9488', '#7c3aed', '#f59e0b'][i]}
-                        strokeWidth="3.5"
-                        strokeDasharray={`${dash} ${100 - dash}`}
-                        strokeDashoffset={-offset}
-                      />
-                    )
-                    offset += dash
-                    return elem
-                  })
-                })()}
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-lg font-bold text-primary">106</span>
-                <span className="text-xs text-on-surface-variant">hrs total</span>
-              </div>
+          <span className="section-label mb-4 block">Skills Breakdown</span>
+          {Object.keys(skills).length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-32 text-on-surface-variant">
+              <p className="text-xs text-center">Complete simulation tasks to earn skill points.</p>
             </div>
-          </div>
-          <div className="space-y-2.5">
-            {timeBreakdown.map(t => (
-              <div key={t.label}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-medium text-on-surface">{t.label}</span>
-                  <span className="text-xs font-bold text-on-surface">{t.hours}h <span className="text-on-surface-variant font-normal">({t.pct}%)</span></span>
+          ) : (
+            <div className="space-y-3">
+              {Object.entries(skills).map(([key, score]) => (
+                <div key={key}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium text-on-surface">{SKILL_LABELS[key] ?? key}</span>
+                    <span className="text-xs font-bold text-on-surface">{score}</span>
+                  </div>
+                  <div className="h-1.5 bg-surface-high rounded-full overflow-hidden">
+                    <div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(score, 100)}%` }} />
+                  </div>
                 </div>
-                <div className="h-1.5 bg-surface-high rounded-full overflow-hidden">
-                  <div className={`h-full ${t.color} rounded-full`} style={{ width: `${t.pct}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Skill Growth Line Chart */}
-        <div className="col-span-2 card">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <span className="section-label">Skill Growth Over Time</span>
-              <p className="text-sm font-bold text-on-surface mt-0.5">Competency score trends (Jan – Jul 2024)</p>
-            </div>
-            <div className="flex items-center gap-3 text-xs">
-              {skillGrowth.map(s => (
-                <span key={s.skill} className="flex items-center gap-1.5">
-                  <span className="w-4 h-0.5 rounded inline-block" style={{ backgroundColor: s.color }} />
-                  {s.skill}
-                </span>
               ))}
             </div>
-          </div>
-          <div className="relative h-40">
-            <svg viewBox="0 0 420 140" className="w-full h-full" preserveAspectRatio="none">
-              {/* Grid lines */}
-              {[60, 70, 80, 90, 100].map(v => (
-                <line key={v} x1="0" y1={140 - (v - 50) * 2.8} x2="420" y2={140 - (v - 50) * 2.8}
-                  stroke="#e5e7eb" strokeWidth="0.5" />
-              ))}
-              {/* Lines */}
-              {skillGrowth.map(skill => {
-                const pts = skill.data.map((v, i) => `${(i / 6) * 420},${140 - (v - 50) * 2.8}`).join(' ')
-                return (
-                  <g key={skill.skill}>
-                    <polyline points={pts} fill="none" stroke={skill.color} strokeWidth="2" strokeLinejoin="round" />
-                    {skill.data.map((v, i) => (
-                      <circle key={i} cx={(i / 6) * 420} cy={140 - (v - 50) * 2.8} r="3" fill={skill.color} />
-                    ))}
-                  </g>
-                )
-              })}
-            </svg>
-            <div className="absolute bottom-0 left-0 right-0 flex justify-between px-1">
-              {months.map(m => <span key={m} className="text-xs text-on-surface-variant">{m}</span>)}
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Streak Calendar */}
-        <div className="card">
+        <div className="col-span-3 card">
           <div className="flex items-center justify-between mb-4">
             <div>
               <span className="section-label">Activity Streak</span>
@@ -216,26 +136,37 @@ export default function Analytics() {
               <span>More</span>
             </div>
           </div>
-          <div className="flex gap-1">
-            {streakGrid.map((week, wi) => (
-              <div key={wi} className="flex flex-col gap-1">
-                {week.map((day, di) => (
-                  <div
-                    key={di}
-                    className={`w-4 h-4 rounded-sm ${intensityColors[day.level]} border border-white`}
-                    title={day.date}
-                  />
-                ))}
-              </div>
-            ))}
-          </div>
+          {streakGrid.length === 0 ? (
+            <div className="h-20 flex items-center justify-center text-sm text-on-surface-variant">
+              No streak data yet.
+            </div>
+          ) : (
+            <div className="flex gap-1">
+              {streakGrid.map((week, wi) => (
+                <div key={wi} className="flex flex-col gap-1">
+                  {week.map((level, di) => (
+                    <div
+                      key={di}
+                      className={`w-4 h-4 rounded-sm ${intensityColors[Math.min(level, intensityColors.length - 1)]} border border-white`}
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
           <div className="mt-4 pt-3 border-t border-border">
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: 'Longest Streak', val: '21 days' },
-                { label: 'Current Streak', val: '14 days' },
-                { label: 'Active Days', val: '68 / 90' },
-                { label: 'Total Sessions', val: '132' },
+            <div className="grid grid-cols-4 gap-3">
+              {topStats.slice(0, 4).map(s => (
+                <div key={s.label} className="bg-surface-low rounded-lg p-2 text-center">
+                  <p className="text-sm font-bold text-primary">{s.value}</p>
+                  <p className="text-xs text-on-surface-variant">{s.label}</p>
+                </div>
+              ))}
+              {topStats.length === 0 && [
+                { label: 'Total XP', val: '0' },
+                { label: 'Tasks Done', val: '0' },
+                { label: 'Active Days', val: '0' },
+                { label: 'Streak', val: '0 days' },
               ].map(s => (
                 <div key={s.label} className="bg-surface-low rounded-lg p-2 text-center">
                   <p className="text-sm font-bold text-primary">{s.val}</p>

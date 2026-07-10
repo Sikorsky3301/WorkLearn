@@ -1,0 +1,13 @@
+# Caps how many sandbox Jobs/pods can run at once so a burst of concurrent
+# student submissions can't starve the node — this is the payoff of moving
+# per-user containers under Kubernetes management.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: sandbox-quota
+  namespace: worklearn-sandbox
+spec:
+  hard:
+    pods: "20"
+    limits.cpu: "10"
+    limits.memory: 5Gi

@@ -118,10 +118,10 @@ export default function Settings() {
                 </div>
               </div>
               <div className="mb-5">
-                <label className="text-xs font-semibold text-on-surface-variant mb-2 block">AI Manager Standup Time</label>
+                <label className="text-xs font-semibold text-on-surface-variant mb-2 block">Manager Reminder Time</label>
                 <div className="flex items-center gap-3">
                   <input type="time" value={standupTime} onChange={e => setStandupTime(e.target.value)} className="input text-sm w-32" />
-                  <p className="text-xs text-on-surface-variant">Your AI Manager will run morning standup at this time daily.</p>
+                  <p className="text-xs text-on-surface-variant">Your Manager will send task reminders at this time daily.</p>
                 </div>
               </div>
               <div>
@@ -141,7 +141,7 @@ export default function Settings() {
               <h2 className="font-bold text-on-surface mb-5">Notification Preferences</h2>
               <div className="space-y-4">
                 {[
-                  { key: 'morning', label: 'Morning Standup Reminder', desc: 'Daily AI Manager check-in at your configured time.' },
+                  { key: 'morning', label: 'Task Reminder', desc: 'Daily Manager reminder of your pending task at your configured time.' },
                   { key: 'evening', label: 'Evening Review Reminder', desc: 'End-of-day progress review prompt at 9 PM.' },
                   { key: 'mentorReminder', label: 'Mentor Session Reminders', desc: '30-minute reminder before scheduled AI Mentor sessions.' },
                   { key: 'evaluations', label: 'Evaluation Results', desc: 'Notify when AI Evaluator completes scoring your submissions.' },

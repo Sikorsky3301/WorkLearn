@@ -231,9 +231,9 @@ export default function EvaluationResult() {
                   <p className="text-xs font-semibold text-on-surface">Discuss with AI Mentor</p>
                   <p className="text-xs text-on-surface-variant">Book a session to work through your weak areas</p>
                 </button>
-                <button onClick={() => navigate('/courses?category=sd')} className="w-full text-left p-2.5 bg-surface-low rounded-lg border border-border hover:border-primary transition-colors">
-                  <p className="text-xs font-semibold text-on-surface">System Design Module</p>
-                  <p className="text-xs text-on-surface-variant">Review compliance and risk frameworks</p>
+                <button onClick={() => navigate('/simulations')} className="w-full text-left p-2.5 bg-surface-low rounded-lg border border-border hover:border-primary transition-colors">
+                  <p className="text-xs font-semibold text-on-surface">Revisit the Job Simulation</p>
+                  <p className="text-xs text-on-surface-variant">Review your tasks and retry weaker areas</p>
                 </button>
               </div>
             </div>

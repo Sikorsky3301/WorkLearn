@@ -249,7 +249,7 @@ const {
 ## 8. Component Library (existing + new)
 
 ### Existing (from main platform)
-- `<LumenLogo>` — Lumen Commerce brand mark
+- `<LumenLogo>` — Lumen Corporation brand mark
 - `<JupyterPlayground>` — In-browser Python (Pyodide)
 - `<DASimulationWorkspace>` — Full simulation workspace
 

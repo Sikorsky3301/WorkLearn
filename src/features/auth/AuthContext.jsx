@@ -1,13 +1,14 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useState, useEffect } from 'react'
+import { api, setToken, clearToken } from '../../shared/api/client'
 
+// Values match the backend Role enum (uppercase)
 export const ROLES = {
-  DIRECT_USER:        'direct_user',
-  UNIVERSITY_STUDENT: 'university_student',
-  CLASS_MENTOR:       'class_mentor',
-  SUPER_ADMIN:        'super_admin',
+  DIRECT_USER:        'DIRECT_USER',
+  UNIVERSITY_STUDENT: 'UNIVERSITY_STUDENT',
+  CLASS_MENTOR:       'CLASS_MENTOR',
+  SUPER_ADMIN:        'SUPER_ADMIN',
 }
 
-// Default feature access per role
 const ROLE_FEATURES = {
   [ROLES.DIRECT_USER]: {
     python_sandbox: true, download_dataset: true, model_solution: true,
@@ -27,88 +28,91 @@ const ROLE_FEATURES = {
   },
 }
 
-// ── Mock credential store ──────────────────────────────────────────────────
-const DIRECT_USERS = {
-  'demo@worklearn.ai': {
-    password: 'demo123', role: ROLES.DIRECT_USER,
-    name: 'Alex Demo', email: 'demo@worklearn.ai', avatar: 'AD',
-  },
-  'admin@worklearn.ai': {
-    password: 'admin123', role: ROLES.SUPER_ADMIN,
-    name: 'Platform Admin', email: 'admin@worklearn.ai', avatar: 'SA',
-  },
-}
-
-const UNIVERSITY_USERS = {
-  '21CS001': {
-    password: 'student123', role: ROLES.UNIVERSITY_STUDENT,
-    name: 'Rahul Sharma', rollNo: '21CS001',
-    department: 'CSE', section: 'A', year: '3rd Year',
-    institution: 'IIT Delhi', institutionCode: 'IITD',
-    unlockedFeatures: [],
-    assignedTasks: [
-      { id: 'a1', type: 'simulation', resourceId: 'da-job-sim', title: 'Junior DA Job Simulation', dueDate: '2025-08-15', status: 'in_progress', progress: 40 },
-      { id: 'a2', type: 'course', resourceId: 'advanced-system-design', title: 'Advanced System Design', dueDate: '2025-08-30', status: 'pending', progress: 0 },
-    ],
-  },
-  '21CS002': {
-    password: 'student123', role: ROLES.UNIVERSITY_STUDENT,
-    name: 'Priya Singh', rollNo: '21CS002',
-    department: 'CSE', section: 'A', year: '3rd Year',
-    institution: 'IIT Delhi', institutionCode: 'IITD',
-    unlockedFeatures: ['python_sandbox'],
-    assignedTasks: [
-      { id: 'a1', type: 'simulation', resourceId: 'da-job-sim', title: 'Junior DA Job Simulation', dueDate: '2025-08-15', status: 'completed', progress: 100 },
-    ],
-  },
-  'MENTOR001': {
-    password: 'mentor123', role: ROLES.CLASS_MENTOR,
-    name: 'Prof. Ananya Sharma', email: 'ananya@iitd.ac.in',
-    department: 'CSE', section: 'CS-3A',
-    institution: 'IIT Delhi', institutionCode: 'IITD',
-    avatar: 'AS',
-    studentCount: 24,
-  },
-}
-
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null)
+  const [user, setUser]       = useState(null)
+  const [loading, setLoading] = useState(true)
 
-  const loginDirect = (email, password) => {
-    const u = DIRECT_USERS[email.toLowerCase()]
-    if (!u || u.password !== password) return { error: 'Invalid email or password.' }
-    const { password: _pw, ...safe } = u
-    setUser(safe)
-    return { success: true, role: safe.role }
+  // Restore session from stored token on mount
+  useEffect(() => {
+    const token = localStorage.getItem('wl_token')
+    if (!token) { setLoading(false); return }
+
+    // 5-second safety timeout — if backend is unreachable, don't hang forever
+    const timeout = setTimeout(() => { clearToken(); setLoading(false) }, 5000)
+
+    api.get('/api/auth/me')
+      .then(setUser)
+      .catch(() => clearToken())
+      .finally(() => { clearTimeout(timeout); setLoading(false) })
+  }, [])
+
+  const register = async (name, email, password) => {
+    try {
+      const { token, user: u } = await api.post('/api/auth/register', { name, email, password })
+      setToken(token)
+      setUser(u)
+      return { success: true, role: u.role }
+    } catch (e) {
+      return { error: e.message }
+    }
   }
 
-  const loginUniversity = (rollNo, password) => {
-    const u = UNIVERSITY_USERS[rollNo.toUpperCase()]
-    if (!u || u.password !== password) return { error: 'Invalid Roll Number or password.' }
-    if (u.role === ROLES.CLASS_MENTOR) return { error: 'Mentors must log in at the Mentor Login page.' }
-    const { password: _pw, ...safe } = u
-    setUser(safe)
-    return { success: true, role: safe.role }
+  const loginDirect = async (email, password) => {
+    try {
+      const { token, user: u } = await api.post('/api/auth/login/direct', { email, password })
+      setToken(token)
+      setUser(u)
+      return { success: true, role: u.role }
+    } catch (e) {
+      return { error: e.message }
+    }
   }
 
-  const loginMentor = (mentorId, password) => {
-    const u = UNIVERSITY_USERS[mentorId.toUpperCase()]
-    if (!u || u.password !== password) return { error: 'Invalid Mentor ID or password.' }
-    if (u.role !== ROLES.CLASS_MENTOR) return { error: 'This portal is for mentors only. Students should use University Login.' }
-    const { password: _pw, ...safe } = u
-    setUser(safe)
-    return { success: true, role: safe.role }
+  const loginSuperAdmin = async (email, password) => {
+    try {
+      const { token, user: u } = await api.post('/api/auth/login/superadmin', { email, password })
+      setToken(token)
+      setUser(u)
+      return { success: true, role: u.role }
+    } catch (e) {
+      return { error: e.message }
+    }
   }
 
-  const logout = () => setUser(null)
+  const loginUniversity = async (rollNo, password) => {
+    try {
+      const { token, user: u } = await api.post('/api/auth/login/university', { roll_no: rollNo, password })
+      setToken(token)
+      setUser(u)
+      return { success: true, role: u.role }
+    } catch (e) {
+      return { error: e.message }
+    }
+  }
+
+  const loginMentor = async (mentorId, password) => {
+    try {
+      const { token, user: u } = await api.post('/api/auth/login/mentor', { mentor_id: mentorId, password })
+      setToken(token)
+      setUser(u)
+      return { success: true, role: u.role }
+    } catch (e) {
+      return { error: e.message }
+    }
+  }
+
+  const logout = () => {
+    clearToken()
+    setUser(null)
+  }
 
   const hasFeature = (featureName) => {
     if (!user) return false
     const defaults = ROLE_FEATURES[user.role] || {}
     if (defaults[featureName]) return true
-    if (user.unlockedFeatures?.includes(featureName)) return true
+    if (user.unlocked_features?.includes(featureName)) return true
     return false
   }
 
@@ -116,12 +120,12 @@ export function AuthProvider({ children }) {
     if (!user) return
     setUser(prev => ({
       ...prev,
-      unlockedFeatures: [...(prev.unlockedFeatures || []), featureName],
+      unlocked_features: [...(prev.unlocked_features || []), featureName],
     }))
   }
 
   return (
-    <AuthContext.Provider value={{ user, loginDirect, loginUniversity, loginMentor, logout, hasFeature, unlockFeature }}>
+    <AuthContext.Provider value={{ user, loading, register, loginDirect, loginSuperAdmin, loginUniversity, loginMentor, logout, hasFeature, unlockFeature }}>
       {children}
     </AuthContext.Provider>
   )

@@ -1,0 +1,18 @@
+# Default-deny all ingress/egress for sandbox pods. NOTE: Docker Desktop's
+# built-in CNI does NOT enforce NetworkPolicy, so this is a no-op there — it
+# becomes effective on any cluster running a policy-enforcing CNI (Calico,
+# Cilium, etc). Locally, isolation instead relies on automountServiceAccount
+# Token: false and dnsPolicy: Default on the sandbox Job pods (see
+# app/services/sandbox_runners/k8s_runner.py) plus --network=none semantics
+# not being available in K8s the way they are in `docker run`. See
+# k8s/README.md for the full caveat.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sandbox-default-deny
+  namespace: worklearn-sandbox
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
