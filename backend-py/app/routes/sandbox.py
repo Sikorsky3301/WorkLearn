@@ -1,9 +1,13 @@
 """
 Sandbox submission endpoint. This is the ONLY place a task's score is
-computed for sandboxed tasks — the client submits code (or text for Task 5),
-the server runs it (Docker for tasks 1-4, an LLM judge for Task 5), and
-grades the ARTIFACT the run produced against a server-computed ground truth.
-The client never supplies a trusted score.
+computed for sandboxed tasks — the client submits code (or text for Task 5
+of da-job-sim), the server runs it (Docker), and grades the ARTIFACT the run
+produced against a server-computed/hidden ground truth. The client never
+supplies a trusted score.
+
+Every lookup here is keyed by (simulation_id, task_id), not bare task_id —
+different simulations reuse task numbers 1-5, so a bare task_id key would
+silently route one simulation's submission through another's grader.
 """
 import base64
 import io
@@ -17,29 +21,54 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 from sqlalchemy import select
 
+from app.config import settings
 from app.database import get_db
 from app.auth import get_current_user
 from app.models import Enrollment
 from app.services import sandbox, artifacts
 from app.services.dataset import generate_dataset, compute_reference_solution, seed_from_enrollment
 from app.services.graders import task1_cleaning, task2_report, task3_segmentation, task4_ab_test, task5_brief
+from app.services.graders import (
+    frontend_task1, frontend_task2, frontend_task3, frontend_task4, frontend_task5,
+)
 from app.services.skill_engine import award_task_completion
 
 router = APIRouter(prefix="/api/sandbox", tags=["sandbox"])
 
-# task_id -> (dataset filename the sandbox is given, output filename the grader reads)
-TASK_IO = {
-    1: ("dataset.csv", "output.csv"),
-    2: ("dataset.csv", "output.json"),
-    3: ("dataset.csv", "output.json"),
-    4: ("dataset.csv", "output.json"),
+# (simulation_id, task_id) -> (input filename, output filename the grader reads).
+# For da-job-sim the input filename is the dataset the sandbox is given; for
+# frontend-dev-sim it's the filename the student's own code is written as
+# (there's no separate "dataset" input — see SIM_GRADERS / submit() below).
+SIM_TASK_IO = {
+    "da-job-sim": {
+        1: ("dataset.csv", "output.csv"),
+        2: ("dataset.csv", "output.json"),
+        3: ("dataset.csv", "output.json"),
+        4: ("dataset.csv", "output.json"),
+    },
+    "frontend-dev-sim": {
+        1: ("submission.html", "output.json"),
+        2: ("submission.html", "output.json"),
+        3: ("submission.js", "output.json"),
+        4: ("submission.jsx", "output.json"),
+        5: ("submission.jsx", "output.json"),
+    },
 }
 
-GRADERS = {
-    1: task1_cleaning.grade,
-    2: task2_report.grade,
-    3: task3_segmentation.grade,
-    4: task4_ab_test.grade,
+SIM_GRADERS = {
+    "da-job-sim": {
+        1: task1_cleaning.grade,
+        2: task2_report.grade,
+        3: task3_segmentation.grade,
+        4: task4_ab_test.grade,
+    },
+    "frontend-dev-sim": {
+        1: frontend_task1.grade,
+        2: frontend_task2.grade,
+        3: frontend_task3.grade,
+        4: frontend_task4.grade,
+        5: frontend_task5.grade,
+    },
 }
 
 FILE_PAGE_SIZE = 50
@@ -48,9 +77,9 @@ MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20MB — generous for a ~9,600-row CSV, s
 
 
 class SubmitBody(BaseModel):
-    code: str | None = None         # tasks 1-4, run through the sandbox
-    text: str | None = None         # task 5
-    output_csv: str | None = None   # tasks 1-4 alternative to `code`: a student-uploaded
+    code: str | None = None         # sandboxed tasks, run through the sandbox
+    text: str | None = None         # da-job-sim Task 5 (LLM-judged brief)
+    output_csv: str | None = None   # da-job-sim alternative to `code`: a student-uploaded
                                      # output file (base64), graded directly — no sandbox run
     dry_run: bool = False           # "Run" preview — grades the code but never persists completion/XP
 
@@ -67,7 +96,8 @@ async def _get_owned_enrollment(enrollment_id: str, user_id: str, db: AsyncSessi
 
 def _resolve_input_csv(enrollment_id: str, task_id: int) -> bytes:
     """The exact dataset.csv bytes this task's sandbox will see — the raw
-    seeded dataset for Task 1, or the student's own Task 1 cleaned output for 2-4."""
+    seeded dataset for Task 1, or the student's own Task 1 cleaned output for 2-4.
+    da-job-sim only."""
     prior_output = artifacts.load_artifact(enrollment_id, 1, "output.csv") if task_id > 1 else None
     if prior_output is not None:
         return prior_output
@@ -109,6 +139,17 @@ def _paginate_csv(csv_bytes: bytes, page: int, page_size: int) -> dict:
     }
 
 
+# Frontend-dev-sim's editable filename per task (extension drives the Explorer
+# icon/Monaco language client-side) — kept alongside SIM_TASK_IO's (filename,
+# output) tuples so both dicts stay structurally parallel across simulations.
+def _frontend_kind(filename: str) -> str:
+    if filename.endswith(".html"):
+        return "html"
+    if filename.endswith((".js", ".jsx")):
+        return "javascript"
+    return "text"
+
+
 @router.get("/{enrollment_id}/tasks/{task_id}/files")
 async def list_files(
     enrollment_id: str, task_id: int,
@@ -118,11 +159,18 @@ async def list_files(
     previews, not decoration: dataset.csv reflects the exact bytes the Docker
     container will read, and output.* reflects the last graded artifact."""
     user_id = token["sub"]
-    await _get_owned_enrollment(enrollment_id, user_id, db)
+    enrollment = await _get_owned_enrollment(enrollment_id, user_id, db)
+    sim_id = enrollment.simulation_id
+    task_io = SIM_TASK_IO.get(sim_id, {})
 
-    if task_id not in TASK_IO:
+    if task_id not in task_io:
         return {"files": [{"name": "submission.py", "kind": "python", "editable": True}]}
 
+    if sim_id == "frontend-dev-sim":
+        submission_filename, _ = task_io[task_id]
+        return {"files": [{"name": submission_filename, "kind": _frontend_kind(submission_filename), "editable": True}]}
+
+    # da-job-sim: dataset.csv preview + last graded output.*
     files = [{"name": "submission.py", "kind": "python", "editable": True}]
 
     try:
@@ -131,7 +179,7 @@ async def list_files(
     except Exception:
         pass  # dataset not ready yet — submission.py is still usable
 
-    _, output_name = TASK_IO[task_id]
+    _, output_name = task_io[task_id]
     output_bytes = artifacts.load_artifact(enrollment_id, task_id, output_name)
     if output_bytes is not None:
         if output_name == "output.csv":
@@ -148,14 +196,16 @@ async def list_files(
 def _resolve_csv_by_name(enrollment_id: str, task_id: int, filename: str) -> bytes:
     """Resolves either of the two CSV files the Explorer can show to their
     actual bytes — shared by pagination and download, which serve the same
-    underlying data two different ways."""
+    underlying data two different ways. da-job-sim only (frontend-dev-sim has
+    no CSV files, so any filename here 404s via the fallback below)."""
     if filename == "dataset.csv":
         try:
             return _resolve_input_csv(enrollment_id, task_id)
         except Exception:
             raise HTTPException(404, "dataset.csv is not ready yet")
     if filename == "output.csv":
-        if TASK_IO.get(task_id, (None, None))[1] != "output.csv":
+        io_map = SIM_TASK_IO.get("da-job-sim", {})
+        if io_map.get(task_id, (None, None))[1] != "output.csv":
             raise HTTPException(404, "No output.csv for this task")
         csv_bytes = artifacts.load_artifact(enrollment_id, task_id, "output.csv")
         if csv_bytes is None:
@@ -197,6 +247,91 @@ async def download_file(
     )
 
 
+async def _submit_da_job_sim(enrollment_id: str, task_id: int, body: SubmitBody, task_io: dict):
+    """The original pandas/CSV pipeline — unchanged behavior, just relocated
+    out of submit() so the per-simulation branches don't tangle together."""
+    if task_id == 5:
+        if not body.text or not body.text.strip():
+            raise HTTPException(400, "text is required for this task")
+        grade_result = await task5_brief.grade(body.text, {})
+        artifacts.save_artifact(enrollment_id, task_id, "brief.txt", body.text.encode("utf-8"))
+        return grade_result, "brief.txt", None
+
+    if task_id not in task_io:
+        raise HTTPException(404, "No sandbox for this task")
+
+    # The reference solution is always computed from the canonical seeded
+    # dataset, regardless of what the student's own code actually reads.
+    seed = seed_from_enrollment(enrollment_id)
+    df = generate_dataset(seed)
+
+    # Tasks 2-4 all analyze the CLEANED dataset — i.e. the student's own
+    # Task 1 output — never the raw one.
+    input_bytes = _resolve_input_csv(enrollment_id, task_id)
+    input_name, output_name = task_io[task_id]
+
+    if body.output_csv:
+        # Student uploaded a pre-made output file instead of writing code —
+        # skip the sandbox entirely and grade the upload directly. Same trust
+        # model as the code path: never grade printed stdout, only the
+        # artifact, and an upload IS the artifact.
+        try:
+            output_bytes = base64.b64decode(body.output_csv, validate=True)
+        except Exception:
+            raise HTTPException(400, "Uploaded file is not valid base64")
+        if len(output_bytes) > MAX_UPLOAD_BYTES:
+            raise HTTPException(400, "Uploaded file is too large")
+        stdout, stderr, timed_out = "", "", False
+    else:
+        if not body.code or not body.code.strip():
+            raise HTTPException(400, "code is required for this task")
+        result = await sandbox.run_submission(body.code, input_files={input_name: input_bytes})
+        try:
+            output_bytes = sandbox.read_output(result, output_name)
+            stdout, stderr, timed_out = result.stdout, result.stderr, result.timed_out
+        finally:
+            sandbox.cleanup(result.workdir)
+
+    reference = compute_reference_solution(task_id, df)
+    grade_result = SIM_GRADERS["da-job-sim"][task_id](output_bytes, reference)
+    grade_result["details"]["stdout"] = stdout[-2000:]
+    grade_result["details"]["stderr"] = stderr[-2000:]
+    grade_result["details"]["timed_out"] = timed_out
+    return grade_result, output_name, output_bytes
+
+
+async def _submit_frontend_dev_sim(enrollment_id: str, task_id: int, body: SubmitBody, task_io: dict, graders: dict):
+    """Runs the student's HTML/CSS/JS/React file against a hidden Jest test
+    spec inside the frontend sandbox image. Same trust model as da-job-sim:
+    the sandbox's stdout is shown to the student for debugging, but grading
+    only ever reads the Jest JSON report the container wrote to /workspace."""
+    from app.services.frontend_specs import FRONTEND_TEST_SPECS
+
+    if task_id not in task_io or task_id not in graders:
+        raise HTTPException(404, "No sandbox for this task")
+    if not body.code or not body.code.strip():
+        raise HTTPException(400, "code is required for this task")
+
+    submission_filename, output_name = task_io[task_id]
+    result = await sandbox.run_submission(
+        body.code,
+        input_files={"submission.test.js": FRONTEND_TEST_SPECS[task_id]},
+        image=settings.sandbox_image_frontend,
+        submission_filename=submission_filename,
+    )
+    try:
+        output_bytes = sandbox.read_output(result, output_name)
+        stdout, stderr, timed_out = result.stdout, result.stderr, result.timed_out
+    finally:
+        sandbox.cleanup(result.workdir)
+
+    grade_result = graders[task_id](output_bytes, None)
+    grade_result["details"]["stdout"] = stdout[-2000:]
+    grade_result["details"]["stderr"] = stderr[-2000:]
+    grade_result["details"]["timed_out"] = timed_out
+    return grade_result, output_name, output_bytes
+
+
 @router.post("/{enrollment_id}/tasks/{task_id}/submit")
 async def submit(
     enrollment_id: str, task_id: int, body: SubmitBody,
@@ -204,68 +339,30 @@ async def submit(
 ):
     user_id = token["sub"]
     enrollment = await _get_owned_enrollment(enrollment_id, user_id, db)
+    sim_id = enrollment.simulation_id
+    task_io = SIM_TASK_IO.get(sim_id, {})
+    graders = SIM_GRADERS.get(sim_id, {})
 
-    if task_id == 5:
-        if not body.text or not body.text.strip():
-            raise HTTPException(400, "text is required for this task")
-        grade_result = await task5_brief.grade(body.text, {})
-        artifacts.save_artifact(enrollment_id, task_id, "brief.txt", body.text.encode("utf-8"))
+    if sim_id == "da-job-sim":
+        grade_result, output_name, output_bytes = await _submit_da_job_sim(enrollment_id, task_id, body, task_io)
+    elif sim_id == "frontend-dev-sim":
+        grade_result, output_name, output_bytes = await _submit_frontend_dev_sim(enrollment_id, task_id, body, task_io, graders)
     else:
-        if task_id not in TASK_IO:
-            raise HTTPException(404, "No sandbox for this task")
+        raise HTTPException(404, "This simulation has no sandbox configured")
 
-        # The reference solution is always computed from the canonical seeded
-        # dataset, regardless of what the student's own code actually reads.
-        seed = seed_from_enrollment(enrollment_id)
-        df = generate_dataset(seed)
-
-        # Tasks 2-4 all analyze the CLEANED dataset — i.e. the student's own
-        # Task 1 output — never the raw one. (Only Task 1 itself gets the raw
-        # seeded data; there's nothing to chain "sequentially" past that,
-        # since tasks 2-4 each independently analyze the same cleaned data.)
-        input_bytes = _resolve_input_csv(enrollment_id, task_id)
-        input_name, output_name = TASK_IO[task_id]
-
-        if body.output_csv:
-            # Student uploaded a pre-made output file instead of writing code
-            # — skip the sandbox entirely and grade the upload directly. Same
-            # trust model as the code path: never grade printed stdout, only
-            # the artifact, and an upload IS the artifact.
-            try:
-                output_bytes = base64.b64decode(body.output_csv, validate=True)
-            except Exception:
-                raise HTTPException(400, "Uploaded file is not valid base64")
-            if len(output_bytes) > MAX_UPLOAD_BYTES:
-                raise HTTPException(400, "Uploaded file is too large")
-            stdout, stderr, timed_out = "", "", False
-        else:
-            if not body.code or not body.code.strip():
-                raise HTTPException(400, "code is required for this task")
-            result = await sandbox.run_submission(body.code, input_files={input_name: input_bytes})
-            try:
-                output_bytes = sandbox.read_output(result, output_name)
-                stdout, stderr, timed_out = result.stdout, result.stderr, result.timed_out
-            finally:
-                sandbox.cleanup(result.workdir)
-
-        reference = compute_reference_solution(task_id, df)
-        grade_result = GRADERS[task_id](output_bytes, reference)
-        grade_result["details"]["stdout"] = stdout[-2000:]
-        grade_result["details"]["stderr"] = stderr[-2000:]
-        grade_result["details"]["timed_out"] = timed_out
-        # Only a real Submit for Grading persists the artifact — a "Run"
-        # (dry_run) is a free, repeatable preview and must leave no trace,
-        # otherwise output.csv would appear in the Explorer before the
-        # student ever actually submitted anything.
-        if output_bytes is not None and not body.dry_run:
-            artifacts.save_artifact(enrollment_id, task_id, output_name, output_bytes)
+    # Only a real Submit for Grading persists the artifact — a "Run" (dry_run)
+    # is a free, repeatable preview and must leave no trace, otherwise a
+    # graded artifact would appear in the Explorer before the student ever
+    # actually submitted anything.
+    if output_bytes is not None and not body.dry_run:
+        artifacts.save_artifact(enrollment_id, task_id, output_name, output_bytes)
 
     if body.dry_run:
         # Preview only — no completion/XP persisted, so students can re-run freely.
         return {**grade_result, "dry_run": True}
 
     awards = await award_task_completion(
-        db, user_id, enrollment_id, task_id,
+        db, user_id, enrollment_id, task_id, simulation_id=sim_id,
         score=grade_result["score"], quiz_score=None, rubric_rating=grade_result,
     )
 

@@ -55,10 +55,21 @@ def _k8s_memory(limit: str) -> str:
     return limit
 
 
-def _job_manifest(job_name: str, workdir_name: str) -> dict:
+def _entrypoint_cmd(image: str) -> list[str]:
+    """Each sandbox image bakes its own entrypoint script in at a fixed path
+    (mirrors the Dockerfile ENTRYPOINT the docker runner relies on implicitly
+    by not overriding command). Unrecognized images fall back to the Python
+    entrypoint — the same image/command pairing this runner always used."""
+    if image == settings.sandbox_image_frontend:
+        return ["node", "/opt/sandbox/entrypoint.js"]
+    return ["python", "/opt/sandbox/entrypoint.py"]
+
+
+def _job_manifest(job_name: str, workdir_name: str, image: str) -> dict:
     memory = _k8s_memory(settings.sandbox_memory_limit)
     cpu = settings.sandbox_cpu_limit  # K8s accepts decimal cpu quantities ("0.5")
     resources = {"memory": memory, "cpu": cpu}
+    entrypoint = " ".join(_entrypoint_cmd(image))
     return {
         "apiVersion": "batch/v1",
         "kind": "Job",
@@ -83,11 +94,11 @@ def _job_manifest(job_name: str, workdir_name: str) -> dict:
                     "containers": [
                         {
                             "name": "sandbox",
-                            "image": settings.sandbox_image,
+                            "image": image,
                             "imagePullPolicy": "Never",
                             "command": [
                                 "/bin/sh", "-c",
-                                "exec python /opt/sandbox/entrypoint.py"
+                                f"exec {entrypoint}"
                                 " > /workspace/.sandbox_stdout"
                                 " 2> /workspace/.sandbox_stderr",
                             ],
@@ -146,18 +157,25 @@ def _read_stream(workdir: Path, name: str) -> str:
     return path.read_text(encoding="utf-8", errors="replace") if path.exists() else ""
 
 
-async def run_submission(code: str, input_files: dict[str, bytes | str] | None = None) -> SandboxResult:
+async def run_submission(
+    code: str,
+    input_files: dict[str, bytes | str] | None = None,
+    image: str | None = None,
+    submission_filename: str = "submission.py",
+) -> SandboxResult:
     """
     Same contract as docker_runner.run_submission: caller reads output.* from
-    result.workdir and MUST call cleanup() when done.
+    result.workdir and MUST call cleanup() when done. `image` overrides
+    settings.sandbox_image for this call (e.g. the frontend sandbox image).
     """
+    resolved_image = image or settings.sandbox_image
     workdir = Path(tempfile.mkdtemp(prefix="sandbox_", dir=settings.sandbox_shared_dir))
     job_name = f"sandbox-{uuid.uuid4().hex[:12]}"
     try:
         # The sandbox container runs as uid 10001 and must write output files;
         # fsGroup does not apply to hostPath volumes, so open up the workdir.
         os.chmod(workdir, 0o777)
-        (workdir / "submission.py").write_text(code, encoding="utf-8")
+        (workdir / submission_filename).write_text(code, encoding="utf-8")
         for name, content in (input_files or {}).items():
             path = workdir / name
             if isinstance(content, bytes):
@@ -170,7 +188,7 @@ async def run_submission(code: str, input_files: dict[str, bytes | str] | None =
         await asyncio.to_thread(
             batch.create_namespaced_job,
             settings.sandbox_namespace,
-            _job_manifest(job_name, workdir.name),
+            _job_manifest(job_name, workdir.name, resolved_image),
         )
 
         # Phase A — scheduling/startup budget. Exceeding it is an

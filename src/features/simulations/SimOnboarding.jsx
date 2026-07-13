@@ -2,11 +2,18 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useOnboarding, useAcceptOnboarding } from '../../shared/api/hooks'
 import lumenLogoImg from '../../assets/lumen-logo.png'
+import enigmaLogoImg from '../../assets/enigma-logo.png'
 
-// Lumen Corporation brand mark (matches DASimulationWorkspace)
-function LumenLogo({ size = 'md' }) {
+// Brand mark per simulation — matches the logo used in that sim's own workspace.
+const SIM_LOGOS = {
+  'da-job-sim': { src: lumenLogoImg, alt: 'Lumen Corporation' },
+  'frontend-dev-sim': { src: enigmaLogoImg, alt: 'Enigma' },
+}
+
+function SimLogo({ sim, size = 'md' }) {
   const h = { sm: 'h-5', md: 'h-7', lg: 'h-9' }[size]
-  return <img src={lumenLogoImg} alt="Lumen Corporation" className={`${h} w-auto object-contain shrink-0`} />
+  const logo = SIM_LOGOS[sim] ?? SIM_LOGOS['da-job-sim']
+  return <img src={logo.src} alt={logo.alt} className={`${h} w-auto object-contain shrink-0`} />
 }
 
 export default function SimOnboarding({ sim = 'da-job-sim', onAccept }) {
@@ -66,13 +73,13 @@ export default function SimOnboarding({ sim = 'da-job-sim', onAccept }) {
 
       {/* Company header */}
       <div className="flex items-center gap-3 mb-6 pb-5 border-b border-border">
-        <LumenLogo size="lg" />
+        <SimLogo sim={sim} size="lg" />
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <span className="font-bold text-on-surface text-lg leading-tight">{company?.name}</span>
             <span className="chip bg-orange-100 text-orange-700 text-[10px]">{company?.industry}</span>
           </div>
-          <p className="text-xs text-on-surface-variant">Growth &amp; Analytics · {offer?.title}</p>
+          <p className="text-xs text-on-surface-variant">{offer?.team} · {offer?.title}</p>
         </div>
         <div className="hidden sm:flex items-center gap-4 text-xs text-on-surface-variant">
           <span>📍 {company?.location}</span>

@@ -65,3 +65,31 @@
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* MIRA hero skill icons: pop in staggered, then gently float, with a hover lift */
+@keyframes miraSkillIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.7); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes miraSkillFloat {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-5px); }
+}
+.mira-skill-icon {
+  opacity: 0;
+  animation: miraSkillIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both,
+             miraSkillFloat 3s ease-in-out infinite;
+  transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
+.mira-skill-icon:hover {
+  transform: scale(1.15) translateY(-4px);
+  background-color: #ffffff;
+  border-color: #312E81;
+  box-shadow: 0 4px 12px rgba(49, 46, 129, 0.12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mira-skill-icon {
+    animation: miraSkillIn 0.3s ease both;
+  }
+}

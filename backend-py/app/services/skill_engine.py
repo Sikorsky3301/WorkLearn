@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from app.models import TaskCompletion, UserSkill, XpLedger, User, Enrollment, AgentMessage, EnrollmentStatus, MessageType
 from app.config import (
-    TASK_SKILL_AWARDS, TASK_XP_AWARDS, TARGET_ROLE_REQUIREMENTS,
+    SIM_TASK_SKILL_AWARDS, SIM_TASK_XP_AWARDS, TARGET_ROLE_REQUIREMENTS,
     SKILL_LABELS, QUIZ_BONUS_THRESHOLD, QUIZ_BONUS_XP
 )
 from datetime import datetime, timezone
@@ -12,6 +12,7 @@ async def award_task_completion(
     user_id: str,
     enrollment_id: str,
     task_id: int,
+    simulation_id: str,
     score: int | None = None,
     quiz_score: int | None = None,
     rubric_rating: dict | None = None,
@@ -38,7 +39,7 @@ async def award_task_completion(
         db.add(tc)
 
     # Award skills
-    skill_awards = TASK_SKILL_AWARDS.get(task_id, {})
+    skill_awards = SIM_TASK_SKILL_AWARDS.get(simulation_id, {}).get(task_id, {})
     for skill_key, delta in skill_awards.items():
         res = await db.execute(
             select(UserSkill).where(UserSkill.user_id == user_id, UserSkill.skill_key == skill_key)
@@ -50,7 +51,7 @@ async def award_task_completion(
             db.add(UserSkill(user_id=user_id, skill_key=skill_key, current_score=min(100, delta)))
 
     # Award XP
-    base_xp = TASK_XP_AWARDS.get(task_id, 0)
+    base_xp = SIM_TASK_XP_AWARDS.get(simulation_id, {}).get(task_id, 0)
     bonus_xp = QUIZ_BONUS_XP if (quiz_score and quiz_score >= QUIZ_BONUS_THRESHOLD) else 0
     total_xp = base_xp + bonus_xp
 

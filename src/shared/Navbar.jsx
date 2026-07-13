@@ -150,6 +150,7 @@ export default function Navbar() {
 
           <NavLink to="/skill-gps" className={navLink}>Skill GPS</NavLink>
           <NavLink to="/ai-mentor" className={navLink}>AI Mentor</NavLink>
+          <NavLink to="/mira" className={navLink}>MIRA</NavLink>
           <NavLink to="/analytics" className={navLink}>Analytics</NavLink>
           <NavLink to="/portfolio" className={navLink}>Portfolio</NavLink>
         </nav>

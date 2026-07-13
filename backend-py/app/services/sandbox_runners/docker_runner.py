@@ -23,17 +23,24 @@ def _run_docker(docker_args: list[str], timeout: int) -> tuple[bytes, bytes, int
         return b"", b"Execution timed out and was terminated.", None, True
 
 
-async def run_submission(code: str, input_files: dict[str, bytes | str] | None = None) -> SandboxResult:
+async def run_submission(
+    code: str,
+    input_files: dict[str, bytes | str] | None = None,
+    image: str | None = None,
+    submission_filename: str = "submission.py",
+) -> SandboxResult:
     """
-    Runs `code` as submission.py inside a locked-down container.
+    Runs `code` as `submission_filename` inside a locked-down container.
     `input_files` are written into the workspace before the container starts
     (e.g. {"dataset.csv": csv_bytes}) so the student's code can read them.
-    The caller is responsible for reading back any output.* files from
-    result.workdir and MUST clean up the workdir when done (see cleanup()).
+    `image` overrides settings.sandbox_image for this call (e.g. the
+    frontend sandbox image). The caller is responsible for reading back any
+    output.* files from result.workdir and MUST clean up the workdir when
+    done (see cleanup()).
     """
     workdir = Path(tempfile.mkdtemp(prefix="sandbox_"))
     try:
-        (workdir / "submission.py").write_text(code, encoding="utf-8")
+        (workdir / submission_filename).write_text(code, encoding="utf-8")
         for name, content in (input_files or {}).items():
             path = workdir / name
             if isinstance(content, bytes):
@@ -50,7 +57,7 @@ async def run_submission(code: str, input_files: dict[str, bytes | str] | None =
             "--cap-drop=ALL",
             "--security-opt=no-new-privileges",
             "-v", f"{workdir}:/workspace",
-            settings.sandbox_image,
+            image or settings.sandbox_image,
         ]
 
         # subprocess.run in a worker thread, not asyncio.create_subprocess_exec:

@@ -1,6 +1,17 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { api } from '../client'
 
+// All available job simulations — single source of truth (backend
+// SIMULATIONS list in app/routes/enrollments.py), so the Dashboard and
+// simulation-browsing pages never need a second, hand-maintained copy.
+export function useSimulations() {
+  return useQuery({
+    queryKey: ['simulations'],
+    queryFn: () => api.get('/api/simulations'),
+    staleTime: 5 * 60_000,
+  })
+}
+
 // Enrollment hooks
 export function useEnrollment(simId) {
   return useQuery({

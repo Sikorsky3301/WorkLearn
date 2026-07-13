@@ -15,3 +15,17 @@ Verify:
 ```
 docker run --rm worklearn-sandbox-python:latest python -c "import pandas, numpy, scipy, statsmodels; print('ok')"
 ```
+
+Same for the frontend sandbox (used by the Frontend Developer job simulation):
+
+```
+docker build -t worklearn-sandbox-frontend:latest backend-py/sandboxes/frontend
+```
+
+Rebuild whenever `sandboxes/frontend/Dockerfile`, `entrypoint.js`, or the Jest/Babel configs change.
+
+Verify:
+
+```
+docker run --rm worklearn-sandbox-frontend:latest node -e "require('jest'); require('react'); console.log('ok')"
+```

@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useQueries } from '@tanstack/react-query'
 import { useEnrollment, useEnroll } from '../../shared/api/hooks'
+import { api } from '../../shared/api/client'
+import lumenLogoImg from '../../assets/lumen-logo.png'
+import enigmaLogoImg from '../../assets/enigma-logo.png'
 
 const SIMULATIONS = [
   {
@@ -8,6 +12,8 @@ const SIMULATIONS = [
     title: 'Junior Data Analyst — Job Simulation',
     description:
       'Work through 5 real-world DA tasks: write SQL queries, run Python EDA, segment customers with RFM, design A/B tests, and present findings. Every task awards skill points and XP.',
+    company: 'Lumen Corporation',
+    logo: lumenLogoImg,
     category: 'Data Analytics',
     categoryColor: 'bg-orange-100 text-orange-700',
     accentColor: 'bg-orange-500',
@@ -25,6 +31,30 @@ const SIMULATIONS = [
       { id: 5, title: 'Data Presentation',          time: '~30 min', desc: 'Build a data story and present insights to stakeholders.' },
     ],
   },
+  {
+    id: 'frontend-dev-sim',
+    title: 'Frontend Developer — Job Simulation',
+    description:
+      'Ship 5 real-world frontend tickets: a semantic landing page, an accessible interactive nav, an async data fetch, a React component, and a stateful task manager app. Every task is graded against real automated tests.',
+    company: 'Enigma',
+    logo: enigmaLogoImg,
+    category: 'Engineering',
+    categoryColor: 'bg-orange-100 text-orange-700',
+    accentColor: 'bg-orange-500',
+    tasks: 5,
+    estimatedTime: '5–7 hours',
+    difficulty: 'Beginner–Advanced',
+    skills: ['HTML/CSS', 'JavaScript', 'React', 'Accessibility', 'State Management'],
+    path: '/simulations/frontend-dev-sim',
+    overviewPath: '/simulations/frontend-dev-sim/overview',
+    taskList: [
+      { id: 1, title: 'Landing Hero Section',    time: '~30 min', desc: 'Build a semantic, responsive hero section with HTML and CSS.' },
+      { id: 2, title: 'Interactive Navigation',  time: '~30 min', desc: 'Wire up a mobile menu toggle and active-link highlighting with vanilla JS.' },
+      { id: 3, title: 'Fetch & Render Data',     time: '~45 min', desc: 'Fetch live data with proper loading and error states.' },
+      { id: 4, title: 'React Component',         time: '~45 min', desc: 'Convert the data list into a proper React component.' },
+      { id: 5, title: 'Task Manager App',        time: '~60 min', desc: 'Build a stateful React app with add/complete/delete and localStorage persistence.' },
+    ],
+  },
 ]
 
 export default function SimulationWorkspace() {
@@ -32,13 +62,24 @@ export default function SimulationWorkspace() {
   const [searchParams] = useSearchParams()
   const enrolledOnly = searchParams.get('filter') === 'enrolled'
 
-  // There's currently one simulation, so its own enrollment status is enough
-  // to decide the "My Enrolled Simulations" filter — this generalizes to a
-  // per-card check (like SimCard already does) if more sims are added later.
-  const { data: enrollment, isLoading } = useEnrollment(SIMULATIONS[0].id)
-  const isEnrolledAnywhere = !!enrollment?.status
+  // Check enrollment status across every simulation (not just the first) so
+  // "My Enrolled Simulations" correctly reflects enrollment in any of them.
+  const enrollmentQueries = useQueries({
+    queries: SIMULATIONS.map(sim => ({
+      queryKey: ['enrollment', sim.id],
+      queryFn: () => api.get(`/api/enrollments/by-sim/${sim.id}`),
+      retry: false,
+      staleTime: 30_000,
+    })),
+  })
+  const isLoading = enrollmentQueries.some(q => q.isLoading)
+  const isEnrolledAnywhere = enrollmentQueries.some(q => !!q.data?.status)
   const showEmptyState = enrolledOnly && !isLoading && !isEnrolledAnywhere
-  const visibleSims = showEmptyState ? [] : SIMULATIONS
+  const visibleSims = showEmptyState
+    ? []
+    : enrolledOnly
+    ? SIMULATIONS.filter((sim, i) => !!enrollmentQueries[i].data?.status)
+    : SIMULATIONS
 
   return (
     <div className="max-w-container mx-auto px-6 py-8">
@@ -61,7 +102,7 @@ export default function SimulationWorkspace() {
           </button>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="grid sm:grid-cols-2 gap-5">
           {visibleSims.map(sim => (
             <SimCard key={sim.id} sim={sim} />
           ))}
@@ -105,78 +146,87 @@ function SimCard({ sim }) {
     <>
       <div
         onClick={isLoading ? undefined : handleCTA}
-        className={`card p-0 overflow-hidden hover:border-primary transition-colors group ${isLoading ? '' : 'cursor-pointer'}`}
+        className={`card p-0 overflow-hidden flex flex-col group transition-all duration-200 ease-out hover:-translate-y-1.5 hover:shadow-xl hover:border-primary/50 ${isLoading ? '' : 'cursor-pointer'}`}
       >
         <div className={`h-1.5 w-full ${sim.accentColor}`} />
-        <div className="p-5">
-          <div className="flex items-start justify-between gap-6">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-2">
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded ${sim.categoryColor}`}>
+        <div className="p-5 flex flex-col flex-1">
+
+          {/* Logo + company row */}
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="h-10 w-10 shrink-0 rounded-lg border border-border bg-white flex items-center justify-center p-1.5 shadow-sm">
+                <img src={sim.logo} alt={sim.company} className="max-h-full max-w-full object-contain" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-on-surface truncate">{sim.company}</p>
+                <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded ${sim.categoryColor}`}>
                   {sim.category}
                 </span>
-                <span className="chip">{sim.tasks} Tasks</span>
-                <span className="chip">{sim.estimatedTime}</span>
-                {status && (
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
-                    status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-primary/10 text-primary'
-                  }`}>
-                    {status === 'completed' ? 'Completed' : 'Enrolled'}
-                  </span>
-                )}
               </div>
+            </div>
+            {status && (
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded shrink-0 ${
+                status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-primary/10 text-primary'
+              }`}>
+                {status === 'completed' ? 'Completed' : 'Enrolled'}
+              </span>
+            )}
+          </div>
 
-              <h2 className="text-base font-bold text-on-surface mb-1 group-hover:text-primary transition-colors">
-                {sim.title}
-              </h2>
-              <p className="text-sm text-on-surface-variant leading-relaxed mb-4">
-                {sim.description}
-              </p>
+          <h2 className="text-base font-bold text-on-surface mb-1 group-hover:text-primary transition-colors">
+            {sim.title}
+          </h2>
+          <p className="text-sm text-on-surface-variant leading-relaxed mb-4">
+            {sim.description}
+          </p>
 
-              <div className="flex flex-wrap gap-1.5 mb-4">
-                {sim.skills.map(s => (
-                  <span key={s} className="text-xs bg-surface-high text-on-surface-variant px-2 py-0.5 rounded">{s}</span>
-                ))}
+          <div className="flex items-center gap-1.5 mb-4">
+            <span className="chip">{sim.tasks} Tasks</span>
+            <span className="chip">{sim.estimatedTime}</span>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5 mb-4">
+            {sim.skills.map(s => (
+              <span key={s} className="text-xs bg-surface-high text-on-surface-variant px-2 py-0.5 rounded">{s}</span>
+            ))}
+          </div>
+
+          {status && (
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-1 h-1.5 bg-surface-high rounded-full overflow-hidden">
+                <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${progress}%` }} />
               </div>
-
-              {status && (
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 h-1.5 bg-surface-high rounded-full overflow-hidden">
-                    <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${progress}%` }} />
-                  </div>
-                  <span className="text-xs text-on-surface-variant shrink-0">{tasksDone} / {sim.tasks} tasks</span>
-                </div>
-              )}
+              <span className="text-xs text-on-surface-variant shrink-0">{tasksDone} / {sim.tasks} tasks</span>
             </div>
+          )}
 
-            <div className="shrink-0 self-center flex flex-col items-stretch gap-2">
-              {isLoading ? (
-                <div className="w-28 h-9 bg-surface-high rounded-lg animate-pulse" />
-              ) : (
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleCTA() }}
-                  disabled={enrolling}
-                  className="btn-primary px-5 py-2.5 text-sm flex items-center justify-center gap-2"
-                >
-                  {enrolling && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-                  {enrolling
-                    ? 'Enrolling…'
-                    : status === 'completed'
-                    ? 'Review'
-                    : status
-                    ? 'Continue →'
-                    : 'Enroll & Start →'}
-                </button>
-              )}
-              {sim.overviewPath && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); navigate(sim.overviewPath) }}
-                  className="text-xs font-semibold text-primary hover:text-primary-dark transition-colors px-2 py-1 text-center cursor-pointer"
-                >
-                  View Full Details
-                </button>
-              )}
-            </div>
+          <div className="mt-auto pt-1 flex items-center gap-2">
+            {isLoading ? (
+              <div className="flex-1 h-9 bg-surface-high rounded-lg animate-pulse" />
+            ) : (
+              <button
+                onClick={(e) => { e.stopPropagation(); handleCTA() }}
+                disabled={enrolling}
+                className="flex-1 btn-primary px-5 py-2.5 text-sm flex items-center justify-center gap-2"
+              >
+                {enrolling && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                {enrolling
+                  ? 'Enrolling…'
+                  : status === 'completed'
+                  ? 'Review'
+                  : status
+                  ? 'Continue →'
+                  : 'Enroll & Start →'}
+              </button>
+            )}
+            {sim.overviewPath && (
+              <button
+                onClick={(e) => { e.stopPropagation(); navigate(sim.overviewPath) }}
+                className="shrink-0 text-xs font-semibold text-primary hover:text-primary-dark transition-colors px-2 py-1 text-center cursor-pointer"
+              >
+                Details
+              </button>
+            )}
           </div>
         </div>
       </div>

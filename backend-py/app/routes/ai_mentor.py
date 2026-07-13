@@ -10,7 +10,7 @@ from app.auth import get_current_user
 from app.models import User, Enrollment, TaskCompletion, MentorChatMessage, UserSkill, XpLedger
 from app.services.skill_engine import get_user_skills, compute_skill_gps
 from app.services.llm import stream_chat, generate
-from app.config import SKILL_LABELS, TASK_NAMES, TARGET_ROLE_REQUIREMENTS
+from app.config import SKILL_LABELS, SIM_TASK_NAMES, TARGET_ROLE_REQUIREMENTS
 
 router = APIRouter(prefix="/api", tags=["ai-mentor"])
 
@@ -45,8 +45,9 @@ Direct, warm, and practical. One good example beats a long explanation.\
 """
 
 
-def _week_for_task(task_id: int) -> int:
-    return 1 if task_id <= 2 else 2
+def _week_for_task(task_id: int, sim_id: str) -> int:
+    from app.routes.enrollments import SIM_TASK_WEEKS
+    return SIM_TASK_WEEKS.get(sim_id, {}).get(task_id, 1)
 
 def _build_context(user: User, skills: dict, enrollment: "Enrollment | None",
                    completed_task_ids: list[int], task_scores: dict, recent_xp: list,
@@ -69,14 +70,19 @@ def _build_context(user: User, skills: dict, enrollment: "Enrollment | None",
 
     # Enrollment / simulation progress
     if enrollment:
+        from app.routes.enrollments import SIM_WORK_TASK_IDS, SIM_TITLES
+        sim_id = enrollment.simulation_id
+        task_names = SIM_TASK_NAMES.get(sim_id, {})
+        work_task_ids = SIM_WORK_TASK_IDS.get(sim_id, [1, 2, 3, 4, 5])
+
         current_task = enrollment.current_task_idx
-        current_task_name = TASK_NAMES.get(current_task, f"Task {current_task}")
-        completed_names = [TASK_NAMES.get(t, f"Task {t}") for t in sorted(completed_task_ids)]
-        remaining = [TASK_NAMES.get(i, f"Task {i}") for i in TASK_NAMES if i not in completed_task_ids and i > 0]
+        current_task_name = task_names.get(current_task, f"Task {current_task}")
+        completed_names = [task_names.get(t, f"Task {t}") for t in sorted(completed_task_ids)]
+        remaining = [task_names.get(i, f"Task {i}") for i in work_task_ids if i not in completed_task_ids]
 
         score_details = []
         for task_id, info in task_scores.items():
-            name = TASK_NAMES.get(task_id, f"Task {task_id}")
+            name = task_names.get(task_id, f"Task {task_id}")
             parts = []
             if info.get("score") is not None:
                 parts.append(f"submission score {info['score']}/100")
@@ -85,21 +91,21 @@ def _build_context(user: User, skills: dict, enrollment: "Enrollment | None",
             if parts:
                 score_details.append(f"  - {name}: {', '.join(parts)}")
 
-        # Where the student is in the journey (onboarding → Week 1 → Week 2)
+        # Where the student is in the journey (onboarding → Week 1 → Week N)
         work_completed = [t for t in completed_task_ids if t > 0]
-        next_work = next((i for i in [1, 2, 3, 4, 5] if i not in work_completed), None)
+        next_work = next((i for i in work_task_ids if i not in work_completed), None)
         if not onboarding_accepted:
             journey_step = "Onboarding — has NOT accepted the offer letter yet (Week 1 not started)"
         elif next_work is None:
-            journey_step = "Finished — all 5 tasks complete"
+            journey_step = f"Finished — all {len(work_task_ids)} tasks complete"
         else:
-            journey_step = f"Week {_week_for_task(next_work)} — currently on {TASK_NAMES.get(next_work, f'Task {next_work}')}"
+            journey_step = f"Week {_week_for_task(next_work, sim_id)} — currently on {task_names.get(next_work, f'Task {next_work}')}"
 
         sim_block = f"""\
-Simulation: DA Job Simulation (status: {enrollment.status.value})
+Simulation: {SIM_TITLES.get(sim_id, sim_id)} (status: {enrollment.status.value})
 Journey step: {journey_step}
 Onboarding accepted: {'yes' if onboarding_accepted else 'no'}
-Completed tasks ({len(work_completed)}/5): {', '.join(completed_names) if completed_names else 'None yet'}
+Completed tasks ({len(work_completed)}/{len(work_task_ids)}): {', '.join(completed_names) if completed_names else 'None yet'}
 Remaining tasks: {', '.join(remaining) if remaining else 'All done!'}"""
         if score_details:
             sim_block += "\nTask performance:\n" + "\n".join(score_details)

@@ -10,7 +10,7 @@ from sqlalchemy import select
 from datetime import datetime, timedelta, timezone
 from app.database import AsyncSessionLocal
 from app.models import User, Enrollment, TaskCompletion, AgentMessage, EnrollmentStatus, MessageType
-from app.config import TASK_NAMES, INACTIVITY_DAYS
+from app.config import SIM_TASK_NAMES, INACTIVITY_DAYS
 
 scheduler = AsyncIOScheduler(timezone="UTC")
 
@@ -48,7 +48,7 @@ async def _active_enrollments():
 async def _daily_reminder():
     for enrollment, user in await _active_enrollments():
         done = await _completed_count(enrollment.id)
-        next_task = TASK_NAMES.get(done + 1, "your final review")
+        next_task = SIM_TASK_NAMES.get(enrollment.simulation_id, {}).get(done + 1, "your final review")
         content = (
             f"Reminder: your next task is \"{next_task}\". "
             f"You've completed {done}/5 tasks so far — keep the momentum going."
@@ -60,7 +60,7 @@ async def _deadline_check():
     now = datetime.now(timezone.utc)
     for enrollment, user in await _active_enrollments():
         done = await _completed_count(enrollment.id)
-        next_task = TASK_NAMES.get(done + 1, "your final review")
+        next_task = SIM_TASK_NAMES.get(enrollment.simulation_id, {}).get(done + 1, "your final review")
         deadline = enrollment.enrolled_at + timedelta(days=SIMULATION_DEADLINE_DAYS)
         days_left = (deadline - now).days
 
@@ -91,7 +91,7 @@ async def _inactivity_nudge():
         rows = result.all()
     for enrollment, user in rows:
         done = await _completed_count(enrollment.id)
-        next_task = TASK_NAMES.get(done + 1, "your simulation")
+        next_task = SIM_TASK_NAMES.get(enrollment.simulation_id, {}).get(done + 1, "your simulation")
         content = (
             f"You haven't logged in for {INACTIVITY_DAYS}+ days and \"{next_task}\" is still waiting. "
             f"Even 15 minutes today will move you forward."

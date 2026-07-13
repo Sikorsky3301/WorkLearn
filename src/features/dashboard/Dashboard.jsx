@@ -1,15 +1,30 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth, ROLES } from '../auth/AuthContext'
-import { useMyAssignment } from '../../shared/api/hooks'
+import { useMyAssignment, useSimulations } from '../../shared/api/hooks'
+import lumenLogoImg from '../../assets/lumen-logo.png'
+import enigmaLogoImg from '../../assets/enigma-logo.png'
+
+// Purely cosmetic per-simulation branding (logo + accent) — the backend has
+// no notion of a "logo," so this is a client-side lookup keyed by the
+// simulation id the backend already sends. Any simulation not listed here
+// (e.g. a future one) still renders — just without a logo/custom accent —
+// so the Dashboard never silently drops a simulation it doesn't recognize.
+const SIM_BRANDING = {
+  'da-job-sim':       { logo: lumenLogoImg, accentColor: 'bg-orange-500' },
+  'frontend-dev-sim': { logo: enigmaLogoImg, accentColor: 'bg-orange-500' },
+}
 
 export default function Dashboard() {
   const navigate = useNavigate()
   const { user, hasFeature } = useAuth()
   const { data: assignment, isLoading: assignmentLoading } = useMyAssignment()
+  const { data: simulationsData, isLoading: simulationsLoading } = useSimulations()
+  const simulations = simulationsData?.simulations ?? []
 
   const isUniStudent = user?.role === ROLES.UNIVERSITY_STUDENT
   const firstName    = user?.name?.split(' ')[0] || 'there'
   const xp           = user?.xp ?? 0
+  const assignmentPath = assignment?.simulation_id ? `/simulations/${assignment.simulation_id}` : '/simulations'
 
   return (
     <div className="max-w-container mx-auto px-6 py-8">
@@ -104,7 +119,7 @@ export default function Dashboard() {
                   )}
                   <button
                     className="btn-primary w-full text-xs py-2"
-                    onClick={() => navigate('/simulations/da-job-sim')}
+                    onClick={() => navigate(assignmentPath)}
                   >
                     Complete this task →
                   </button>
@@ -140,7 +155,7 @@ export default function Dashboard() {
                 <p className="text-xs text-on-surface-variant leading-relaxed mb-3">
                   {assignment.manager?.name} is waiting — accept your offer to begin Week 1 and earn your Journey badge.
                 </p>
-                <button className="btn-primary text-xs px-4 py-2" onClick={() => navigate('/simulations/da-job-sim')}>
+                <button className="btn-primary text-xs px-4 py-2" onClick={() => navigate(assignmentPath)}>
                   Review offer →
                 </button>
               </div>
@@ -152,9 +167,9 @@ export default function Dashboard() {
                   </svg>
                 </div>
                 <p className="text-sm font-medium mb-1">No task assigned yet</p>
-                <p className="text-xs leading-relaxed mb-3">Enroll in the Job Simulation and your manager will assign your first task.</p>
-                <button className="btn-primary text-xs px-4 py-2" onClick={() => navigate('/simulations/da-job-sim')}>
-                  Start Simulation →
+                <p className="text-xs leading-relaxed mb-3">Enroll in a Job Simulation and your manager will assign your first task.</p>
+                <button className="btn-primary text-xs px-4 py-2" onClick={() => navigate('/simulations')}>
+                  Browse Simulations →
                 </button>
               </div>
             )}
@@ -177,45 +192,62 @@ export default function Dashboard() {
         {/* ── Right: Simulation + quick links ── */}
         <div className="col-span-2 space-y-4">
           <div>
-            <span className="section-label">Job Simulation</span>
+            <span className="section-label">Job Simulations</span>
             <h2 className="text-lg font-bold text-on-surface mt-0.5 mb-1">Start your first real-world project</h2>
             <p className="text-sm text-on-surface-variant">Complete tasks, earn XP, and build verified skills.</p>
           </div>
 
-          {/* DA Job Sim card */}
-          <div
-            className="card p-0 overflow-hidden hover:border-primary transition-colors cursor-pointer group"
-            onClick={() => navigate('/simulations/da-job-sim')}
-          >
-            <div className="h-1.5 bg-primary w-full" />
-            <div className="p-5">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded bg-orange-100 text-orange-700">Data Analytics</span>
-                    <span className="chip">5 Tasks</span>
+          {/* Job simulation cards — pulled from the backend's simulation list,
+              not hardcoded, so a new simulation shows up here automatically. */}
+          <div className="space-y-3">
+            {simulationsLoading ? (
+              <div className="card p-0 h-32 animate-pulse bg-surface-high" />
+            ) : (
+              simulations.map(sim => {
+                const branding = SIM_BRANDING[sim.id]
+                return (
+                  <div
+                    key={sim.id}
+                    className="card p-0 overflow-hidden hover:border-primary transition-colors cursor-pointer group"
+                    onClick={() => navigate(`/simulations/${sim.id}`)}
+                  >
+                    <div className={`h-1.5 w-full ${branding?.accentColor ?? 'bg-primary'}`} />
+                    <div className="p-5">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2.5 mb-2.5">
+                            {branding?.logo && (
+                              <div className="h-8 w-8 shrink-0 rounded-lg border border-border bg-white flex items-center justify-center p-1">
+                                <img src={branding.logo} alt={sim.title} className="max-h-full max-w-full object-contain" />
+                              </div>
+                            )}
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-orange-100 text-orange-700">{sim.tag}</span>
+                            <span className="chip">{sim.tasks} Tasks</span>
+                          </div>
+                          <h3 className="font-bold text-on-surface text-base mb-1 group-hover:text-primary transition-colors">
+                            {sim.title}
+                          </h3>
+                          <p className="text-sm text-on-surface-variant leading-relaxed mb-4">
+                            {sim.description}
+                          </p>
+                          <div className="flex items-center gap-2 text-xs text-on-surface-variant flex-wrap">
+                            {(sim.skills ?? []).slice(0, 4).map(s => (
+                              <span key={s} className="bg-surface-high px-2 py-0.5 rounded">{s}</span>
+                            ))}
+                          </div>
+                        </div>
+                        <button
+                          className="btn-primary text-sm px-5 py-2.5 shrink-0 self-center"
+                          onClick={e => { e.stopPropagation(); navigate(`/simulations/${sim.id}`) }}
+                        >
+                          Start →
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <h3 className="font-bold text-on-surface text-base mb-1 group-hover:text-primary transition-colors">
-                    Junior Data Analyst — Job Simulation
-                  </h3>
-                  <p className="text-sm text-on-surface-variant leading-relaxed mb-4">
-                    Work through real DA tasks: SQL queries, Python EDA, customer segmentation, A/B testing, and data storytelling. Earn skill points and XP on every task.
-                  </p>
-                  <div className="flex items-center gap-2 text-xs text-on-surface-variant flex-wrap">
-                    <span className="bg-surface-high px-2 py-0.5 rounded">SQL</span>
-                    <span className="bg-surface-high px-2 py-0.5 rounded">Python</span>
-                    <span className="bg-surface-high px-2 py-0.5 rounded">Analytics</span>
-                    <span className="bg-surface-high px-2 py-0.5 rounded">Statistics</span>
-                  </div>
-                </div>
-                <button
-                  className="btn-primary text-sm px-5 py-2.5 shrink-0 self-center"
-                  onClick={e => { e.stopPropagation(); navigate('/simulations/da-job-sim') }}
-                >
-                  Start →
-                </button>
-              </div>
-            </div>
+                )
+              })
+            )}
           </div>
 
           {/* Quick navigation */}

@@ -7,7 +7,7 @@ from app.database import get_db
 from app.auth import get_current_user
 from app.models import Enrollment, EnrollmentStatus, TaskCompletion, AgentMessage, MessageType, UserBadge
 from app.services.skill_engine import award_task_completion
-from app.config import TASK_NAMES
+from app.config import SIM_TASK_NAMES
 
 router = APIRouter(prefix="/api", tags=["enrollments"])
 
@@ -18,7 +18,14 @@ SIMULATIONS = [
         "description": "Real-world DA tasks from Lumen Corporation: clean data, build reports, segment customers, run A/B tests, and deliver an executive brief.",
         "tag": "Data", "level": "Beginner", "tasks": 5, "estimated_hours": "4–6 hrs",
         "skills": ["SQL", "Python", "Analytics", "Data Visualization", "Statistics"],
-    }
+    },
+    {
+        "id": "frontend-dev-sim",
+        "title": "Frontend Developer Job Simulation",
+        "description": "Real-world frontend tickets from Enigma: build a responsive landing page, wire up interactivity, fetch live data, and ship a stateful React app.",
+        "tag": "Engineering", "level": "Beginner", "tasks": 5, "estimated_hours": "5–7 hrs",
+        "skills": ["HTML/CSS", "JavaScript", "React", "Accessibility", "State Management"],
+    },
 ]
 
 # The in-simulation manager who "assigns" tasks to the student
@@ -27,19 +34,47 @@ SIM_MANAGERS = {
         "name": "Priya Sharma", "role": "Growth & Analytics Manager",
         "company": "Lumen Corporation", "avatar": "PS",
     },
+    "frontend-dev-sim": {
+        "name": "Maya Chen", "role": "Frontend Engineering Lead",
+        "company": "Enigma", "avatar": "MC",
+    },
 }
 DEFAULT_MANAGER = {"name": "Your Manager", "role": "Simulation Manager", "company": "", "avatar": "M"}
 
+# Everything below is keyed by simulation_id first — two simulations both
+# number their tasks 1-5, so a bare task_id key would mix up briefs/weeks
+# across simulations (same pattern as SIM_TASK_IO/SIM_GRADERS in sandbox.py
+# and SIM_TASK_XP_AWARDS/SIM_TASK_SKILL_AWARDS in config.py).
+
 # One-line brief the manager attaches to each task
-TASK_BRIEFS = {
-    1: "Clean the raw order data and give me a one-page data-quality summary.",
-    2: "Build the monthly business review report — headline KPIs and where growth is coming from.",
-    3: "Segment our customers with RFM so we know who to prioritise.",
-    4: "Analyse the pricing A/B test and tell me which variant to ship.",
-    5: "Pull it together into an executive brief for leadership.",
+SIM_TASK_BRIEFS = {
+    "da-job-sim": {
+        1: "Clean the raw order data and give me a one-page data-quality summary.",
+        2: "Build the monthly business review report — headline KPIs and where growth is coming from.",
+        3: "Segment our customers with RFM so we know who to prioritise.",
+        4: "Analyse the pricing A/B test and tell me which variant to ship.",
+        5: "Pull it together into an executive brief for leadership.",
+    },
+    "frontend-dev-sim": {
+        1: "Build the landing hero section — semantic, responsive, no JS needed yet.",
+        2: "Wire up the navigation — mobile menu toggle and active-link highlighting.",
+        3: "Fetch and render the team directory from the API, with loading and error states.",
+        4: "Convert the directory list into a proper React component.",
+        5: "Build the task manager — add, complete, delete, and persist across reloads.",
+    },
 }
-WORK_TASK_IDS = [1, 2, 3, 4, 5]
-_SIM_TITLES = {s["id"]: s["title"] for s in SIMULATIONS}
+SIM_WORK_TASK_IDS = {
+    "da-job-sim": [1, 2, 3, 4, 5],
+    "frontend-dev-sim": [1, 2, 3, 4, 5],
+}
+# Which week each task belongs to — drives the Manager/AI Mentor's "Week N"
+# narration. da-job-sim is a 2-week program; frontend-dev-sim is 3 weeks
+# (basic -> intermediate -> advanced).
+SIM_TASK_WEEKS = {
+    "da-job-sim": {1: 1, 2: 1, 3: 2, 4: 2, 5: 2},
+    "frontend-dev-sim": {1: 1, 2: 1, 3: 2, 4: 2, 5: 3},
+}
+SIM_TITLES = {s["id"]: s["title"] for s in SIMULATIONS}
 
 # Badge granted when the student accepts the simulation's offer letter
 JOURNEY_BADGE_KEY = "sim_journey"
@@ -69,7 +104,10 @@ SIM_ONBOARDING = {
             "Analysing an A/B test and making a ship / no-ship call",
             "Turning analysis into a clear executive brief",
         ],
-        "projects": [{"id": i, "name": TASK_NAMES[i], "brief": TASK_BRIEFS[i]} for i in WORK_TASK_IDS],
+        "projects": [
+            {"id": i, "name": SIM_TASK_NAMES["da-job-sim"][i], "brief": SIM_TASK_BRIEFS["da-job-sim"][i]}
+            for i in SIM_WORK_TASK_IDS["da-job-sim"]
+        ],
         "offer": {
             "title": "Junior Data Analyst — Job Simulation",
             "role": "Junior Data Analyst",
@@ -81,6 +119,46 @@ SIM_ONBOARDING = {
                 "building the exact skills a junior data analyst needs on the job. "
                 "By accepting, you're committing to give each task a genuine attempt and to learn by doing. "
                 "We're excited to see what you deliver."
+            ),
+        },
+    },
+    "frontend-dev-sim": {
+        "company": {
+            "name": "Enigma", "industry": "B2B SaaS · Productivity Software",
+            "size": "~85 employees", "location": "Remote-first · US/EU",
+            "about": "Enigma builds a workspace platform teams use to plan, track, and ship their work in one place. "
+                     "The Web Platform team owns everything the customer actually sees and clicks — performance and polish are the product.",
+        },
+        "manager": SIM_MANAGERS["frontend-dev-sim"],
+        "intro": (
+            "Hey, welcome to the Web Platform team — excited to have you.\n\n"
+            "Here's how I work: I'll hand you tickets exactly like I would to any frontend engineer on the team. "
+            "Build the real thing, don't just make it look right — I'll be checking that it actually behaves correctly, not just that it renders.\n\n"
+            "You'll start with the fundamentals — markup and layout — and build up to a real interactive React feature by the end. "
+            "Let's get you set up."
+        ),
+        "learn": [
+            "Building accessible, responsive layouts with semantic HTML and CSS",
+            "Adding interactivity with vanilla JavaScript and the DOM API",
+            "Fetching and rendering async data with proper loading/error states",
+            "Writing your first React components with props and conditional rendering",
+            "Managing state in React with hooks and persisting it across sessions",
+        ],
+        "projects": [
+            {"id": i, "name": SIM_TASK_NAMES["frontend-dev-sim"][i], "brief": SIM_TASK_BRIEFS["frontend-dev-sim"][i]}
+            for i in SIM_WORK_TASK_IDS["frontend-dev-sim"]
+        ],
+        "offer": {
+            "title": "Frontend Developer — Job Simulation",
+            "role": "Frontend Developer",
+            "team": "Web Platform",
+            "company": "Enigma",
+            "body": (
+                "We're delighted to offer you a place on the Enigma Frontend Developer Job Simulation. "
+                "You'll work directly with your manager on five real tickets, going from a static landing page to a fully interactive React application, "
+                "building the exact skills a frontend developer needs on the job. "
+                "By accepting, you're committing to give each task a genuine attempt and to learn by doing. "
+                "We're excited to see what you ship."
             ),
         },
     },
@@ -125,25 +203,29 @@ async def my_assignment(db: AsyncSession = Depends(get_db), token: dict = Depend
         return {"has_assignment": False, "reason": "not_enrolled"}
 
     manager = SIM_MANAGERS.get(enrollment.simulation_id, DEFAULT_MANAGER)
+    sim_id = enrollment.simulation_id
+    work_task_ids = SIM_WORK_TASK_IDS.get(sim_id, [])
+    task_names = SIM_TASK_NAMES.get(sim_id, {})
+    task_briefs = SIM_TASK_BRIEFS.get(sim_id, {})
 
     completions = await db.execute(
         select(TaskCompletion.task_id).where(TaskCompletion.enrollment_id == enrollment.id)
     )
     completed_ids = {r[0] for r in completions}
-    completed_count = len([t for t in WORK_TASK_IDS if t in completed_ids])
-    next_task = next((t for t in WORK_TASK_IDS if t not in completed_ids), None)
+    completed_count = len([t for t in work_task_ids if t in completed_ids])
+    next_task = next((t for t in work_task_ids if t not in completed_ids), None)
 
     base = {
-        "simulation_id": enrollment.simulation_id,
-        "simulation_title": _SIM_TITLES.get(enrollment.simulation_id, enrollment.simulation_id),
+        "simulation_id": sim_id,
+        "simulation_title": SIM_TITLES.get(sim_id, sim_id),
         "enrollment_id": enrollment.id,
         "manager": manager,
         "completed_count": completed_count,
-        "total_tasks": len(WORK_TASK_IDS),
+        "total_tasks": len(work_task_ids),
     }
 
     # Enrolled but hasn't accepted the offer yet → onboarding is pending
-    if not await _has_journey_badge(db, user_id, enrollment.simulation_id):
+    if not await _has_journey_badge(db, user_id, sim_id):
         return {**base, "has_assignment": False, "reason": "onboarding_pending"}
 
     if next_task is None:
@@ -153,8 +235,8 @@ async def my_assignment(db: AsyncSession = Depends(get_db), token: dict = Depend
         **base,
         "has_assignment": True,
         "task_id": next_task,
-        "task_name": TASK_NAMES.get(next_task, f"Task {next_task}"),
-        "brief": TASK_BRIEFS.get(next_task, ""),
+        "task_name": task_names.get(next_task, f"Task {next_task}"),
+        "brief": task_briefs.get(next_task, ""),
         # True once they've completed at least one earlier task (i.e. actively in progress)
         "in_progress": completed_count > 0,
         "assigned_at": enrollment.enrolled_at.isoformat(),
@@ -208,7 +290,7 @@ async def accept_onboarding(
 
     # Idempotent badge grant
     if not await _has_journey_badge(db, user_id, sim_id):
-        title = _SIM_TITLES.get(sim_id, sim_id)
+        title = SIM_TITLES.get(sim_id, sim_id)
         badge = UserBadge(
             user_id=user_id, badge_key=JOURNEY_BADGE_KEY,
             label=f"{title} — Journey", icon="🎖️", simulation_id=sim_id,
@@ -264,24 +346,31 @@ async def complete_task(
     result = await db.execute(
         select(Enrollment).where(Enrollment.id == enrollment_id, Enrollment.user_id == user_id)
     )
-    if not result.scalar_one_or_none():
+    enrollment = result.scalar_one_or_none()
+    if not enrollment:
         raise HTTPException(404, "Enrollment not found")
+    sim_id = enrollment.simulation_id
 
-    awards = await award_task_completion(db, user_id, enrollment_id, task_id, body.score, body.quiz_score, body.rubric_rating)
+    awards = await award_task_completion(
+        db, user_id, enrollment_id, task_id, simulation_id=sim_id,
+        score=body.score, quiz_score=body.quiz_score, rubric_rating=body.rubric_rating,
+    )
 
-    # Check if all 5 tasks done → complete simulation
+    # Check if every task in this simulation is done → complete the simulation
+    work_task_ids = SIM_WORK_TASK_IDS.get(sim_id, [])
     count = await db.execute(
         select(TaskCompletion).where(TaskCompletion.enrollment_id == enrollment_id, TaskCompletion.task_id >= 1)
     )
-    if len(count.scalars().all()) >= 5:
+    if work_task_ids and len(count.scalars().all()) >= len(work_task_ids):
         await db.execute(
             update(Enrollment).where(Enrollment.id == enrollment_id).values(
                 status=EnrollmentStatus.COMPLETED, completed_at=datetime.now(timezone.utc)
             )
         )
+        sim_title = SIM_TITLES.get(sim_id, sim_id)
         db.add(AgentMessage(
             user_id=user_id, enrollment_id=enrollment_id, type=MessageType.REVIEW,
-            content=f"Congratulations! You completed the Junior DA Simulation and earned {awards['xp_awarded']} XP on your final task. Your Skill GPS has been updated."
+            content=f"Congratulations! You completed the {sim_title} and earned {awards['xp_awarded']} XP on your final task. Your Skill GPS has been updated."
         ))
         await db.commit()
 
@@ -310,7 +399,7 @@ async def _spawn_manager_welcome(user_id: str, enrollment_id: str, sim_id: str):
         if not user:
             return
         manager = SIM_MANAGERS.get(sim_id, DEFAULT_MANAGER)
-        first_task = TASK_NAMES.get(1, "Task 1")
+        first_task = SIM_TASK_NAMES.get(sim_id, {}).get(1, "Task 1")
         content = (
             f"Welcome to the team, {user.name}! I'm {manager['name']}, your {manager['role']}. "
             f"Your first assignment is \"{first_task}\" — head to the Job Simulation to get started."
