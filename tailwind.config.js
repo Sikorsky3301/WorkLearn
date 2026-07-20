@@ -1,3 +1,6 @@
+import tailwindcssAnimate from 'tailwindcss-animate'
+import typography from '@tailwindcss/typography'
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
@@ -40,7 +43,15 @@ export default {
       maxWidth: {
         container: '1280px',
       },
+      keyframes: {
+        scroll: {
+          to: { transform: 'translate(calc(-50% - 0.5rem))' },
+        },
+      },
+      animation: {
+        scroll: 'scroll var(--animation-duration, 40s) var(--animation-direction, forwards) linear infinite',
+      },
     },
   },
-  plugins: [],
+  plugins: [tailwindcssAnimate, typography],
 }

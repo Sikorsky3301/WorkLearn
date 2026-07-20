@@ -1,4 +1,13 @@
+from pathlib import Path
+from pydantic import Field, AliasChoices
 from pydantic_settings import BaseSettings
+
+# Anchored to this file's location, not the process's current working
+# directory — pydantic-settings resolves a relative env_file against CWD at
+# launch, so starting uvicorn from anywhere other than backend-py/ silently
+# finds no .env and every setting falls back to its hardcoded default
+# (empty API keys, etc.) with no error.
+_ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 
 
 class Settings(BaseSettings):
@@ -14,6 +23,18 @@ class Settings(BaseSettings):
     ai_provider: str = "anthropic"  # anthropic | gemini | groq
     frontend_url: str = "http://localhost:5173"
     port: int = 3001
+
+    # Langfuse tracing — tracing is skipped entirely (no overhead, no log
+    # noise) unless both keys are set. See app/services/langfuse_client.py.
+    langfuse_public_key: str = ""
+    langfuse_secret_key: str = ""
+    # Langfuse's own docs/UI call this "Base URL" in some places and "Host"
+    # (the actual Python SDK env var) in others — accept either env var name
+    # so LANGFUSE_BASE_URL doesn't blow up startup with "extra_forbidden".
+    langfuse_host: str = Field(
+        default="https://cloud.langfuse.com",
+        validation_alias=AliasChoices("LANGFUSE_HOST", "LANGFUSE_BASE_URL"),
+    )
 
     # Sandbox: docker daemon must be installed on the host and the image
     # pre-built — see backend-py/sandboxes/README.md
@@ -37,7 +58,7 @@ class Settings(BaseSettings):
     sandbox_startup_timeout_seconds: int = 30
 
     class Config:
-        env_file = ".env"
+        env_file = _ENV_FILE
 
 
 settings = Settings()
@@ -66,6 +87,16 @@ SIM_TASK_XP_AWARDS: dict[str, dict[int, int]] = {
         4: 100,  # Task 4 — React Component
         5: 120,  # Task 5 — Task Manager App
     },
+    "sales-crm-sim": {
+        1: 40,   # Stage 1 — Lead Qualification
+        2: 50,   # Stage 2 — Research
+        3: 70,   # Stage 3 — Cold Outreach
+        4: 100,  # Stage 4 — Discovery Call
+        5: 90,   # Stage 5 — CRM Pipeline Management
+        6: 100,  # Stage 6 — Objection Handling
+        7: 80,   # Stage 7 — Proposal
+        8: 120,  # Stage 8 — Close
+    },
 }
 
 SIM_TASK_SKILL_AWARDS: dict[str, dict[int, dict[str, int]]] = {
@@ -82,6 +113,16 @@ SIM_TASK_SKILL_AWARDS: dict[str, dict[int, dict[str, int]]] = {
         3: {"javascript": 15, "async_data": 15},
         4: {"react": 20, "component_design": 15},
         5: {"react": 15, "state_management": 25},
+    },
+    "sales-crm-sim": {
+        1: {"sales_research": 10, "crm_accuracy": 5},
+        2: {"sales_research": 20},
+        3: {"email_writing": 20, "communication": 10},
+        4: {"discovery": 25, "communication": 15},
+        5: {"crm_accuracy": 25},
+        6: {"objection_handling": 25, "negotiation": 10},
+        7: {"negotiation": 15, "communication": 10},
+        8: {"closing": 25, "negotiation": 15},
     },
 }
 
@@ -121,6 +162,16 @@ TARGET_ROLE_REQUIREMENTS: dict[str, dict[str, int]] = {
         "component_design": 40,
         "state_management": 35,
     },
+    "junior_sales_rep": {
+        "sales_research": 40,
+        "email_writing": 40,
+        "discovery": 50,
+        "crm_accuracy": 50,
+        "objection_handling": 45,
+        "negotiation": 40,
+        "closing": 45,
+        "communication": 55,
+    },
 }
 
 SKILL_LABELS: dict[str, str] = {
@@ -142,6 +193,13 @@ SKILL_LABELS: dict[str, str] = {
     "react": "React",
     "component_design": "Component Design",
     "state_management": "State Management",
+    "sales_research": "Sales Research",
+    "email_writing": "Email Writing",
+    "discovery": "Discovery & Qualification",
+    "crm_accuracy": "CRM Accuracy",
+    "objection_handling": "Objection Handling",
+    "negotiation": "Negotiation",
+    "closing": "Closing",
 }
 
 SIM_TASK_NAMES: dict[str, dict[int, str]] = {
@@ -160,6 +218,16 @@ SIM_TASK_NAMES: dict[str, dict[int, str]] = {
         3: "Task 3 — Fetch & Render Data",
         4: "Task 4 — React Component",
         5: "Task 5 — Task Manager App",
+    },
+    "sales-crm-sim": {
+        1: "Stage 1 — Lead Qualification",
+        2: "Stage 2 — Research",
+        3: "Stage 3 — Cold Outreach",
+        4: "Stage 4 — Discovery Call",
+        5: "Stage 5 — CRM Pipeline Management",
+        6: "Stage 6 — Objection Handling",
+        7: "Stage 7 — Proposal",
+        8: "Stage 8 — Close",
     },
 }
 

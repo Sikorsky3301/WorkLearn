@@ -5,7 +5,7 @@
 
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              ENTRY POINTS                                   │
+│                              ENTRY POINTS
 │                                                                             │
 │    /login                /university/login            /mentor/login         │
 │   (Direct Users)         (University Students)        (Class Mentors)       │
@@ -229,10 +229,29 @@ USER       ADMIN                  │                          │
   │   │   └── CourseDetails.jsx        → /courses/:id
   │   │
   │   ├── simulations/
-  │   │   ├── DASimulationWorkspace.jsx→ /simulations/da-job-sim
+  │   │   │   (shared across every simulation — browse/enroll, offer-letter
+  │   │   │    onboarding, evaluation results; nothing sim-specific here)
   │   │   ├── SimulationWorkspace.jsx  → /simulations
+  │   │   ├── SimOnboarding.jsx        ← offer-letter/onboarding, sim-parameterized
   │   │   ├── EvaluationResult.jsx     → /evaluations/:id
-  │   │   └── JupyterPlayground.jsx    ← embedded component
+  │   │   │
+  │   │   │   (one folder per simulation — everything for that sim lives here)
+  │   │   ├── da-job-sim/
+  │   │   │   ├── DASimulationWorkspace.jsx → /simulations/da-job-sim
+  │   │   │   ├── SimulationOverview.jsx    → /simulations/da-job-sim/overview
+  │   │   │   └── JupyterPlayground.jsx     ← embedded component
+  │   │   ├── frontend-dev-sim/
+  │   │   │   ├── FrontendSimulationWorkspace.jsx → /simulations/frontend-dev-sim
+  │   │   │   ├── FrontendSimulationOverview.jsx  → /simulations/frontend-dev-sim/overview
+  │   │   │   └── FrontendPlayground.jsx          ← embedded component
+  │   │   └── sales-crm-sim/
+  │   │       ├── CrmSimShell.jsx       → /simulations/sales-crm-sim
+  │   │       ├── CrmSimOverview.jsx    → /simulations/sales-crm-sim/overview
+  │   │       ├── engine/               ← stage config, Zustand store glue, scoring
+  │   │       ├── store/                ← useCrmSimStore (Zustand + localStorage)
+  │   │       ├── stages/               ← Stage1..Stage8 + the Stage5Crm/ mini-CRM
+  │   │       ├── results/              ← SimResults, replay, certificate
+  │   │       ├── ai/, data/            ← AI persona metadata, seed scenario data
   │   │
   │   ├── portfolio/     Portfolio.jsx          → /portfolio
   │   ├── ai-mentor/     CareerTwin.jsx         → /ai-mentor

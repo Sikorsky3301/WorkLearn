@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from './features/auth/AuthContext'
+import { Toaster } from './shared/ui/shadcn/sonner'
 import App from './App'
 import './index.css'
 
@@ -44,7 +45,7 @@ class ErrorBoundary extends React.Component {
               className="px-4 py-2 bg-indigo-900 text-white text-sm font-semibold rounded-lg hover:bg-indigo-800"
             >
               Go to Dashboard
-            </button>
+            </button>/
           </div>
         </div>
       )
@@ -60,6 +61,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <App />
+            <Toaster />
           </AuthProvider>
         </QueryClientProvider>
       </BrowserRouter>

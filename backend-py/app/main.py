@@ -3,8 +3,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import engine, Base
-from app.routes import auth, enrollments, ai_mentor, agent_messages, analytics, admin, mentor, sandbox
+from app.routes import auth, enrollments, ai_mentor, agent_messages, analytics, admin, mentor, sandbox, crm_sim
 from app.agents.manager import start_scheduler
+from app.services.langfuse_client import init_langfuse, shutdown_langfuse, langfuse_enabled
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -19,12 +20,18 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[manager] scheduler failed to start: {e}")
 
+    # Langfuse tracing — registers the SDK singleton get_client() reuses
+    # elsewhere; no-ops if LANGFUSE_PUBLIC_KEY/LANGFUSE_SECRET_KEY aren't set.
+    init_langfuse()
+    print(f"[langfuse] tracing {'enabled' if langfuse_enabled else 'disabled (no API keys configured)'}")
+
     yield
 
     # Shutdown
     from app.agents.manager import scheduler
     if scheduler.running:
         scheduler.shutdown(wait=False)
+    shutdown_langfuse()
 
 app = FastAPI(title="WorkAlearn API", lifespan=lifespan)
 
@@ -60,6 +67,7 @@ app.include_router(analytics.router)
 app.include_router(admin.router)
 app.include_router(mentor.router)
 app.include_router(sandbox.router)
+app.include_router(crm_sim.router)
 
 @app.get("/health")
 async def health():

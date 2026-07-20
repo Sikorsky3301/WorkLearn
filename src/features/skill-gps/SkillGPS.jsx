@@ -240,15 +240,6 @@ export default function SkillGPS() {
         </div>
       )}
 
-      <footer className="mt-10 border-t border-border pt-4 flex items-center justify-between text-xs text-on-surface-variant">
-        <span>WorkLearn AI</span>
-        <div className="flex gap-4">
-          <a href="#" className="hover:text-primary">Terms</a>
-          <a href="#" className="hover:text-primary">Privacy</a>
-          <a href="#" className="hover:text-primary">Help Center</a>
-        </div>
-        <span>© 2024 WorkLearn AI. All rights reserved.</span>
-      </footer>
     </div>
   )
 }

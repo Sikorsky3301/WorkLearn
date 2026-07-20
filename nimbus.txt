@@ -1,0 +1,234 @@
+====================================================================
+NIMBUS CRM SIMULATION — TEST ANSWER SHEET
+Enterprise SaaS Sales Representative @ Nimbus CRM
+Target account: Atlas Forge Manufacturing (Marcus Webb, VP of Operations)
+====================================================================
+Copy/paste these into each stage to move through the simulation quickly.
+Everything below is written to be internally consistent (same numbers,
+same names) so later stages don't contradict earlier ones.
+
+
+--------------------------------------------------------------------
+STAGE 1 — LEAD QUALIFICATION
+--------------------------------------------------------------------
+Lead score: 78
+
+Buying intent: High
+
+Priority: High
+
+Notes:
+New VP of Sales has a 90-day mandate to fix pipeline visibility. Inbound
+demo request is a strong signal, not cold outbound.
+
+Reasoning (40+ characters required):
+Atlas Forge shows multiple concrete buying signals: an inbound demo
+request, a newly hired VP of Sales publicly asking for better pipeline
+visibility, and an open sales-ops req suggesting budget already exists.
+Revenue and headcount are a good fit for our mid-market motion, and the
+90-day executive mandate creates real urgency rather than a vague
+"someday" project.
+
+
+--------------------------------------------------------------------
+STAGE 2 — RESEARCH
+--------------------------------------------------------------------
+Pain points:
+No shared pipeline visibility — leadership only learns a deal slipped
+after it's already lost. Manual spreadsheet tracking is error-prone
+across a 6-9 month sales cycle, and the new EV product line means reps
+are prospecting a buyer persona they have no playbook for.
+
+Opportunities:
+Nimbus CRM directly fixes the forecast-accuracy problem (Q3 was off by
+34%) and gives Elena Kade the pipeline visibility she was hired to
+deliver in 90 days. We can also help build the new EV-buyer playbook as
+part of onboarding, which HubSpot never offered them.
+
+Risks:
+Priya Anand (Procurement) is running a competing ERP-bundled CRM bid, so
+price/contract terms will get scrutinized closely. They also rejected
+HubSpot 8 months ago for being "too marketing-focused" — need to prove
+Nimbus is built for long industrial sales cycles, not another mismatch.
+
+
+--------------------------------------------------------------------
+STAGE 3 — COLD OUTREACH
+--------------------------------------------------------------------
+Subject:
+Fixing Atlas Forge's Q3 forecast miss (34% off)
+
+Body (paste into the rich text editor):
+Hi Marcus,
+
+Congrats on the new EV component line — exciting move for Atlas Forge.
+
+I noticed your team is still tracking deals across spreadsheets, and
+that Q3 forecast landed 34% off actuals. With a 6-9 month sales cycle,
+that gap usually means deals are slipping through the cracks before
+leadership ever sees them.
+
+Nimbus CRM gives manufacturing sales teams real-time pipeline visibility
+without the manual data entry — exactly what Elena mentioned needing
+when she came on board six weeks ago.
+
+Worth a 15-minute call this week to see if it's a fit?
+
+Best,
+[Your name]
+Nimbus CRM
+
+Call to action:
+Book a 15-minute call this week
+
+Then click "Grade my email" to get the AI score before continuing.
+
+
+--------------------------------------------------------------------
+STAGE 4 — DISCOVERY CALL (chat with Marcus Webb, VP of Operations)
+--------------------------------------------------------------------
+Send these messages one at a time (need 6+ total messages, so 3-4 from
+you is enough since each reply from Marcus also counts):
+
+1. "Hi Marcus, thanks for taking the call. Before I dive in, can you
+   walk me through how your team currently tracks deals day to day?"
+2. "That forecast miss last quarter — what did that actually cost you
+   with leadership? Did it change any budget conversations?"
+3. "With the new EV line, are your reps prospecting a completely
+   different buyer than your usual automotive contacts?"
+4. "If we could get you real pipeline visibility before your 90-day
+   mark with the CEO, what would that be worth to you?"
+
+Budget noted:
+Sales-ops headcount is already approved this fiscal year — budget likely exists.
+
+Timeline noted:
+Elena has a 90-day mandate from the CEO to show pipeline improvement.
+
+Call notes:
+Marcus confirmed spreadsheets + a legacy on-prem CRM. Q3 forecast miss
+was a visible embarrassment with leadership. EV line means reps have no
+playbook for the new buyer persona. Elena Kade (new VP Sales) is the
+real economic buyer and champion internally.
+
+
+--------------------------------------------------------------------
+STAGE 5 — CRM (work the deal)
+--------------------------------------------------------------------
+ACCOUNT
+  Account name: Atlas Forge Manufacturing
+  Industry: Industrial Manufacturing
+  Website: atlasforge.com
+  Phone: (330) 555-0142
+
+CONTACT
+  Full name: Marcus Webb
+  Title: VP of Operations
+  Account: Atlas Forge Manufacturing (select the one you just created)
+  Email: marcus.webb@atlasforge.com
+  Phone: (330) 555-0198
+
+OPPORTUNITY
+  Opportunity name: Atlas Forge — Nimbus CRM Platform
+  Account: Atlas Forge Manufacturing
+  Contact: Marcus Webb
+  Stage: Needs Analysis
+  Probability: 25 (auto-fills when you pick the stage)
+  Amount: 96000
+  Expected close date: pick a date ~60-90 days out
+
+TASK
+  Task: Follow up with Elena Kade to confirm budget sign-off
+  Due date: pick a date ~1 week out
+  Priority: High
+
+(Optional) ACTIVITY — quick add:
+  Type: Call
+  Subject: Discovery call with Marcus Webb
+  Notes: Confirmed pain points, budget signal, and 90-day timeline.
+
+
+--------------------------------------------------------------------
+STAGE 6 — OBJECTION HANDLING (chat with Ray Dominguez, CFO)
+--------------------------------------------------------------------
+Send these messages (need 4+ total messages):
+
+1. "Hi Ray, I know price and ROI are top of mind for you — happy to walk
+   through the numbers whenever you're ready."
+2. "Totally fair to compare us against the ERP bundle. The difference is
+   Nimbus is purpose-built for long B2B sales cycles like yours, not a
+   bolt-on — that's exactly why HubSpot didn't work out for you last year."
+3. "If we can show this pays for itself by closing the Q3-style forecast
+   gap alone, would that change how you're weighing the two options?"
+4. "I can put together a 12-month ROI breakdown tied to the forecast
+   accuracy number Marcus gave me — would that help with your board
+   approval process?"
+
+Objection tracker — mark these:
+  "Too expensive"              → Raised, then Resolved
+  "Already using another CRM"  → Raised, then Resolved
+
+
+--------------------------------------------------------------------
+STAGE 7 — PROPOSAL
+--------------------------------------------------------------------
+Executive Summary:
+Atlas Forge Manufacturing needs real-time pipeline visibility to fix a
+34% forecast miss and support Elena Kade's 90-day sales modernization
+mandate. Nimbus CRM delivers that visibility without adding manual data
+entry, and helps build a playbook for the new EV buyer persona.
+
+Business Problems:
+No shared pipeline visibility across the sales team. Manual, error-prone
+spreadsheet tracking over 6-9 month sales cycles. No existing playbook
+for the new EV-manufacturer buyer persona. Forecast accuracy missed by
+34% last quarter, undermining leadership's trust in sales reporting.
+
+Recommended Solution:
+Nimbus CRM's AI Sales Platform — centralized pipeline, automated data
+capture to eliminate manual entry, and forecast accuracy tooling built
+for long industrial sales cycles rather than fast-moving transactional
+sales.
+
+Implementation Plan:
+Phase 1 (Weeks 1-2): account/contact/opportunity migration from
+spreadsheets. Phase 2 (Weeks 3-4): rep training on pipeline hygiene and
+EV-buyer playbook. Phase 3 (Week 5+): forecast accuracy review cadence
+with Elena and leadership.
+
+Expected ROI:
+Closing even half of last quarter's 34% forecast gap on a ~$85M revenue
+base represents meaningful recovered/ predictable revenue — plus hours
+saved per rep per week from eliminating manual spreadsheet updates.
+
+Timeline:
+Contract signed → onboarding kickoff within 5 business days → full team
+live within 30 days, ahead of Elena's 90-day mandate deadline.
+
+Pricing Summary:
+$96,000 annual contract, matching the opportunity logged in the CRM —
+includes onboarding, EV-buyer playbook setup, and quarterly forecast
+accuracy reviews.
+
+
+--------------------------------------------------------------------
+STAGE 8 — CLOSE
+--------------------------------------------------------------------
+Click each action button in order:
+  1. Schedule Demo
+  2. Request Signature
+  3. Book Follow-up
+  4. Create Onboarding Task
+
+Negotiation notes (paste into the textarea):
+Ray pushed on price versus the ERP bundle; agreed to hold at $96,000 in
+exchange for a quarterly forecast-accuracy review commitment instead of
+a discount. Elena confirmed sign-off pending final CFO approval.
+
+Final step — Update Opportunity Stage:
+  Select "Closed Won" → click Update
+
+That completes all 8 stages — you should land on the Results screen with
+an overall score, radar chart, strengths/weaknesses, and a hiring
+recommendation. From there "View Full Replay" shows the transcript and
+event-log timeline.

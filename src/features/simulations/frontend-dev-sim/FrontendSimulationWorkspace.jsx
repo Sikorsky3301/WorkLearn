@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import FrontendPlayground, { SandboxResultPanel } from './FrontendPlayground'
-import { useEnrollment, useEnroll, useCompleteTask, useOnboarding } from '../../shared/api/hooks'
-import SimOnboarding from './SimOnboarding'
-import enigmaLogoImg from '../../assets/enigma-logo.png'
+import { useEnrollment, useEnroll, useCompleteTask, useOnboarding } from '../../../shared/api/hooks'
+import SimOnboarding from '../SimOnboarding'
+import enigmaLogoImg from '../../../assets/enigma-logo.png'
 
 // ── Enigma brand mark — wordmark image, sized by height only ───────────────
 function EnigmaLogo({ size = 'md' }) {

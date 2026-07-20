@@ -29,6 +29,7 @@ export function useEnroll(simId) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['enrollment', simId] })
       qc.invalidateQueries({ queryKey: ['my-assignment'] })
+      qc.invalidateQueries({ queryKey: ['my-assignments'] })
     },
   })
 }
@@ -71,11 +72,21 @@ export function useSandboxFileRows(enrollmentId, taskId, filename, page, pageSiz
   })
 }
 
-// Current task assigned by the simulation manager (for the Dashboard)
+// Current task assigned by the simulation manager, most-recent enrollment only.
 export function useMyAssignment() {
   return useQuery({
     queryKey: ['my-assignment'],
     queryFn: () => api.get('/api/my-assignment'),
+    staleTime: 30_000,
+  })
+}
+
+// One manager/task summary per enrolled simulation — what the Dashboard uses
+// so a student running multiple job simulations sees every manager at once.
+export function useMyAssignments() {
+  return useQuery({
+    queryKey: ['my-assignments'],
+    queryFn: () => api.get('/api/my-assignments'),
     staleTime: 30_000,
   })
 }
@@ -97,6 +108,7 @@ export function useAcceptOnboarding(simId) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['onboarding', simId] })
       qc.invalidateQueries({ queryKey: ['my-assignment'] })
+      qc.invalidateQueries({ queryKey: ['my-assignments'] })
       qc.invalidateQueries({ queryKey: ['badges'] })
     },
   })
@@ -125,6 +137,7 @@ export function useCompleteTask(enrollmentId) {
       qc.invalidateQueries({ queryKey: ['skills'] })
       qc.invalidateQueries({ queryKey: ['agent-messages'] })
       qc.invalidateQueries({ queryKey: ['my-assignment'] })
+      qc.invalidateQueries({ queryKey: ['my-assignments'] })
     },
   })
 }
@@ -242,6 +255,28 @@ export function useDeleteEnrollment() {
       qc.invalidateQueries({ queryKey: ['admin-users'] })
       qc.invalidateQueries({ queryKey: ['admin-stats'] })
     },
+  })
+}
+
+// Sales CRM job simulation — AI-backed endpoints (grading, AI customer,
+// final scoring). CRM entity data itself lives in the sim's own Zustand
+// store (useCrmSimStore), not React Query — these hooks only cover the
+// calls that need a real LLM.
+export function useGradeEmail() {
+  return useMutation({
+    mutationFn: (body) => api.post('/api/crm-sim/grade-email', body),
+  })
+}
+
+export function useAiCustomer() {
+  return useMutation({
+    mutationFn: (body) => api.post('/api/crm-sim/ai-customer', body),
+  })
+}
+
+export function useFinalScore() {
+  return useMutation({
+    mutationFn: (body) => api.post('/api/crm-sim/final-score', body),
   })
 }
 

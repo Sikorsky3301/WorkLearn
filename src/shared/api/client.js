@@ -1,15 +1,19 @@
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
 
+// sessionStorage (not localStorage) — scoped per browser tab, not per
+// origin, so logging in as a different role in another tab doesn't stomp
+// on this tab's session. Trade-off: the session doesn't survive closing
+// the tab (only a same-tab refresh), which is the point.
 function getToken() {
-  return localStorage.getItem('wl_token')
+  return sessionStorage.getItem('wl_token')
 }
 
 export function setToken(token) {
-  localStorage.setItem('wl_token', token)
+  sessionStorage.setItem('wl_token', token)
 }
 
 export function clearToken() {
-  localStorage.removeItem('wl_token')
+  sessionStorage.removeItem('wl_token')
 }
 
 async function request(path, options = {}) {

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import Editor from '@monaco-editor/react'
-import { useSubmitSandbox } from '../../shared/api/hooks'
+import { useSubmitSandbox } from '../../../shared/api/hooks'
 
 const MIN_HEIGHT = 280
 const MAX_HEIGHT = 900

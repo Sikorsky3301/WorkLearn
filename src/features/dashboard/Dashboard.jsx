@@ -1,30 +1,34 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth, ROLES } from '../auth/AuthContext'
-import { useMyAssignment, useSimulations } from '../../shared/api/hooks'
+import { useMyAssignments, useSimulations } from '../../shared/api/hooks'
 import lumenLogoImg from '../../assets/lumen-logo.png'
 import enigmaLogoImg from '../../assets/enigma-logo.png'
+import nimbusLogoImg from '../../assets/nimbus-logo.png'
+import derekHoltPhoto from '../../assets/derek-holt.jpg'
 
-// Purely cosmetic per-simulation branding (logo + accent) — the backend has
-// no notion of a "logo," so this is a client-side lookup keyed by the
-// simulation id the backend already sends. Any simulation not listed here
-// (e.g. a future one) still renders — just without a logo/custom accent —
-// so the Dashboard never silently drops a simulation it doesn't recognize.
+// Purely cosmetic per-simulation branding (logo + accent + manager photo) —
+// the backend has no notion of any of these, so this is a client-side
+// lookup keyed by the simulation id the backend already sends. Any
+// simulation not listed here (e.g. a future one) still renders — just
+// without branding/a photo — so the Dashboard never silently drops a
+// simulation it doesn't recognize.
 const SIM_BRANDING = {
   'da-job-sim':       { logo: lumenLogoImg, accentColor: 'bg-orange-500' },
   'frontend-dev-sim': { logo: enigmaLogoImg, accentColor: 'bg-orange-500' },
+  'sales-crm-sim':    { logo: nimbusLogoImg, accentColor: 'bg-blue-600', managerPhoto: derekHoltPhoto },
 }
 
 export default function Dashboard() {
   const navigate = useNavigate()
   const { user, hasFeature } = useAuth()
-  const { data: assignment, isLoading: assignmentLoading } = useMyAssignment()
+  const { data: assignmentsData, isLoading: assignmentsLoading } = useMyAssignments()
   const { data: simulationsData, isLoading: simulationsLoading } = useSimulations()
   const simulations = simulationsData?.simulations ?? []
+  const assignments = assignmentsData?.assignments ?? []
 
   const isUniStudent = user?.role === ROLES.UNIVERSITY_STUDENT
   const firstName    = user?.name?.split(' ')[0] || 'there'
   const xp           = user?.xp ?? 0
-  const assignmentPath = assignment?.simulation_id ? `/simulations/${assignment.simulation_id}` : '/simulations'
 
   return (
     <div className="max-w-container mx-auto px-6 py-8">
@@ -63,104 +67,27 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-3 gap-6">
 
-        {/* ── Left: Manager + XP ── */}
+        {/* ── Left: Managers + XP ── */}
         <div className="col-span-1 space-y-4">
 
-          {/* Manager-assigned task */}
-          <div className="card">
-            <div className="flex items-center justify-between mb-4">
+          {/* Managers + assigned tasks — one card per enrolled simulation, so
+              running multiple job simulations at once shows every manager. */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
               <div>
-                <span className="section-label">Your Manager</span>
-                <h3 className="font-bold text-on-surface mt-0.5">Assigned Task</h3>
-              </div>
-              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white text-xs font-bold">
-                {assignment?.manager?.avatar || 'AI'}
+                <span className="section-label">{assignments.length > 1 ? 'Your Managers' : 'Your Manager'}</span>
+                <h3 className="font-bold text-on-surface mt-0.5">
+                  {assignments.length > 1 ? `${assignments.length} Active Simulations` : 'Assigned Task'}
+                </h3>
               </div>
             </div>
 
-            {assignmentLoading ? (
-              <div className="flex items-center justify-center py-10">
+            {assignmentsLoading ? (
+              <div className="card flex items-center justify-center py-10">
                 <span className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
-            ) : assignment?.has_assignment ? (
-              <div>
-                {/* Which job simulation this manager belongs to */}
-                <div className="inline-flex items-center gap-1.5 mb-3 px-2 py-1 rounded-md bg-primary/5 border border-primary/15">
-                  <span className="text-[10px]">💼</span>
-                  <span className="text-[11px] font-semibold text-primary truncate">{assignment.simulation_title}</span>
-                </div>
-
-                {/* Manager identity — scoped to this simulation */}
-                <div className="flex items-center gap-2.5 mb-3">
-                  <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
-                    {assignment.manager.avatar}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-on-surface leading-tight truncate">{assignment.manager.name}</p>
-                    <p className="text-xs text-on-surface-variant truncate">
-                      {assignment.manager.role}{assignment.manager.company ? ` · ${assignment.manager.company}` : ''}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Assignment detail */}
-                <div className="border border-border rounded-xl p-3.5 bg-surface-low">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${assignment.in_progress ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
-                      {assignment.in_progress ? 'In progress' : 'New assignment'}
-                    </span>
-                    <span className="text-[11px] text-on-surface-variant">
-                      {assignment.completed_count}/{assignment.total_tasks} done
-                    </span>
-                  </div>
-                  <p className="font-bold text-on-surface text-sm mb-1">{assignment.task_name}</p>
-                  {assignment.brief && (
-                    <p className="text-xs text-on-surface-variant leading-relaxed mb-3">"{assignment.brief}"</p>
-                  )}
-                  <button
-                    className="btn-primary w-full text-xs py-2"
-                    onClick={() => navigate(assignmentPath)}
-                  >
-                    Complete this task →
-                  </button>
-                </div>
-                <p className="text-[11px] text-on-surface-variant mt-2 text-center">
-                  Needs to be completed to advance your simulation.
-                </p>
-              </div>
-            ) : assignment?.reason === 'completed' ? (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                {assignment.simulation_title && (
-                  <div className="inline-flex items-center gap-1.5 mb-3 px-2 py-1 rounded-md bg-primary/5 border border-primary/15">
-                    <span className="text-[10px]">💼</span>
-                    <span className="text-[11px] font-semibold text-primary truncate">{assignment.simulation_title}</span>
-                  </div>
-                )}
-                <div className="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center mb-3 text-lg">✓</div>
-                <p className="text-sm font-medium text-on-surface mb-1">All tasks completed!</p>
-                <p className="text-xs text-on-surface-variant leading-relaxed">
-                  You've finished every task {assignment.manager?.name} assigned. Your Skill GPS is updated.
-                </p>
-              </div>
-            ) : assignment?.reason === 'onboarding_pending' ? (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                {assignment.simulation_title && (
-                  <div className="inline-flex items-center gap-1.5 mb-3 px-2 py-1 rounded-md bg-primary/5 border border-primary/15">
-                    <span className="text-[10px]">💼</span>
-                    <span className="text-[11px] font-semibold text-primary truncate">{assignment.simulation_title}</span>
-                  </div>
-                )}
-                <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mb-3 text-lg">📩</div>
-                <p className="text-sm font-medium text-on-surface mb-1">You have an offer to accept</p>
-                <p className="text-xs text-on-surface-variant leading-relaxed mb-3">
-                  {assignment.manager?.name} is waiting — accept your offer to begin Week 1 and earn your Journey badge.
-                </p>
-                <button className="btn-primary text-xs px-4 py-2" onClick={() => navigate(assignmentPath)}>
-                  Review offer →
-                </button>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-8 text-center text-on-surface-variant">
+            ) : assignments.length === 0 ? (
+              <div className="card flex flex-col items-center justify-center py-8 text-center text-on-surface-variant">
                 <div className="w-10 h-10 rounded-full bg-surface-high flex items-center justify-center mb-3">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
@@ -171,6 +98,12 @@ export default function Dashboard() {
                 <button className="btn-primary text-xs px-4 py-2" onClick={() => navigate('/simulations')}>
                   Browse Simulations →
                 </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {assignments.map(a => (
+                  <AssignmentCard key={a.simulation_id} assignment={a} onGo={() => navigate(`/simulations/${a.simulation_id}`)} />
+                ))}
               </div>
             )}
           </div>
@@ -278,4 +211,94 @@ export default function Dashboard() {
       </div>
     </div>
   )
+}
+
+// One manager/task summary for a single enrolled simulation — the Dashboard
+// renders one of these per entry in useMyAssignments() so a student running
+// several job simulations at once sees every manager, not just the latest.
+function AssignmentCard({ assignment, onGo }) {
+  const branding = SIM_BRANDING[assignment.simulation_id]
+
+  const simChip = (
+    <div className="inline-flex items-center gap-1.5 mb-3 px-2 py-1 rounded-md bg-primary/5 border border-primary/15">
+      {branding?.logo ? (
+        <img src={branding.logo} alt={assignment.simulation_title} className="h-3.5 w-auto object-contain" />
+      ) : (
+        <span className="text-[10px]">💼</span>
+      )}
+      <span className="text-[11px] font-semibold text-primary truncate">{assignment.simulation_title}</span>
+    </div>
+  )
+
+  if (assignment.has_assignment) {
+    return (
+      <div className="card">
+        {simChip}
+        <div className="flex items-center gap-2.5 mb-3">
+          {branding?.managerPhoto ? (
+            <img src={branding.managerPhoto} alt={assignment.manager.name} className="w-9 h-9 rounded-full object-cover shrink-0" />
+          ) : (
+            <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
+              {assignment.manager.avatar}
+            </div>
+          )}
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-on-surface leading-tight truncate">{assignment.manager.name}</p>
+            <p className="text-xs text-on-surface-variant truncate">
+              {assignment.manager.role}{assignment.manager.company ? ` · ${assignment.manager.company}` : ''}
+            </p>
+          </div>
+        </div>
+
+        <div className="border border-border rounded-xl p-3.5 bg-surface-low">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${assignment.in_progress ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+              {assignment.in_progress ? 'In progress' : 'New assignment'}
+            </span>
+            <span className="text-[11px] text-on-surface-variant">
+              {assignment.completed_count}/{assignment.total_tasks} done
+            </span>
+          </div>
+          <p className="font-bold text-on-surface text-sm mb-1">{assignment.task_name}</p>
+          {assignment.brief && (
+            <p className="text-xs text-on-surface-variant leading-relaxed mb-3">"{assignment.brief}"</p>
+          )}
+          <button className="btn-primary w-full text-xs py-2" onClick={onGo}>
+            Complete this task →
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (assignment.reason === 'completed') {
+    return (
+      <div className="card flex flex-col items-center justify-center py-8 text-center">
+        {simChip}
+        <div className="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center mb-3 text-lg">✓</div>
+        <p className="text-sm font-medium text-on-surface mb-1">All tasks completed!</p>
+        <p className="text-xs text-on-surface-variant leading-relaxed">
+          You've finished every task {assignment.manager?.name} assigned. Your Skill GPS is updated.
+        </p>
+      </div>
+    )
+  }
+
+  if (assignment.reason === 'onboarding_pending') {
+    return (
+      <div className="card flex flex-col items-center justify-center py-8 text-center">
+        {simChip}
+        <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mb-3 text-lg">📩</div>
+        <p className="text-sm font-medium text-on-surface mb-1">You have an offer to accept</p>
+        <p className="text-xs text-on-surface-variant leading-relaxed mb-3">
+          {assignment.manager?.name} is waiting — accept your offer to begin and earn your Journey badge.
+        </p>
+        <button className="btn-primary text-xs px-4 py-2" onClick={onGo}>
+          Review offer →
+        </button>
+      </div>
+    )
+  }
+
+  return null
 }

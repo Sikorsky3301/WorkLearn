@@ -36,7 +36,7 @@ export function AuthProvider({ children }) {
 
   // Restore session from stored token on mount
   useEffect(() => {
-    const token = localStorage.getItem('wl_token')
+    const token = sessionStorage.getItem('wl_token')
     if (!token) { setLoading(false); return }
 
     // 5-second safety timeout — if backend is unreachable, don't hang forever

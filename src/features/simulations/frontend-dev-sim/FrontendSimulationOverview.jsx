@@ -1,35 +1,35 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useEnrollment } from '../../shared/api/hooks'
-import { TASKS, TASK_ICONS, TASK_COLORS } from './DASimulationWorkspace'
+import { useEnrollment } from '../../../shared/api/hooks'
+import { TASKS, TASK_ICONS, TASK_COLORS } from './FrontendSimulationWorkspace'
 
-const SIM_ID = 'da-job-sim'
-const SIM_PATH = '/simulations/da-job-sim'
+const SIM_ID = 'frontend-dev-sim'
+const SIM_PATH = '/simulations/frontend-dev-sim'
 
 const OBJECTIVES = [
-  'Audit and clean a messy operational dataset, justifying every cleaning decision.',
-  'Define and calculate the KPIs a retail/e-commerce business runs on.',
-  'Segment a customer base using RFM analysis and translate segments into actions.',
-  "Read an A/B test correctly — including knowing when not to ship.",
-  'Communicate findings to non-technical stakeholders in plain business language.',
+  'Build a semantic, accessible HTML/CSS layout from a real design ticket.',
+  'Add vanilla JavaScript interactivity that behaves correctly, not just looks right.',
+  'Handle async data properly — loading, success, and error states, every time.',
+  'Write your first React components with props and conditional rendering.',
+  'Manage state in React with hooks, and persist it across page reloads.',
 ]
 
 const PREREQUISITES = [
-  'Comfort with basic spreadsheets',
-  'SQL or Python helpful but not required',
-  'No prior analytics role experience needed',
-  'Works in Excel, Google Sheets, SQL, or Python',
+  'Comfort with HTML and CSS basics',
+  'Some JavaScript helpful but not required',
+  'No prior frontend job experience needed',
+  'Works with any modern browser — nothing to install locally',
 ]
 
 // Illustrative learner feedback — not pulled from a review system (this app
 // doesn't have one yet); presented as example testimonials, not live metrics.
 const REVIEWS = [
-  { name: 'Aditi R.', role: 'Career switcher → Data Analyst', rating: 5,
-    quote: "The data cleaning task alone taught me more than a month of tutorials. Priya's follow-up questions on my log forced me to actually justify every decision instead of just deleting rows." },
-  { name: 'Marcus T.', role: 'Recent CS graduate', rating: 5,
-    quote: 'First time an exercise made me defend a "no-ship" recommendation on an A/B test instead of just reporting a p-value. That distinction is exactly what interviewers asked me about.' },
-  { name: 'Fatima K.', role: 'Business analyst, upskilling', rating: 4,
-    quote: "Solid, realistic ticket-by-ticket structure. Wish there were more datasets, but what's here mirrors real messy company data closely." },
+  { name: 'Jordan P.', role: 'Bootcamp graduate → Frontend Developer', rating: 5,
+    quote: "The nav toggle task caught me completely underestimating aria-expanded. Maya's hint about screen readers actually reading that attribute changed how I write every button now." },
+  { name: 'Sofia M.', role: 'Backend dev, going full-stack', rating: 5,
+    quote: 'The React tasks build on each other so naturally — vanilla JS fetch, then the exact same feature as a component. Finally understood props vs. state by actually doing it twice.' },
+  { name: 'Devon L.', role: 'Self-taught, first job search', rating: 4,
+    quote: "Real automated tests running against my actual code, not just a checklist — that pressure is exactly what a real PR review feels like. Wish there were a CSS-Grid-specific task." },
 ]
 const AVG_RATING = REVIEWS.reduce((s, r) => s + r.rating, 0) / REVIEWS.length
 
@@ -66,7 +66,7 @@ function SparkleIcon(props) {
 }
 
 function StarIcon({ filled, half }) {
-  const id = 'half-star-fill'
+  const id = 'half-star-fill-fe'
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" strokeWidth="1.5" strokeLinejoin="round">
       {half && (
@@ -128,23 +128,23 @@ function EnrollCard({ status, isLoading, tasksDone, onGo }) {
 
       <ul className="space-y-2.5 pt-4 border-t border-border">
         <li className="flex items-center gap-2.5 text-sm text-on-surface-variant">
-          <BookIcon className="text-primary shrink-0" /> 6 modules
+          <BookIcon className="text-primary shrink-0" /> 3 weeks, 6 modules
         </li>
         <li className="flex items-center gap-2.5 text-sm text-on-surface-variant">
-          <ClockIcon className="text-primary shrink-0" /> 5–6 hours, self-paced
+          <ClockIcon className="text-primary shrink-0" /> 5–7 hours, self-paced
         </li>
         <li className="flex items-center gap-2.5 text-sm text-on-surface-variant">
-          <ToolsIcon className="text-primary shrink-0" /> Excel, SQL, or Python
+          <ToolsIcon className="text-primary shrink-0" /> HTML, CSS, JavaScript, React
         </li>
         <li className="flex items-center gap-2.5 text-sm text-on-surface-variant">
-          <CompassIcon className="text-primary shrink-0" /> Mastery-based, no deadlines
+          <CompassIcon className="text-primary shrink-0" /> Graded by real automated tests
         </li>
       </ul>
     </div>
   )
 }
 
-export default function SimulationOverview() {
+export default function FrontendSimulationOverview() {
   const navigate = useNavigate()
   const { data: enrollment, isLoading } = useEnrollment(SIM_ID)
   const status = enrollment?.status
@@ -163,7 +163,7 @@ export default function SimulationOverview() {
       <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-on-surface-variant mb-6">
         <button className="hover:text-primary transition-colors cursor-pointer" onClick={() => navigate('/simulations')}>Simulations</button>
         <span className="text-border">/</span>
-        <span className="text-on-surface font-medium">Junior Data Analyst — Job Simulation</span>
+        <span className="text-on-surface font-medium">Frontend Developer — Job Simulation</span>
       </nav>
 
       <div className="grid lg:grid-cols-3 gap-8 items-start">
@@ -173,8 +173,8 @@ export default function SimulationOverview() {
           {/* Hero */}
           <div>
             <div className="flex items-center gap-2 mb-3 flex-wrap">
-              <span className="chip bg-orange-100 text-orange-700">Data Analytics</span>
-              <span className="chip">Beginner → Intermediate</span>
+              <span className="chip bg-orange-100 text-orange-700">Engineering</span>
+              <span className="chip">Beginner → Advanced</span>
               <span className="flex items-center gap-1.5 text-sm">
                 <Stars rating={AVG_RATING} />
                 <span className="font-semibold text-on-surface">{AVG_RATING.toFixed(1)}</span>
@@ -183,20 +183,21 @@ export default function SimulationOverview() {
             </div>
 
             <h1 className="text-3xl sm:text-4xl font-bold text-on-surface mb-3 leading-tight tracking-tight">
-              Junior Data Analyst — Job Simulation
+              Frontend Developer — Job Simulation
             </h1>
 
             <p className="text-on-surface-variant leading-relaxed mb-5 max-w-2xl">
-              You won't watch lectures. You'll do the actual work a junior analyst does in their first 90 days: clean
-              messy real-world data, build a performance report leadership actually reads, segment customers,
-              evaluate an experiment, and turn it all into a recommendation an executive will act on. Every task
-              mirrors a real ticket from your manager, Priya Sharma.
+              You won't watch lectures. You'll ship the actual tickets a junior frontend developer
+              gets in their first few weeks: a semantic landing page, an accessible interactive nav,
+              a real async data fetch with proper error handling, and a stateful React app — each one
+              graded against hidden automated tests, the same way a real PR gets checked by CI. Every
+              ticket comes from your manager, Maya Chen.
             </p>
 
             <div className="flex items-center gap-5 text-sm text-on-surface-variant flex-wrap">
-              <span className="flex items-center gap-1.5"><BookIcon /> 6 modules</span>
-              <span className="flex items-center gap-1.5"><ClockIcon /> 5–6 hours</span>
-              <span className="flex items-center gap-1.5"><ToolsIcon /> Tool-optional</span>
+              <span className="flex items-center gap-1.5"><BookIcon /> 3 weeks</span>
+              <span className="flex items-center gap-1.5"><ClockIcon /> 5–7 hours</span>
+              <span className="flex items-center gap-1.5"><ToolsIcon /> HTML → JS → React</span>
               <span className="flex items-center gap-1.5"><CompassIcon /> Self-paced</span>
             </div>
           </div>
@@ -209,7 +210,6 @@ export default function SimulationOverview() {
             </div>
             <p className="text-xs text-on-surface-variant mb-5">Click a task to see exactly what you'll do and what you'll learn.</p>
             <div className="relative">
-              {/* Connecting timeline rail */}
               <div className="absolute left-[17px] top-2 bottom-2 w-px bg-border" aria-hidden="true" />
 
               <div className="relative flex items-start gap-4 pb-6">
@@ -218,8 +218,8 @@ export default function SimulationOverview() {
                 </div>
                 <div className="pt-1">
                   <p className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant mb-0.5">Week 0 — Onboarding</p>
-                  <p className="font-semibold text-on-surface text-sm">Welcome to Growth &amp; Analytics</p>
-                  <p className="text-xs text-on-surface-variant mt-0.5 leading-relaxed">Meet your manager Priya Sharma, load the lumen_orders dataset, and read your first ticket.</p>
+                  <p className="font-semibold text-on-surface text-sm">Welcome to the Web Platform team</p>
+                  <p className="text-xs text-on-surface-variant mt-0.5 leading-relaxed">Meet your manager Maya Chen, get the lay of the Enigma codebase, and read your first ticket.</p>
                 </div>
               </div>
 
@@ -344,11 +344,12 @@ export default function SimulationOverview() {
           <div className="card border-2 border-primary/15 bg-primary/[0.02]">
             <div className="pb-4 mb-4 border-b border-border">
               <p className="text-[11px] font-bold tracking-widest text-primary uppercase mb-1">Certification</p>
-              <p className="font-bold text-on-surface text-sm">Junior Data Analyst</p>
+              <p className="font-bold text-on-surface text-sm">Frontend Developer</p>
             </div>
             <p className="text-xs text-on-surface leading-relaxed mb-3">
-              Earn the "Simulation Journey" badge and a portfolio-ready deliverables package on completion —
-              your cleaned dataset, sales report, RFM segmentation, A/B test read, and executive brief.
+              Pass a 5-question final assessment after your last task to earn the "Simulation Journey"
+              badge and a portfolio-ready deliverables package — your landing page, interactive nav,
+              live data fetch, React component, and task manager app.
             </p>
             <div className="flex items-center gap-1.5">
               <div className="w-2 h-2 bg-green-500 rounded-full shrink-0" />
@@ -358,26 +359,22 @@ export default function SimulationOverview() {
 
           <div className="card">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-9 h-9 bg-orange-500 rounded-full flex items-center justify-center shrink-0">
-                <span className="text-white text-xs font-bold">PS</span>
+              <div className="w-9 h-9 bg-gradient-to-br from-orange-500 to-red-500 rounded-full flex items-center justify-center shrink-0">
+                <span className="text-white text-xs font-bold">MC</span>
               </div>
               <div>
-                <p className="font-semibold text-on-surface text-sm">Your Manager: Priya Sharma</p>
-                <p className="text-xs text-on-surface-variant">AI Analytics Manager</p>
+                <p className="font-semibold text-on-surface text-sm">Your Manager: Maya Chen</p>
+                <p className="text-xs text-on-surface-variant">Frontend Engineering Lead</p>
               </div>
             </div>
             <p className="text-xs text-on-surface-variant leading-relaxed">
-              Priya reviews your data-quality log, pushes back on weak reasoning, and gives the same feedback a
-              real analytics manager would — every number you hand leadership, you should be able to explain.
+              Maya reviews your actual submitted code against hidden automated tests, the same way a
+              real PR gets checked by CI — every task has to genuinely work, not just look right.
             </p>
           </div>
         </div>
       </div>
 
-      <footer className="mt-12 border-t border-border pt-4 flex items-center justify-between text-xs text-on-surface-variant">
-        <span>WorkLearn AI</span>
-        <span>© 2025 WorkLearn AI. All rights reserved.</span>
-      </footer>
     </div>
   )
 }

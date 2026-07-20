@@ -1,8 +1,9 @@
-import { Routes, Route, Navigate, Outlet } from 'react-router-dom'
+import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from './features/auth/AuthContext'
 
 // ── Shared ────────────────────────────────────────────────────────────────────
 import Navbar from './shared/Navbar'
+import Footer from './shared/Footer'
 
 // ── Auth: global (direct/individual users + super admin) ───────────────────────
 import Login            from './features/auth/global/Login'
@@ -22,12 +23,17 @@ import ClassMentor from './features/mentor/ClassMentor'
 import Dashboard from './features/dashboard/Dashboard'
 
 // ── Simulations ───────────────────────────────────────────────────────────────
+// Shared across every simulation (browse/enroll, offer-letter onboarding,
+// evaluation results) live at features/simulations/ root; each simulation's
+// own files live in its own features/simulations/{sim-id}/ folder.
 import SimulationWorkspace   from './features/simulations/SimulationWorkspace'
-import SimulationOverview    from './features/simulations/SimulationOverview'
-import DASimulationWorkspace from './features/simulations/DASimulationWorkspace'
-import FrontendSimulationOverview  from './features/simulations/FrontendSimulationOverview'
-import FrontendSimulationWorkspace from './features/simulations/FrontendSimulationWorkspace'
 import EvaluationResult      from './features/simulations/EvaluationResult'
+import SimulationOverview    from './features/simulations/da-job-sim/SimulationOverview'
+import DASimulationWorkspace from './features/simulations/da-job-sim/DASimulationWorkspace'
+import FrontendSimulationOverview  from './features/simulations/frontend-dev-sim/FrontendSimulationOverview'
+import FrontendSimulationWorkspace from './features/simulations/frontend-dev-sim/FrontendSimulationWorkspace'
+import CrmSimOverview from './features/simulations/sales-crm-sim/CrmSimOverview'
+import CrmSimShell    from './features/simulations/sales-crm-sim/CrmSimShell'
 
 // ── Other platform features ───────────────────────────────────────────────────
 import Portfolio    from './features/portfolio/Portfolio'
@@ -44,11 +50,21 @@ import MiraSetup   from './features/mira/MiraSetup'
 import MiraSession from './features/mira/MiraSession'
 import MiraResults from './features/mira/MiraResults'
 
+// Routes that are an active, focused work session — an immersive
+// simulation workspace or a live MIRA interview — skip the global footer so
+// nothing competes for attention. (The simulation workspaces render their
+// own in-character branded footer instead; see DASimulationWorkspace /
+// FrontendSimulationWorkspace.)
+const FOOTERLESS_ROUTES = ['/mira/session', '/simulations/da-job-sim', '/simulations/frontend-dev-sim', '/simulations/sales-crm-sim']
+
 function MainLayout() {
+  const location = useLocation()
+  const showFooter = !FOOTERLESS_ROUTES.includes(location.pathname)
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white flex flex-col">
       <Navbar />
-      <main><Outlet /></main>
+      <main className="flex-1"><Outlet /></main>
+      {showFooter && <Footer />}
     </div>
   )
 }
@@ -111,6 +127,8 @@ export default function App() {
           <Route path="/simulations/da-job-sim"            element={<DASimulationWorkspace />} />
           <Route path="/simulations/frontend-dev-sim/overview" element={<FrontendSimulationOverview />} />
           <Route path="/simulations/frontend-dev-sim"           element={<FrontendSimulationWorkspace />} />
+          <Route path="/simulations/sales-crm-sim/overview"    element={<CrmSimOverview />} />
+          <Route path="/simulations/sales-crm-sim"              element={<CrmSimShell />} />
           <Route path="/portfolio"               element={<Portfolio />} />
           <Route path="/ai-mentor"               element={<AIMentor />} />
           <Route path="/skill-gps"               element={<SkillGPS />} />

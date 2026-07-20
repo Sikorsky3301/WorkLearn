@@ -9,6 +9,7 @@ python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
 anthropic==0.40.0
+langfuse==4.14.0
 apscheduler==3.10.4
 python-dotenv==1.0.1
 sse-starlette==2.1.3

@@ -57,6 +57,7 @@ export default function MiraResults() {
         <h1 className="text-2xl font-bold text-on-surface">Your Interview Feedback</h1>
         <p className="text-sm text-on-surface-variant mt-1">
           {config?.interviewType} · {config?.role} · {config?.difficulty} · {questions.length} questions
+          {config?.resumeFileName && <> · <span className="text-primary">Personalized from {config.resumeFileName}</span></>}
         </p>
       </div>
 

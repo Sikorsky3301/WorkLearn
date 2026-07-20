@@ -10,6 +10,7 @@ from app.auth import get_current_user
 from app.models import User, Enrollment, TaskCompletion, MentorChatMessage, UserSkill, XpLedger
 from app.services.skill_engine import get_user_skills, compute_skill_gps
 from app.services.llm import stream_chat, generate
+from app.services.langfuse_client import traced_observation, traced_context
 from app.config import SKILL_LABELS, SIM_TASK_NAMES, TARGET_ROLE_REQUIREMENTS
 
 router = APIRouter(prefix="/api", tags=["ai-mentor"])
@@ -214,21 +215,32 @@ async def chat(body: ChatBody, db: AsyncSession = Depends(get_db), token: dict =
 
     async def event_stream():
         full_response = []
-        try:
-            async for chunk in stream_chat(system, messages):
-                full_response.append(chunk)
-                yield f"data: {json.dumps({'text': chunk})}\n\n"
-        except Exception as e:
-            print(f"[chat] ERROR:\n{traceback.format_exc()}")
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
-        finally:
-            if full_response:
-                async with AsyncSessionLocal() as save_db:
-                    save_db.add(MentorChatMessage(
-                        user_id=user_id, role="assistant",
-                        content="".join(full_response),
-                    ))
-                    await save_db.commit()
+        # Root span must wrap the generator body itself, not the outer route
+        # handler — StreamingResponse only starts iterating this generator
+        # after chat() has already returned, so a span opened in chat()
+        # would already be closed before any chunk is produced.
+        with traced_observation("span", "mentor-chat", input={"message": body.message}) as root_span:
+            # session_id groups this user's ongoing mentor conversation —
+            # there's no explicit chat-session boundary in the data model
+            # (MentorChatMessage rows are just one continuous per-user
+            # history), so the user's own id is the natural session key.
+            with traced_context(user_id=user_id, session_id=f"mentor-{user_id}", tags=["ai-mentor"]):
+                try:
+                    async for chunk in stream_chat(system, messages, trace_name="mentor-chat-generation"):
+                        full_response.append(chunk)
+                        yield f"data: {json.dumps({'text': chunk})}\n\n"
+                except Exception as e:
+                    print(f"[chat] ERROR:\n{traceback.format_exc()}")
+                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                finally:
+                    if full_response:
+                        async with AsyncSessionLocal() as save_db:
+                            save_db.add(MentorChatMessage(
+                                user_id=user_id, role="assistant",
+                                content="".join(full_response),
+                            ))
+                            await save_db.commit()
+            root_span.update(output="".join(full_response))
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(
@@ -274,11 +286,13 @@ async def skill_gps(role: str = "junior_da", db: AsyncSession = Depends(get_db),
     if gps["top_gaps"]:
         gap_list = ", ".join(f"{g['skill']} ({g['current']}/{g['required']})" for g in gps["top_gaps"])
         try:
-            raw = await generate(
-                f"A data analyst student has these skill gaps: {gap_list}. Target role: {target_role}. "
-                f"List exactly 3 specific, actionable next steps as a JSON array of strings. Only output the JSON array.",
-                max_tokens=300,
-            )
+            with traced_context(user_id=user_id, tags=["skill-gps"]):
+                raw = await generate(
+                    f"A data analyst student has these skill gaps: {gap_list}. Target role: {target_role}. "
+                    f"List exactly 3 specific, actionable next steps as a JSON array of strings. Only output the JSON array.",
+                    max_tokens=300,
+                    trace_name="skill-gps-next-actions",
+                )
             import re
             match = re.search(r'\[.*\]', raw, re.DOTALL)
             next_actions = json.loads(match.group()) if match else []

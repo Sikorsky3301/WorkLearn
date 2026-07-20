@@ -3,11 +3,20 @@ import { useNavigate } from 'react-router-dom'
 import { useOnboarding, useAcceptOnboarding } from '../../shared/api/hooks'
 import lumenLogoImg from '../../assets/lumen-logo.png'
 import enigmaLogoImg from '../../assets/enigma-logo.png'
+import nimbusLogoImg from '../../assets/nimbus-logo.png'
+import derekHoltPhoto from '../../assets/derek-holt.jpg'
 
 // Brand mark per simulation — matches the logo used in that sim's own workspace.
 const SIM_LOGOS = {
   'da-job-sim': { src: lumenLogoImg, alt: 'Lumen Corporation' },
   'frontend-dev-sim': { src: enigmaLogoImg, alt: 'Enigma' },
+  'sales-crm-sim': { src: nimbusLogoImg, alt: 'Nimbus CRM' },
+}
+
+// Real manager headshots, where we have one — sims without an entry here
+// fall back to the initials avatar (see the manager intro card below).
+const SIM_MANAGER_PHOTOS = {
+  'sales-crm-sim': derekHoltPhoto,
 }
 
 function SimLogo({ sim, size = 'md' }) {
@@ -51,10 +60,10 @@ export default function SimOnboarding({ sim = 'da-job-sim', onAccept }) {
           <div className="w-16 h-px bg-border mx-auto mb-6" />
           <p className="text-sm text-on-surface leading-relaxed mb-8">
             Offer accepted — welcome to the team! Your <strong>Simulation Journey</strong> badge is now on your
-            profile. {manager?.name} has your first assignment ready. Let's get into Week 1.
+            profile. {manager?.name} has your first assignment ready. Let's get started.
           </p>
           <button className="btn-primary px-6 py-2.5 w-full" onClick={() => onAccept?.()}>
-            Start Week 1 →
+            Get Started →
           </button>
           <button
             onClick={() => navigate('/portfolio')}
@@ -95,9 +104,13 @@ export default function SimOnboarding({ sim = 'da-job-sim', onAccept }) {
           {/* Manager intro */}
           <div className="card">
             <div className="flex items-center gap-3 mb-4 pb-4 border-b border-border">
-              <div className="w-11 h-11 bg-orange-500 rounded-full flex items-center justify-center shrink-0">
-                <span className="text-white text-sm font-bold">{manager?.avatar}</span>
-              </div>
+              {SIM_MANAGER_PHOTOS[sim] ? (
+                <img src={SIM_MANAGER_PHOTOS[sim]} alt={manager?.name} className="w-11 h-11 rounded-full object-cover shrink-0" />
+              ) : (
+                <div className="w-11 h-11 bg-orange-500 rounded-full flex items-center justify-center shrink-0">
+                  <span className="text-white text-sm font-bold">{manager?.avatar}</span>
+                </div>
+              )}
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-bold text-on-surface">{manager?.name}</p>

@@ -26,6 +26,13 @@ SIMULATIONS = [
         "tag": "Engineering", "level": "Beginner", "tasks": 5, "estimated_hours": "5–7 hrs",
         "skills": ["HTML/CSS", "JavaScript", "React", "Accessibility", "State Management"],
     },
+    {
+        "id": "sales-crm-sim",
+        "title": "Enterprise SaaS Sales Representative",
+        "description": "A full sales cycle at Nimbus CRM: qualify a lead, research the account, send cold outreach, run a discovery call, work the deal in a real CRM, handle objections, write a proposal, and close.",
+        "tag": "Sales", "level": "Intermediate", "tasks": 8, "estimated_hours": "3–5 hrs",
+        "skills": ["Discovery", "CRM Accuracy", "Objection Handling", "Negotiation", "Closing"],
+    },
 ]
 
 # The in-simulation manager who "assigns" tasks to the student
@@ -37,6 +44,10 @@ SIM_MANAGERS = {
     "frontend-dev-sim": {
         "name": "Maya Chen", "role": "Frontend Engineering Lead",
         "company": "Enigma", "avatar": "MC",
+    },
+    "sales-crm-sim": {
+        "name": "Derek Holt", "role": "VP of Sales",
+        "company": "Nimbus CRM", "avatar": "DH",
     },
 }
 DEFAULT_MANAGER = {"name": "Your Manager", "role": "Simulation Manager", "company": "", "avatar": "M"}
@@ -62,17 +73,30 @@ SIM_TASK_BRIEFS = {
         4: "Convert the directory list into a proper React component.",
         5: "Build the task manager — add, complete, delete, and persist across reloads.",
     },
+    "sales-crm-sim": {
+        1: "Review the inbound lead and score it — buying intent, priority, and your reasoning.",
+        2: "Research the account — company profile, competitors, decision makers, budget signals.",
+        3: "Send the cold outreach email — subject, body, and a clear call to action.",
+        4: "Run the discovery call — qualify budget, timeline, and the real pain points.",
+        5: "Work the deal in the CRM — account, contacts, opportunity, and next steps.",
+        6: "Handle the objections that come up and keep the deal moving.",
+        7: "Put together the proposal — problem, solution, ROI, pricing, timeline.",
+        8: "Close it — demo, signature, negotiation, and the onboarding handoff.",
+    },
 }
 SIM_WORK_TASK_IDS = {
     "da-job-sim": [1, 2, 3, 4, 5],
     "frontend-dev-sim": [1, 2, 3, 4, 5],
+    "sales-crm-sim": [1, 2, 3, 4, 5, 6, 7, 8],
 }
 # Which week each task belongs to — drives the Manager/AI Mentor's "Week N"
 # narration. da-job-sim is a 2-week program; frontend-dev-sim is 3 weeks
-# (basic -> intermediate -> advanced).
+# (basic -> intermediate -> advanced). sales-crm-sim is a single continuous
+# sales cycle rather than a multi-week program, so every stage is "Week 1".
 SIM_TASK_WEEKS = {
     "da-job-sim": {1: 1, 2: 1, 3: 2, 4: 2, 5: 2},
     "frontend-dev-sim": {1: 1, 2: 1, 3: 2, 4: 2, 5: 3},
+    "sales-crm-sim": {1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1},
 }
 SIM_TITLES = {s["id"]: s["title"] for s in SIMULATIONS}
 
@@ -162,6 +186,52 @@ SIM_ONBOARDING = {
             ),
         },
     },
+    "sales-crm-sim": {
+        "company": {
+            "name": "Nimbus CRM", "industry": "CRM SaaS",
+            "size": "~60 employees", "location": "Remote-first · US",
+            "about": "Nimbus CRM builds an AI-powered sales platform for mid-market and enterprise sales teams. "
+                     "The sales org is expanding into industrial and manufacturing accounts, which is exactly the "
+                     "kind of deal you're about to run.",
+        },
+        "manager": SIM_MANAGERS["sales-crm-sim"],
+        "intro": (
+            "Welcome to the team — glad to have you on board.\n\n"
+            "Here's how I work: I hand my reps a real deal, start to finish, and I expect you to run the whole "
+            "cycle yourself — qualify it, research it, work it, and close it. I'm not going to hover over every "
+            "email, but I will read your CRM, your transcripts, and your proposal the way I'd read any rep's on "
+            "my team.\n\n"
+            "Your first deal is Atlas Forge Manufacturing — a real inbound lead that just came in. Let's get you "
+            "into it."
+        ),
+        "learn": [
+            "Qualifying an inbound lead and defending your scoring with real reasoning",
+            "Researching an account like a rep who actually wants to win the deal",
+            "Writing cold outreach that earns a reply, not a delete",
+            "Running a discovery call that uncovers real pain, budget, and timeline",
+            "Working a deal in a real CRM — accounts, contacts, opportunities, pipeline",
+            "Handling real objections with substance, not scripted reassurance",
+            "Building a proposal that makes an honest business case",
+            "Closing — demo, signature, negotiation, and a clean handoff to onboarding",
+        ],
+        "projects": [
+            {"id": i, "name": SIM_TASK_NAMES["sales-crm-sim"][i], "brief": SIM_TASK_BRIEFS["sales-crm-sim"][i]}
+            for i in SIM_WORK_TASK_IDS["sales-crm-sim"]
+        ],
+        "offer": {
+            "title": "Enterprise SaaS Sales Representative — Job Simulation",
+            "role": "Enterprise SaaS Sales Representative",
+            "team": "Sales",
+            "company": "Nimbus CRM",
+            "body": (
+                "We're delighted to offer you a place on the Nimbus CRM Enterprise SaaS Sales Representative Job "
+                "Simulation. You'll run one real deal start to finish — lead qualification, research, outreach, "
+                "a discovery call, working the pipeline in a real CRM, objection handling, a proposal, and the "
+                "close — building the exact skills an enterprise sales rep needs on the job. By accepting, you're "
+                "committing to give each stage a genuine attempt and to learn by doing. We're excited to see you close."
+            ),
+        },
+    },
 }
 
 class CompleteTaskBody(BaseModel):
@@ -190,18 +260,11 @@ async def my_badges(db: AsyncSession = Depends(get_db), token: dict = Depends(ge
     )
     return {"badges": [_badge_dict(b) for b in result.scalars().all()]}
 
-@router.get("/my-assignment")
-async def my_assignment(db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
-    """Current task the simulation manager has assigned to the student — for the Dashboard."""
-    user_id = token["sub"]
-    result = await db.execute(
-        select(Enrollment).where(Enrollment.user_id == user_id)
-        .order_by(Enrollment.enrolled_at.desc()).limit(1)
-    )
-    enrollment = result.scalar_one_or_none()
-    if not enrollment:
-        return {"has_assignment": False, "reason": "not_enrolled"}
-
+async def _build_assignment(db: AsyncSession, user_id: str, enrollment: Enrollment) -> dict:
+    """Manager + current-task summary for one enrollment — shared by the
+    single-simulation `/my-assignment` (kept for back-compat) and the
+    multi-simulation `/my-assignments` the Dashboard now uses so every
+    enrolled simulation's manager/task shows up, not just the latest one."""
     manager = SIM_MANAGERS.get(enrollment.simulation_id, DEFAULT_MANAGER)
     sim_id = enrollment.simulation_id
     work_task_ids = SIM_WORK_TASK_IDS.get(sim_id, [])
@@ -241,6 +304,35 @@ async def my_assignment(db: AsyncSession = Depends(get_db), token: dict = Depend
         "in_progress": completed_count > 0,
         "assigned_at": enrollment.enrolled_at.isoformat(),
     }
+
+@router.get("/my-assignment")
+async def my_assignment(db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
+    """Most-recently-enrolled simulation's manager/task. Kept for any caller
+    still using the singular endpoint — the Dashboard itself now uses
+    `/my-assignments` (plural) so it can show every enrolled simulation."""
+    user_id = token["sub"]
+    result = await db.execute(
+        select(Enrollment).where(Enrollment.user_id == user_id)
+        .order_by(Enrollment.enrolled_at.desc()).limit(1)
+    )
+    enrollment = result.scalar_one_or_none()
+    if not enrollment:
+        return {"has_assignment": False, "reason": "not_enrolled"}
+    return await _build_assignment(db, user_id, enrollment)
+
+@router.get("/my-assignments")
+async def my_assignments(db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
+    """One manager/task summary per simulation the student is enrolled in —
+    powers the Dashboard's "Your Managers" list so a student running multiple
+    job simulations at once sees every manager and their current task."""
+    user_id = token["sub"]
+    result = await db.execute(
+        select(Enrollment).where(Enrollment.user_id == user_id)
+        .order_by(Enrollment.enrolled_at.asc())
+    )
+    enrollments = result.scalars().all()
+    assignments = [await _build_assignment(db, user_id, e) for e in enrollments]
+    return {"assignments": assignments}
 
 @router.post("/simulations/{sim_id}/enroll")
 async def enroll(sim_id: str, background: BackgroundTasks, db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):

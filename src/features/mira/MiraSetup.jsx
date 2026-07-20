@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMira } from './MiraContext'
 import { INTERVIEW_TYPES, ROLES, DIFFICULTIES, DURATIONS } from './questionBank'
+import { FileUpload } from '../../shared/ui/file-upload'
 
 function OptionGroup({ label, options, value, onChange }) {
   return (
@@ -36,12 +37,13 @@ export default function MiraSetup() {
   const [customRole, setCustomRole] = useState('')
   const [difficulty, setDifficulty] = useState('Intermediate')
   const [duration, setDuration] = useState('20 minutes')
+  const [resumeFile, setResumeFile] = useState(null)
 
   const durationMeta = DURATIONS.find(d => d.label === duration)
   const effectiveRole = role === 'Custom role' ? (customRole.trim() || 'Custom role') : role
 
   function handleBegin() {
-    startInterview({ interviewType, role: effectiveRole, difficulty, duration })
+    startInterview({ interviewType, role: effectiveRole, difficulty, duration, resumeFileName: resumeFile?.name })
     navigate('/mira/session')
   }
 
@@ -81,6 +83,7 @@ export default function MiraSetup() {
             <div>
               <p className="text-sm font-semibold text-on-surface">
                 {durationMeta?.questionCount} questions · {interviewType} · {effectiveRole} · {difficulty}
+                {resumeFile && <> · Personalized from <span className="text-primary">{resumeFile.name}</span></>}
               </p>
               <p className="text-xs text-on-surface-variant">
                 MIRA will score each answer on communication, technical accuracy, and confidence.
@@ -91,6 +94,25 @@ export default function MiraSetup() {
           <button onClick={handleBegin} className="btn-primary w-full py-3 text-sm font-semibold">
             Begin Interview →
           </button>
+        </div>
+
+        <div className="card mb-5">
+          <label className="section-label mb-1 block">Personalize with Resume / JD</label>
+          <p className="text-xs text-on-surface-variant mb-4">
+            Optional — upload your resume or a job description and MIRA will lean on it when picking questions.
+          </p>
+          <div className="border border-dashed border-border rounded-lg">
+            <FileUpload onChange={(uploaded) => setResumeFile(uploaded[0] ?? null)} />
+          </div>
+          {resumeFile && (
+            <button
+              type="button"
+              onClick={() => setResumeFile(null)}
+              className="btn-ghost text-xs mt-3"
+            >
+              Remove {resumeFile.name}
+            </button>
+          )}
         </div>
 
         <div className="card bg-primary/5 border-primary/20">

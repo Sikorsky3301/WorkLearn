@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import JupyterPlayground from './JupyterPlayground'
-import { useEnrollment, useEnroll, useCompleteTask, useOnboarding, useSubmitSandbox } from '../../shared/api/hooks'
-import SimOnboarding from './SimOnboarding'
-import lumenLogoImg from '../../assets/lumen-logo.png'
+import { useEnrollment, useEnroll, useCompleteTask, useOnboarding, useSubmitSandbox } from '../../../shared/api/hooks'
+import SimOnboarding from '../SimOnboarding'
+import lumenLogoImg from '../../../assets/lumen-logo.png'
 
 // ── Lumen Corporation brand mark — a wordmark image, sized by height only
 // (the source asset is a wide logo, not a square icon) ──────────────────────

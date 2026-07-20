@@ -5,6 +5,7 @@ import { useEnrollment, useEnroll } from '../../shared/api/hooks'
 import { api } from '../../shared/api/client'
 import lumenLogoImg from '../../assets/lumen-logo.png'
 import enigmaLogoImg from '../../assets/enigma-logo.png'
+import nimbusLogoImg from '../../assets/nimbus-logo.png'
 
 const SIMULATIONS = [
   {
@@ -55,6 +56,44 @@ const SIMULATIONS = [
       { id: 5, title: 'Task Manager App',        time: '~60 min', desc: 'Build a stateful React app with add/complete/delete and localStorage persistence.' },
     ],
   },
+  {
+    id: 'sales-crm-sim',
+    title: 'Enterprise SaaS Sales Representative',
+    description:
+      'Run a full sales cycle at Nimbus CRM: qualify a lead, research the account, send cold outreach, run an AI discovery call, work the deal in a real CRM, handle objections, write a proposal, and close.',
+    company: 'Nimbus CRM',
+    logo: nimbusLogoImg,
+    category: 'Sales',
+    categoryColor: 'bg-blue-100 text-blue-700',
+    accentColor: 'bg-blue-600',
+    tasks: 8,
+    estimatedTime: '3–5 hours',
+    difficulty: 'Intermediate',
+    skills: ['Discovery', 'CRM Accuracy', 'Objection Handling', 'Negotiation', 'Closing'],
+    path: '/simulations/sales-crm-sim',
+    overviewPath: '/simulations/sales-crm-sim/overview',
+    taskList: [
+      { id: 1, title: 'Lead Qualification', time: '~15 min', desc: 'Score an inbound lead and judge buying intent.' },
+      { id: 2, title: 'Research',           time: '~15 min', desc: 'Build a real picture of the account before reaching out.' },
+      { id: 3, title: 'Cold Outreach',      time: '~15 min', desc: 'Write a cold email that earns a reply, graded by AI.' },
+      { id: 4, title: 'Discovery Call',     time: '~20 min', desc: 'Run a live discovery call with an AI prospect.' },
+      { id: 5, title: 'CRM — Work the Deal',time: '~20 min', desc: 'Log the account, contact, and opportunity in a real CRM.' },
+      { id: 6, title: 'Objection Handling', time: '~15 min', desc: 'Handle real objections from an AI prospect.' },
+      { id: 7, title: 'Proposal',           time: '~15 min', desc: 'Write the business case — problem, solution, ROI, pricing.' },
+      { id: 8, title: 'Close',              time: '~15 min', desc: 'Demo, signature, negotiation, and the onboarding handoff.' },
+    ],
+  },
+]
+
+// Additional simulation types from the spec's landing page that aren't
+// built yet — shown as non-interactive cards so the landing page reflects
+// the intended catalog without overstating what's actually playable today.
+const COMING_SOON_SIMULATIONS = [
+  { id: 'inside-sales-exec', title: 'Inside Sales Executive', category: 'Sales', accentColor: 'bg-slate-400' },
+  { id: 'account-exec', title: 'Account Executive', category: 'Sales', accentColor: 'bg-slate-400' },
+  { id: 'bdr', title: 'Business Development Representative', category: 'Sales', accentColor: 'bg-slate-400' },
+  { id: 'cs-associate', title: 'Customer Success Associate', category: 'Sales', accentColor: 'bg-slate-400' },
+  { id: 'sales-ops', title: 'Sales Operations Specialist', category: 'Sales', accentColor: 'bg-slate-400' },
 ]
 
 export default function SimulationWorkspace() {
@@ -106,6 +145,9 @@ export default function SimulationWorkspace() {
           {visibleSims.map(sim => (
             <SimCard key={sim.id} sim={sim} />
           ))}
+          {!enrolledOnly && COMING_SOON_SIMULATIONS.map(sim => (
+            <ComingSoonCard key={sim.id} sim={sim} />
+          ))}
         </div>
       )}
     </div>
@@ -154,8 +196,14 @@ function SimCard({ sim }) {
           {/* Logo + company row */}
           <div className="flex items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="h-10 w-10 shrink-0 rounded-lg border border-border bg-white flex items-center justify-center p-1.5 shadow-sm">
-                <img src={sim.logo} alt={sim.company} className="max-h-full max-w-full object-contain" />
+              <div className="h-10 w-10 shrink-0 rounded-lg border border-border bg-white flex items-center justify-center p-1.5 shadow-sm overflow-hidden">
+                {sim.logo ? (
+                  <img src={sim.logo} alt={sim.company} className="max-h-full max-w-full object-contain" />
+                ) : (
+                  <span className={`w-full h-full rounded flex items-center justify-center text-white text-xs font-bold ${sim.accentColor}`}>
+                    {sim.company.split(' ').map(w => w[0]).slice(0, 2).join('')}
+                  </span>
+                )}
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-bold text-on-surface truncate">{sim.company}</p>
@@ -242,6 +290,36 @@ function SimCard({ sim }) {
         />
       )}
     </>
+  )
+}
+
+function ComingSoonCard({ sim }) {
+  return (
+    <div className="card p-0 overflow-hidden flex flex-col opacity-70">
+      <div className={`h-1.5 w-full ${sim.accentColor}`} />
+      <div className="p-5 flex flex-col flex-1">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className={`h-10 w-10 shrink-0 rounded-lg flex items-center justify-center text-white text-xs font-bold ${sim.accentColor}`}>
+              {sim.title.split(' ').map(w => w[0]).slice(0, 2).join('')}
+            </div>
+            <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded bg-surface-high text-on-surface-variant`}>
+              {sim.category}
+            </span>
+          </div>
+          <span className="text-xs font-semibold px-2 py-0.5 rounded shrink-0 bg-surface-high text-on-surface-variant">
+            Coming Soon
+          </span>
+        </div>
+        <h2 className="text-base font-bold text-on-surface mb-1">{sim.title}</h2>
+        <p className="text-sm text-on-surface-variant leading-relaxed mb-4 flex-1">
+          This job simulation is on our roadmap — check back soon.
+        </p>
+        <button disabled className="btn-secondary px-5 py-2.5 text-sm cursor-not-allowed">
+          Not yet available
+        </button>
+      </div>
+    </div>
   )
 }
 
