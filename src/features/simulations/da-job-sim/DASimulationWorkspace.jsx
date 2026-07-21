@@ -3,7 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import JupyterPlayground from './JupyterPlayground'
 import { useEnrollment, useEnroll, useCompleteTask, useOnboarding, useSubmitSandbox } from '../../../shared/api/hooks'
 import SimOnboarding from '../SimOnboarding'
+import SimManagerChat from '../SimManagerChat'
 import lumenLogoImg from '../../../assets/lumen-logo.png'
+import priyaSharmaPhoto from '../../../assets/priya-sharma.jpg'
+
+const MANAGER = { name: 'Priya Sharma', role: 'Manager', initials: 'PS', photo: priyaSharmaPhoto, avatarClass: 'bg-gradient-to-br from-orange-400 to-orange-600' }
+const COMPANY = 'Lumen Corporation'
 
 // ── Lumen Corporation brand mark — a wordmark image, sized by height only
 // (the source asset is a wide logo, not a square icon) ──────────────────────
@@ -1197,23 +1202,6 @@ export default function DASimulationWorkspace() {
               {/* ── Instructions tab ── */}
               {leftTab === 'Instructions' && (
                 <>
-                  {/* Email brief from Priya */}
-                  <div className="border border-border rounded-lg overflow-hidden">
-                    <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-orange-50 to-transparent border-b border-border">
-                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center shrink-0 text-white text-xs font-bold shadow-sm ring-2 ring-white">
-                        PS
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-bold text-on-surface">Priya Sharma</p>
-                          <span className="chip bg-orange-100 text-orange-700 text-[10px] shrink-0">Manager</span>
-                        </div>
-                        <p className="text-xs text-on-surface-variant truncate mt-0.5">{task.subject}</p>
-                      </div>
-                    </div>
-                    <p className="text-sm text-on-surface leading-relaxed whitespace-pre-line px-4 py-3">{task.message}</p>
-                  </div>
-
                   {/* Task 1: dataset schema + reference */}
                   {task.id === 1 && (
                     <>
@@ -1590,6 +1578,8 @@ export default function DASimulationWorkspace() {
         </div>
         <span>© 2025 WorkLearn AI. All rights reserved.</span>
       </footer>
+
+      <SimManagerChat manager={MANAGER} company={COMPANY} task={task} taskKey={task.id} />
     </div>
   )
 }

@@ -9,6 +9,7 @@ import { useCrmSimStore } from './store/useCrmSimStore'
 import { useSimTimer, formatElapsed } from './engine/useSimEngine'
 import { STAGES, SIM_META, stageByIndex } from './engine/simulationConfig'
 import SimOnboarding from '../SimOnboarding'
+import ManagerChatWidget from './ManagerChatWidget'
 import nimbusLogoImg from '../../../assets/nimbus-logo.png'
 
 import Stage1LeadQualification from './stages/Stage1LeadQualification'
@@ -204,6 +205,8 @@ export default function CrmSimShell() {
           </span>
         </div>
       </footer>
+
+      <ManagerChatWidget />
     </div>
   )
 }

@@ -3,7 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import FrontendPlayground, { SandboxResultPanel } from './FrontendPlayground'
 import { useEnrollment, useEnroll, useCompleteTask, useOnboarding } from '../../../shared/api/hooks'
 import SimOnboarding from '../SimOnboarding'
+import SimManagerChat from '../SimManagerChat'
 import enigmaLogoImg from '../../../assets/enigma-logo.png'
+import mayaChenPhoto from '../../../assets/maya-chen.jpg'
+
+const MANAGER = { name: 'Maya Chen', role: 'Manager', initials: 'MC', photo: mayaChenPhoto, avatarClass: 'bg-gradient-to-br from-orange-500 to-red-500' }
+const COMPANY = 'Enigma'
 
 // ── Enigma brand mark — wordmark image, sized by height only ───────────────
 function EnigmaLogo({ size = 'md' }) {
@@ -1249,6 +1254,8 @@ export default function FrontendSimulationWorkspace() {
         </div>
         <span>© 2025 WorkLearn AI. All rights reserved.</span>
       </footer>
+
+      <SimManagerChat manager={MANAGER} company={COMPANY} task={task} taskKey={task.id} />
     </div>
   )
 }

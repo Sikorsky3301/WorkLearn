@@ -142,7 +142,7 @@ export default function Stage8Close() {
         />
       </div>
 
-      <StageFooterNav stage={STAGE} criteriaMet={criteriaMet} isLast onContinue={() => completeStageIndex(8)} />
+      <StageFooterNav stage={STAGE} criteriaMet={criteriaMet} isLast onContinue={(quizScore) => completeStageIndex(8, { quizScore })} />
     </div>
   )
 }

@@ -26,7 +26,7 @@ export default function Stage5Crm() {
         <CrmShellLayout />
       </div>
       <div className="px-6 bg-white border-t border-border shrink-0">
-        <StageFooterNav stage={STAGE} criteriaMet={criteriaMet} onContinue={() => completeStageIndex(5)} />
+        <StageFooterNav stage={STAGE} criteriaMet={criteriaMet} onContinue={(quizScore) => completeStageIndex(5, { quizScore })} />
       </div>
     </div>
   )

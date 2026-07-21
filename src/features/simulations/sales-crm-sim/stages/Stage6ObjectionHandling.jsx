@@ -115,7 +115,7 @@ export default function Stage6ObjectionHandling() {
         </Card>
       </div>
 
-      <StageFooterNav stage={STAGE} criteriaMet={criteriaMet} onContinue={() => completeStageIndex(6)} />
+      <StageFooterNav stage={STAGE} criteriaMet={criteriaMet} onContinue={(quizScore) => completeStageIndex(6, { quizScore })} />
     </div>
   )
 }

@@ -156,7 +156,7 @@ export default function Stage3ColdOutreach() {
         </Card>
       </div>
 
-      <StageFooterNav stage={STAGE} criteriaMet={criteriaMet} onContinue={() => completeStageIndex(3)} />
+      <StageFooterNav stage={STAGE} criteriaMet={criteriaMet} onContinue={(quizScore) => completeStageIndex(3, { quizScore })} />
     </div>
   )
 }

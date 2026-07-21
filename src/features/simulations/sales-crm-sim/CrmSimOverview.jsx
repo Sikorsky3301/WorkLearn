@@ -1,9 +1,14 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BookOpen, Clock, Target, CheckCircle2, ChevronDown, Users, TrendingUp } from 'lucide-react'
+import { motion } from 'motion/react'
+import {
+  BookOpen, Clock, Target, CheckCircle2, ChevronDown, Users, TrendingUp,
+  UserSearch, Search, Mail, Phone, Database, ShieldQuestion, FileText, Trophy,
+} from 'lucide-react'
 import { useEnrollment } from '../../../shared/api/hooks'
 import { Badge } from '../../../shared/ui/shadcn/badge'
 import { Button } from '../../../shared/ui/shadcn/button'
+import { cn } from '../../../shared/utils/cn'
 import { STAGES, SIM_META } from './engine/simulationConfig'
 import nimbusLogoImg from '../../../assets/nimbus-logo.png'
 
@@ -20,6 +25,31 @@ const OBJECTIVES = [
   'Build a proposal that makes an honest business case.',
   'Close — demo, signature, negotiation, and a clean handoff to onboarding.',
 ]
+
+const STAT_PILLS = [
+  { icon: BookOpen, label: '8 stages', color: 'bg-blue-50 text-blue-700 border-blue-100' },
+  { icon: Clock, label: '3–5 hours', color: 'bg-violet-50 text-violet-700 border-violet-100' },
+  { icon: Users, label: 'AI prospect calls', color: 'bg-emerald-50 text-emerald-700 border-emerald-100' },
+  { icon: TrendingUp, label: 'Live CRM & pipeline', color: 'bg-amber-50 text-amber-700 border-amber-100' },
+]
+
+// One icon + color per stage — replaces the plain numbered circle so the
+// timeline reads at a glance instead of just counting up.
+const STAGE_STYLE = [
+  { icon: UserSearch, bg: 'bg-blue-500' },
+  { icon: Search, bg: 'bg-violet-500' },
+  { icon: Mail, bg: 'bg-amber-500' },
+  { icon: Phone, bg: 'bg-emerald-500' },
+  { icon: Database, bg: 'bg-cyan-500' },
+  { icon: ShieldQuestion, bg: 'bg-rose-500' },
+  { icon: FileText, bg: 'bg-indigo-500' },
+  { icon: Trophy, bg: 'bg-blue-700' },
+]
+
+const fadeUp = {
+  initial: { opacity: 0, y: 12 },
+  animate: { opacity: 1, y: 0 },
+}
 
 export default function CrmSimOverview() {
   const navigate = useNavigate()
@@ -44,7 +74,7 @@ export default function CrmSimOverview() {
 
       <div className="grid lg:grid-cols-3 gap-8 items-start">
         <div className="lg:col-span-2 space-y-6">
-          <div>
+          <motion.div initial={fadeUp.initial} animate={fadeUp.animate} transition={{ duration: 0.35 }}>
             <div className="flex items-center gap-3 mb-4">
               <img src={nimbusLogoImg} alt={SIM_META.company} className="h-9 w-auto object-contain shrink-0" />
               <div className="flex items-center gap-2 flex-wrap">
@@ -65,15 +95,19 @@ export default function CrmSimOverview() {
               week on the job under your manager, {SIM_META.manager.name}.
             </p>
 
-            <div className="flex items-center gap-5 text-sm text-on-surface-variant flex-wrap">
-              <span className="flex items-center gap-1.5"><BookOpen className="h-4 w-4" /> 8 stages</span>
-              <span className="flex items-center gap-1.5"><Clock className="h-4 w-4" /> 3–5 hours</span>
-              <span className="flex items-center gap-1.5"><Users className="h-4 w-4" /> AI prospect calls</span>
-              <span className="flex items-center gap-1.5"><TrendingUp className="h-4 w-4" /> Live CRM &amp; pipeline</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              {STAT_PILLS.map((stat) => (
+                <span key={stat.label} className={cn('flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border', stat.color)}>
+                  <stat.icon className="h-3.5 w-3.5" /> {stat.label}
+                </span>
+              ))}
             </div>
-          </div>
+          </motion.div>
 
-          <div className="card">
+          <motion.div
+            className="card overflow-hidden"
+            initial={fadeUp.initial} animate={fadeUp.animate} transition={{ duration: 0.35, delay: 0.05 }}
+          >
             <div className="flex items-center justify-between mb-1">
               <h2 className="text-lg font-bold text-on-surface">The Sales Cycle — Stage by Stage</h2>
               <span className="text-xs font-medium text-on-surface-variant">{STAGES.length} stages</span>
@@ -85,10 +119,11 @@ export default function CrmSimOverview() {
               {STAGES.map((stage, i) => {
                 const isLast = i === STAGES.length - 1
                 const isOpen = expanded.has(stage.id)
+                const { icon: StageIcon, bg } = STAGE_STYLE[i] ?? STAGE_STYLE[0]
                 return (
                   <div key={stage.id} className={`relative flex items-start gap-4 ${isLast ? '' : 'pb-6'}`}>
-                    <div className="relative z-10 w-9 h-9 rounded-full bg-primary text-white ring-1 ring-white/40 flex items-center justify-center shrink-0 shadow-sm text-xs font-bold">
-                      {stage.index}
+                    <div className={cn('relative z-10 w-9 h-9 rounded-full ring-1 ring-white/40 flex items-center justify-center shrink-0 shadow-sm text-white', bg)}>
+                      <StageIcon className="h-4 w-4" />
                     </div>
                     <div className="flex-1 min-w-0 pt-1">
                       <button
@@ -121,31 +156,44 @@ export default function CrmSimOverview() {
                 )
               })}
             </div>
-          </div>
+          </motion.div>
 
-          <div className="card">
+          <motion.div
+            className="card"
+            initial={fadeUp.initial} animate={fadeUp.animate} transition={{ duration: 0.35, delay: 0.1 }}
+          >
             <h2 className="text-lg font-bold text-on-surface mb-4">What You'll Practice</h2>
             <div className="grid sm:grid-cols-2 gap-3">
               {OBJECTIVES.map((obj, i) => (
-                <div key={i} className="flex items-start gap-3 p-3.5 bg-surface-low rounded-lg">
-                  <Target className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                <div
+                  key={i}
+                  className="flex items-start gap-3 p-3.5 bg-surface-low border border-transparent rounded-lg hover:border-blue-200 hover:bg-blue-50/40 transition-colors"
+                >
+                  <Target className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
                   <p className="text-sm text-on-surface leading-snug">{obj}</p>
                 </div>
               ))}
             </div>
-          </div>
+          </motion.div>
         </div>
 
-        <div className="space-y-5 lg:sticky lg:top-20">
-          <div className="card border-2 border-primary/15 shadow-sm">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-primary mb-3">
+        <motion.div
+          className="space-y-5 lg:sticky lg:top-20"
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4, delay: 0.15 }}
+        >
+          <div className="card border-2 border-blue-200 shadow-sm relative overflow-hidden">
+            <div className="absolute -top-10 -right-10 w-28 h-28 bg-blue-500/10 rounded-full blur-2xl pointer-events-none" />
+            <p className="text-[11px] font-bold uppercase tracking-widest text-blue-700 mb-3 relative">
               {status === 'completed' ? 'Completed' : status ? 'In Progress' : 'Get Started'}
             </p>
 
             {isLoading ? (
               <div className="h-11 bg-surface-high rounded-lg animate-pulse mb-4" />
             ) : (
-              <Button className="w-full py-5 text-sm mb-4" onClick={() => navigate(SIM_PATH)}>
+              <Button
+                className="w-full py-5 text-sm mb-4 bg-blue-600 hover:bg-blue-700"
+                onClick={() => navigate(SIM_PATH)}
+              >
                 {status === 'completed' ? 'Review Simulation' : status ? 'Continue Simulation' : 'Start Simulation'}
               </Button>
             )}
@@ -157,30 +205,30 @@ export default function CrmSimOverview() {
                   <span className="font-semibold text-on-surface">{stagesDone} / {STAGES.length} stages</span>
                 </div>
                 <div className="h-1.5 bg-surface-high rounded-full overflow-hidden">
-                  <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${Math.round((stagesDone / STAGES.length) * 100)}%` }} />
+                  <div className="h-full bg-blue-600 rounded-full transition-all" style={{ width: `${Math.round((stagesDone / STAGES.length) * 100)}%` }} />
                 </div>
               </div>
             )}
 
             <ul className="space-y-2.5 pt-4 border-t border-border">
               <li className="flex items-center gap-2.5 text-sm text-on-surface-variant">
-                <CheckCircle2 className="h-4 w-4 text-primary shrink-0" /> 8 stages, one continuous deal
+                <CheckCircle2 className="h-4 w-4 text-blue-600 shrink-0" /> 8 stages, one continuous deal
               </li>
               <li className="flex items-center gap-2.5 text-sm text-on-surface-variant">
-                <CheckCircle2 className="h-4 w-4 text-primary shrink-0" /> Real-time AI prospect conversations
+                <CheckCircle2 className="h-4 w-4 text-blue-600 shrink-0" /> Real-time AI prospect conversations
               </li>
               <li className="flex items-center gap-2.5 text-sm text-on-surface-variant">
-                <CheckCircle2 className="h-4 w-4 text-primary shrink-0" /> Full CRM — leads to closed deal
+                <CheckCircle2 className="h-4 w-4 text-blue-600 shrink-0" /> Full CRM — leads to closed deal
               </li>
               <li className="flex items-center gap-2.5 text-sm text-on-surface-variant">
-                <CheckCircle2 className="h-4 w-4 text-primary shrink-0" /> Scored results &amp; hiring recommendation
+                <CheckCircle2 className="h-4 w-4 text-blue-600 shrink-0" /> Scored results &amp; hiring recommendation
               </li>
             </ul>
           </div>
 
-          <div className="card border-2 border-primary/15 bg-primary/[0.02]">
+          <div className="card border-2 border-blue-100 bg-blue-50/30">
             <div className="pb-4 mb-4 border-b border-border">
-              <p className="text-[11px] font-bold tracking-widest text-primary uppercase mb-1">Company</p>
+              <p className="text-[11px] font-bold tracking-widest text-blue-700 uppercase mb-1">Company</p>
               <p className="font-bold text-on-surface text-sm">{SIM_META.company}</p>
             </div>
             <p className="text-xs text-on-surface leading-relaxed">
@@ -194,7 +242,7 @@ export default function CrmSimOverview() {
               {SIM_META.manager.photo ? (
                 <img src={SIM_META.manager.photo} alt={SIM_META.manager.name} className="w-9 h-9 rounded-full object-cover shrink-0" />
               ) : (
-                <div className="w-9 h-9 bg-primary rounded-full flex items-center justify-center shrink-0">
+                <div className="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center shrink-0">
                   <span className="text-white text-xs font-bold">{SIM_META.manager.avatar}</span>
                 </div>
               )}
@@ -208,7 +256,7 @@ export default function CrmSimOverview() {
               the same way a real sales manager would.
             </p>
           </div>
-        </div>
+        </motion.div>
       </div>
     </div>
   )

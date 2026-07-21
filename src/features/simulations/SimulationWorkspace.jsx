@@ -1,7 +1,6 @@
-import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueries } from '@tanstack/react-query'
-import { useEnrollment, useEnroll } from '../../shared/api/hooks'
+import { useEnrollment } from '../../shared/api/hooks'
 import { api } from '../../shared/api/client'
 import lumenLogoImg from '../../assets/lumen-logo.png'
 import enigmaLogoImg from '../../assets/enigma-logo.png'
@@ -156,55 +155,35 @@ export default function SimulationWorkspace() {
 
 function SimCard({ sim }) {
   const navigate = useNavigate()
-  const { data: enrollment, isLoading }  = useEnrollment(sim.id)
-  const { mutate: enroll, isPending: enrolling } = useEnroll(sim.id)
-
-  const [onboarding, setOnboarding] = useState(false)
-  const [step, setStep]             = useState(1)
+  const { data: enrollment, isLoading } = useEnrollment(sim.id)
 
   const status    = enrollment?.status
   const tasksDone = enrollment?.task_completions?.length ?? 0
   const progress  = status ? Math.round((tasksDone / sim.tasks) * 100) : 0
 
-  function handleCTA() {
-    if (status) {
-      navigate(sim.path)
-    } else {
-      setStep(1)
-      setOnboarding(true)
-    }
-  }
-
-  function handleConfirm() {
-    enroll(undefined, {
-      onSuccess: () => {
-        setOnboarding(false)
-        navigate(sim.path)
-      },
-    })
-  }
+  // The card always opens the overview page — enrolling and resuming a
+  // pending stage both happen from the overview page's own CTA button
+  // (which the workspace itself handles via auto-enroll-on-entry), not here.
+  const goToOverview = () => navigate(sim.overviewPath ?? sim.path)
 
   return (
-    <>
-      <div
-        onClick={isLoading ? undefined : handleCTA}
-        className={`card p-0 overflow-hidden flex flex-col group transition-all duration-200 ease-out hover:-translate-y-1.5 hover:shadow-xl hover:border-primary/50 ${isLoading ? '' : 'cursor-pointer'}`}
-      >
+    <div
+      onClick={isLoading ? undefined : goToOverview}
+      className={`card p-0 overflow-hidden flex flex-col group transition-all duration-200 ease-out hover:-translate-y-1.5 hover:shadow-xl hover:border-primary/50 ${isLoading ? '' : 'cursor-pointer'}`}
+    >
         <div className={`h-1.5 w-full ${sim.accentColor}`} />
         <div className="p-5 flex flex-col flex-1">
 
           {/* Logo + company row */}
           <div className="flex items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="h-10 w-10 shrink-0 rounded-lg border border-border bg-white flex items-center justify-center p-1.5 shadow-sm overflow-hidden">
-                {sim.logo ? (
-                  <img src={sim.logo} alt={sim.company} className="max-h-full max-w-full object-contain" />
-                ) : (
-                  <span className={`w-full h-full rounded flex items-center justify-center text-white text-xs font-bold ${sim.accentColor}`}>
-                    {sim.company.split(' ').map(w => w[0]).slice(0, 2).join('')}
-                  </span>
-                )}
-              </div>
+              {sim.logo ? (
+                <img src={sim.logo} alt={sim.company} className="h-8 w-auto max-w-[100px] object-contain shrink-0" />
+              ) : (
+                <div className={`h-10 w-10 shrink-0 rounded-lg flex items-center justify-center text-white text-xs font-bold ${sim.accentColor}`}>
+                  {sim.company.split(' ').map(w => w[0]).slice(0, 2).join('')}
+                </div>
+              )}
               <div className="min-w-0">
                 <p className="text-sm font-bold text-on-surface truncate">{sim.company}</p>
                 <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded ${sim.categoryColor}`}>
@@ -248,48 +227,20 @@ function SimCard({ sim }) {
             </div>
           )}
 
-          <div className="mt-auto pt-1 flex items-center gap-2">
+          <div className="mt-auto pt-1">
             {isLoading ? (
-              <div className="flex-1 h-9 bg-surface-high rounded-lg animate-pulse" />
+              <div className="h-9 bg-surface-high rounded-lg animate-pulse" />
             ) : (
               <button
-                onClick={(e) => { e.stopPropagation(); handleCTA() }}
-                disabled={enrolling}
-                className="flex-1 btn-primary px-5 py-2.5 text-sm flex items-center justify-center gap-2"
+                onClick={(e) => { e.stopPropagation(); goToOverview() }}
+                className="w-full btn-primary px-5 py-2.5 text-sm flex items-center justify-center gap-2"
               >
-                {enrolling && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-                {enrolling
-                  ? 'Enrolling…'
-                  : status === 'completed'
-                  ? 'Review'
-                  : status
-                  ? 'Continue →'
-                  : 'Enroll & Start →'}
-              </button>
-            )}
-            {sim.overviewPath && (
-              <button
-                onClick={(e) => { e.stopPropagation(); navigate(sim.overviewPath) }}
-                className="shrink-0 text-xs font-semibold text-primary hover:text-primary-dark transition-colors px-2 py-1 text-center cursor-pointer"
-              >
-                Details
+                {status === 'completed' ? 'Review' : status ? 'Continue →' : 'View Overview →'}
               </button>
             )}
           </div>
         </div>
       </div>
-
-      {onboarding && (
-        <EnrollmentModal
-          sim={sim}
-          step={step}
-          onStep={setStep}
-          onClose={() => setOnboarding(false)}
-          onConfirm={handleConfirm}
-          enrolling={enrolling}
-        />
-      )}
-    </>
   )
 }
 

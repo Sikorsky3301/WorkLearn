@@ -35,11 +35,13 @@ export function useStageCompletion() {
   const completedRef = useRef(completedStages)
   completedRef.current = completedStages
 
-  function completeStageIndex(index, { score } = {}) {
+  function completeStageIndex(index, { score, quizScore } = {}) {
     if (completedRef.current.includes(index)) return
     completeStage(index)
     if (enrollmentId) {
-      completeTaskRemote({ taskId: index, score: score ?? null, quizScore: null, rubricRating: null })
+      // quizScore >= 80 earns the existing QUIZ_BONUS_XP server-side —
+      // same bonus mechanic the DA/Frontend sims' task quizzes already use.
+      completeTaskRemote({ taskId: index, score: score ?? null, quizScore: quizScore ?? null, rubricRating: null })
     }
   }
 

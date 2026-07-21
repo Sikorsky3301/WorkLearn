@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import { createEvent } from '../engine/eventLogger'
 import { STAGES } from '../engine/simulationConfig'
 import { SEED_LEAD } from '../data/seedData'
+import { getManagerReply, getStageGreeting } from '../data/managerChatKnowledge'
 
 const uid = (prefix) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 
@@ -51,6 +52,9 @@ const initialState = {
 
   eventLog: [],
   scores: null,
+
+  // Non-AI, keyword-matched manager chat — see data/managerChatKnowledge.js
+  managerChat: { messages: [], greetedStages: [] },
 }
 
 export const useCrmSimStore = create(
@@ -237,6 +241,38 @@ export const useCrmSimStore = create(
       })),
 
       setScores: (scores) => set({ scores }),
+
+      // ── Manager chat (rule-based, no AI) ─────────────────────────────
+      sendManagerMessage: (text) => set((s) => ({
+        managerChat: {
+          ...s.managerChat,
+          messages: [...s.managerChat.messages, { id: uid('mmsg'), role: 'user', text, ts: Date.now() }],
+        },
+        eventLog: [...s.eventLog, createEvent('manager_chat_message', s.currentStageIndex, { role: 'user' })],
+      })),
+
+      appendManagerReply: (userText) => set((s) => {
+        const reply = getManagerReply(userText, s.currentStageIndex)
+        return {
+          managerChat: {
+            ...s.managerChat,
+            messages: [...s.managerChat.messages, { id: uid('mmsg'), role: 'manager', text: reply, ts: Date.now() }],
+          },
+          eventLog: [...s.eventLog, createEvent('manager_chat_message', s.currentStageIndex, { role: 'manager' })],
+        }
+      }),
+
+      greetStageForManagerChat: (stageIndex) => set((s) => {
+        if (s.managerChat.greetedStages.includes(stageIndex)) return {}
+        const text = getStageGreeting(stageIndex, { isFirstStage: s.managerChat.greetedStages.length === 0 })
+        return {
+          managerChat: {
+            ...s.managerChat,
+            messages: [...s.managerChat.messages, { id: uid('mmsg'), role: 'manager', text, ts: Date.now() }],
+            greetedStages: [...s.managerChat.greetedStages, stageIndex],
+          },
+        }
+      }),
 
       resetSimulation: () => set({ ...initialState, crm: { ...initialState.crm, leads: [SEED_LEAD] } }),
     }),

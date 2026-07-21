@@ -93,7 +93,7 @@ export default function Stage4DiscoveryCall() {
         </Card>
       </div>
 
-      <StageFooterNav stage={STAGE} criteriaMet={criteriaMet} onContinue={() => completeStageIndex(4)} />
+      <StageFooterNav stage={STAGE} criteriaMet={criteriaMet} onContinue={(quizScore) => completeStageIndex(4, { quizScore })} />
     </div>
   )
 }
