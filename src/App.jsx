@@ -15,6 +15,7 @@ import MentorLogin      from './features/auth/university/MentorLogin'
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
 import SuperAdmin from './features/admin/SuperAdmin'
+import SimulationBuilder from './features/admin/simulations/SimulationBuilder'
 
 // ── Mentor ────────────────────────────────────────────────────────────────────
 import ClassMentor from './features/mentor/ClassMentor'
@@ -24,16 +25,18 @@ import Dashboard from './features/dashboard/Dashboard'
 
 // ── Simulations ───────────────────────────────────────────────────────────────
 // Shared across every simulation (browse/enroll, offer-letter onboarding,
-// evaluation results) live at features/simulations/ root; each simulation's
-// own files live in its own features/simulations/{sim-id}/ folder.
-import SimulationWorkspace   from './features/simulations/SimulationWorkspace'
-import EvaluationResult      from './features/simulations/EvaluationResult'
-import SimulationOverview    from './features/simulations/da-job-sim/SimulationOverview'
-import DASimulationWorkspace from './features/simulations/da-job-sim/DASimulationWorkspace'
-import FrontendSimulationOverview  from './features/simulations/frontend-dev-sim/FrontendSimulationOverview'
-import FrontendSimulationWorkspace from './features/simulations/frontend-dev-sim/FrontendSimulationWorkspace'
-import CrmSimOverview from './features/simulations/sales-crm-sim/CrmSimOverview'
-import CrmSimShell    from './features/simulations/sales-crm-sim/CrmSimShell'
+// evaluation results) live at features/simulations/ root. All 3 simulations
+// (da-job-sim, frontend-dev-sim, sales-crm-sim) are now DB-backed and render
+// through the generic engine below — their old hardcoded workspace/overview
+// components (features/simulations/{da-job-sim,frontend-dev-sim,sales-crm-sim}/)
+// are no longer routed but left on disk for reference; several of their
+// sub-components (Stage5Crm, AiCustomerChat, StageQuiz, JupyterPlayground,
+// FrontendPlayground) are still imported directly by the generic task-type
+// renderers in features/simulations/generic/.
+import SimulationWorkspace from './features/simulations/SimulationWorkspace'
+import EvaluationResult    from './features/simulations/EvaluationResult'
+import GenericSimOverview  from './features/simulations/generic/GenericSimOverview'
+import GenericSimShell     from './features/simulations/generic/GenericSimShell'
 
 // ── Other platform features ───────────────────────────────────────────────────
 import Portfolio    from './features/portfolio/Portfolio'
@@ -52,14 +55,17 @@ import MiraResults from './features/mira/MiraResults'
 
 // Routes that are an active, focused work session — an immersive
 // simulation workspace or a live MIRA interview — skip the global footer so
-// nothing competes for attention. (The simulation workspaces render their
-// own in-character branded footer instead; see DASimulationWorkspace /
-// FrontendSimulationWorkspace.)
-const FOOTERLESS_ROUTES = ['/mira/session', '/simulations/da-job-sim', '/simulations/frontend-dev-sim', '/simulations/sales-crm-sim']
+// nothing competes for attention. (GenericSimShell renders its own
+// in-character branded footer instead — see GenericSimShell.jsx.) Any
+// `/simulations/<slug>` with no further path segment is a running
+// simulation; `/simulations` (the picker) and `/simulations/<slug>/overview`
+// still show the normal footer.
+const FOOTERLESS_ROUTES = ['/mira/session']
+const FOOTERLESS_PATTERN = /^\/simulations\/[^/]+$/
 
 function MainLayout() {
   const location = useLocation()
-  const showFooter = !FOOTERLESS_ROUTES.includes(location.pathname)
+  const showFooter = !FOOTERLESS_ROUTES.includes(location.pathname) && !FOOTERLESS_PATTERN.test(location.pathname)
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <Navbar />
@@ -105,6 +111,23 @@ function AdminRoute() {
   return <SuperAdmin />
 }
 
+// The simulation builder is a standalone page (its own header, full width,
+// no sidebar chrome) rather than nested inside SuperAdmin.jsx's tab-swap
+// model — a long-lived multi-tab editing session benefits from a real,
+// shareable/refreshable URL. Same auth gate as AdminRoute above.
+function AdminBuilderRoute() {
+  const { user, loading } = useAuth()
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-950">
+        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+  if (!user || user.role !== 'SUPER_ADMIN') return <AdminLogin />
+  return <SimulationBuilder />
+}
+
 export default function App() {
   return (
     <Routes>
@@ -114,6 +137,7 @@ export default function App() {
       <Route path="/mentor/login"     element={<MentorLogin />} />
       {/* Admin route — shows login if not authenticated, panel if SUPER_ADMIN */}
       <Route path="/admin" element={<AdminRoute />} />
+      <Route path="/admin/simulations/:id" element={<AdminBuilderRoute />} />
 
       {/* Protected — require login */}
       <Route element={<ProtectedRoute />}>
@@ -122,13 +146,9 @@ export default function App() {
         <Route element={<MainLayout />}>
           <Route path="/"                        element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard"               element={<Dashboard />} />
-          <Route path="/simulations"                       element={<SimulationWorkspace />} />
-          <Route path="/simulations/da-job-sim/overview"   element={<SimulationOverview />} />
-          <Route path="/simulations/da-job-sim"            element={<DASimulationWorkspace />} />
-          <Route path="/simulations/frontend-dev-sim/overview" element={<FrontendSimulationOverview />} />
-          <Route path="/simulations/frontend-dev-sim"           element={<FrontendSimulationWorkspace />} />
-          <Route path="/simulations/sales-crm-sim/overview"    element={<CrmSimOverview />} />
-          <Route path="/simulations/sales-crm-sim"              element={<CrmSimShell />} />
+          <Route path="/simulations"                element={<SimulationWorkspace />} />
+          <Route path="/simulations/:slug/overview" element={<GenericSimOverview />} />
+          <Route path="/simulations/:slug"          element={<GenericSimShell />} />
           <Route path="/portfolio"               element={<Portfolio />} />
           <Route path="/ai-mentor"               element={<AIMentor />} />
           <Route path="/skill-gps"               element={<SkillGPS />} />

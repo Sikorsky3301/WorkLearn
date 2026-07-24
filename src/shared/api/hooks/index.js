@@ -246,6 +246,104 @@ export function useDeleteUser() {
   })
 }
 
+// Simulation CMS admin hooks (superadmin only) — CRUD for Simulation/SimulationTask
+export function useAdminSimulations() {
+  return useQuery({
+    queryKey: ['admin-simulations'],
+    queryFn: () => api.get('/api/admin/simulations'),
+    staleTime: 10_000,
+  })
+}
+
+export function useAdminSimulation(id) {
+  return useQuery({
+    queryKey: ['admin-simulation', id],
+    queryFn: () => api.get(`/api/admin/simulations/${id}`),
+    enabled: !!id,
+  })
+}
+
+export function useCreateSimulation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body) => api.post('/api/admin/simulations', body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-simulations'] }),
+  })
+}
+
+export function useUpdateSimulation(id) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body) => api.patch(`/api/admin/simulations/${id}`, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-simulation', id] })
+      qc.invalidateQueries({ queryKey: ['admin-simulations'] })
+    },
+  })
+}
+
+export function usePublishSimulation(id) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.post(`/api/admin/simulations/${id}/publish`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-simulation', id] })
+      qc.invalidateQueries({ queryKey: ['admin-simulations'] })
+    },
+  })
+}
+
+export function useUnpublishSimulation(id) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.post(`/api/admin/simulations/${id}/unpublish`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-simulation', id] })
+      qc.invalidateQueries({ queryKey: ['admin-simulations'] })
+    },
+  })
+}
+
+export function useDeleteSimulation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => api.del(`/api/admin/simulations/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-simulations'] }),
+  })
+}
+
+export function useCreateTask(simId) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body) => api.post(`/api/admin/simulations/${simId}/tasks`, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-simulation', simId] }),
+  })
+}
+
+export function useUpdateTask(simId) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ taskId, ...body }) => api.patch(`/api/admin/simulations/${simId}/tasks/${taskId}`, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-simulation', simId] }),
+  })
+}
+
+export function useDeleteTask(simId) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (taskId) => api.del(`/api/admin/simulations/${simId}/tasks/${taskId}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-simulation', simId] }),
+  })
+}
+
+export function useReorderTasks(simId) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (taskIds) => api.post(`/api/admin/simulations/${simId}/tasks/reorder`, { task_ids: taskIds }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-simulation', simId] }),
+  })
+}
+
 export function useDeleteEnrollment() {
   const qc = useQueryClient()
   return useMutation({
@@ -255,6 +353,31 @@ export function useDeleteEnrollment() {
       qc.invalidateQueries({ queryKey: ['admin-users'] })
       qc.invalidateQueries({ queryKey: ['admin-stats'] })
     },
+  })
+}
+
+// Generic CMS-authored simulation runtime — full sim+tasks definition, plus
+// the two LLM-backed task types (ai_roleplay_chat, text_rubric's llm mode).
+// Quiz/structured_form/crm_workspace/code_sandbox completion all go through
+// the existing useCompleteTask/useSubmitSandbox hooks above — unchanged.
+export function useSimulationFull(slug) {
+  return useQuery({
+    queryKey: ['simulation-full', slug],
+    queryFn: () => api.get(`/api/simulations/${slug}/full`),
+    enabled: !!slug,
+    staleTime: 60_000,
+  })
+}
+
+export function useRoleplayMessage(simId, taskIndex) {
+  return useMutation({
+    mutationFn: (body) => api.post(`/api/simulations/${simId}/tasks/${taskIndex}/roleplay-message`, body),
+  })
+}
+
+export function useGradeText(simId, taskIndex) {
+  return useMutation({
+    mutationFn: (body) => api.post(`/api/simulations/${simId}/tasks/${taskIndex}/grade-text`, body),
   })
 }
 

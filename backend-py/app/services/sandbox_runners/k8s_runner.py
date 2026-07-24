@@ -12,6 +12,7 @@ shell redirect so the two streams stay separate (pod logs would merge them).
 As with the docker runner, nothing here trusts stdout for grading.
 """
 import asyncio
+import logging
 import os
 import shutil
 import tempfile
@@ -21,6 +22,8 @@ from pathlib import Path
 
 from app.config import settings
 from app.services.sandbox_runners.base import SandboxResult
+
+logger = logging.getLogger(__name__)
 
 _POLL_INTERVAL = 0.3
 
@@ -148,8 +151,10 @@ async def _delete_job(job_name: str) -> None:
             settings.sandbox_namespace,
             propagation_policy="Background",
         )
-    except Exception:
-        pass  # ttlSecondsAfterFinished / activeDeadlineSeconds reap stragglers
+    except Exception as exc:
+        # ttlSecondsAfterFinished / activeDeadlineSeconds reap stragglers —
+        # this is expected often enough that DEBUG is the right level.
+        logger.debug("job %s delete failed (likely already reaped): %s", job_name, exc)
 
 
 def _read_stream(workdir: Path, name: str) -> str:
@@ -242,6 +247,7 @@ async def run_submission(
             workdir=workdir,
         )
     except Exception:
+        logger.exception("k8s sandbox run failed, cleaning up job=%s workdir=%s", job_name, workdir)
         await _delete_job(job_name)
         shutil.rmtree(workdir, ignore_errors=True)
         raise

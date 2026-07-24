@@ -3,18 +3,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, distinct, delete
 from datetime import date, datetime, timedelta, timezone
 from app.database import get_db
-from app.auth import get_current_user
 from app.models import User, Role, Enrollment, EnrollmentStatus, XpLedger, UnlockedFeature, TaskCompletion, UserBadge
-from app.routes.enrollments import SIMULATIONS, JOURNEY_BADGE_KEY
+from app.models_cms import Simulation
+from app.routes.enrollments import JOURNEY_BADGE_KEY
+from app.dependencies import require_superadmin
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
-
-_SIM_TITLES = {s["id"]: s["title"] for s in SIMULATIONS}
-
-def require_superadmin(token: dict = Depends(get_current_user)):
-    if token.get("role") != "SUPER_ADMIN":
-        raise HTTPException(403, "Superadmin access required")
-    return token
 
 @router.get("/stats")
 async def admin_stats(db: AsyncSession = Depends(get_db), token: dict = Depends(require_superadmin)):
@@ -169,10 +163,12 @@ async def user_enrollments(user_id: str, db: AsyncSession = Depends(get_db), tok
             select(func.count()).select_from(TaskCompletion)
             .where(TaskCompletion.enrollment_id == e.id, TaskCompletion.task_id >= 1)
         )
+        sim_res = await db.execute(select(Simulation.title).where(Simulation.id == e.simulation_id))
+        sim_title = sim_res.scalar_one_or_none() or e.simulation_id
         out.append({
             "id": e.id,
             "simulation_id": e.simulation_id,
-            "simulation_title": _SIM_TITLES.get(e.simulation_id, e.simulation_id),
+            "simulation_title": sim_title,
             "status": e.status.value if hasattr(e.status, "value") else str(e.status),
             "completed_tasks": done_res.scalar() or 0,
             "enrolled_at": e.enrolled_at.strftime("%b %d, %Y"),

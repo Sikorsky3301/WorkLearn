@@ -4,7 +4,7 @@ from app.config import settings
 
 engine = create_async_engine(
     settings.database_url,
-    echo=False,
+    echo=settings.log_level.upper() == "DEBUG",
     pool_size=5,
     max_overflow=10,
     connect_args={},

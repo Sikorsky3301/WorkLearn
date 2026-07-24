@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:5173"
     port: int = 3001
 
+    # Standard library logging level for the whole app (also gates SQLAlchemy
+    # SQL echo — see app/database.py). One knob instead of a separate DEBUG
+    # bool, so the two can't drift out of sync.
+    log_level: str = "INFO"
+
     # Langfuse tracing — tracing is skipped entirely (no overhead, no log
     # noise) unless both keys are set. See app/services/langfuse_client.py.
     langfuse_public_key: str = ""
@@ -64,67 +69,12 @@ class Settings(BaseSettings):
 settings = Settings()
 
 # ── Skill Engine constants ────────────────────────────────────────────────────
-# Every dict below is keyed by simulation_id first, task_id second — two
-# simulations both number their tasks 1-5, so a bare task_id key would award
-# one simulation's XP/skills (or task name) using the other's definitions.
-# (See backend-py/app/routes/sandbox.py's SIM_TASK_IO/SIM_GRADERS for the
-# same pattern applied to the sandbox/grading side.)
-
-SIM_TASK_XP_AWARDS: dict[str, dict[int, int]] = {
-    "da-job-sim": {
-        0: 10,  # Onboarding
-        1: 50,  # Task 1 — Clean the Data
-        2: 80,  # Task 2 — Sales Report
-        3: 90,  # Task 3 — RFM Segmentation
-        4: 100,  # Task 4 — A/B Test Analysis
-        5: 120,  # Task 5 — Executive Brief
-    },
-    "frontend-dev-sim": {
-        0: 10,  # Onboarding
-        1: 50,  # Task 1 — Landing Hero Section
-        2: 80,  # Task 2 — Interactive Navigation
-        3: 90,  # Task 3 — Fetch & Render Data
-        4: 100,  # Task 4 — React Component
-        5: 120,  # Task 5 — Task Manager App
-    },
-    "sales-crm-sim": {
-        1: 40,   # Stage 1 — Lead Qualification
-        2: 50,   # Stage 2 — Research
-        3: 70,   # Stage 3 — Cold Outreach
-        4: 100,  # Stage 4 — Discovery Call
-        5: 90,   # Stage 5 — CRM Pipeline Management
-        6: 100,  # Stage 6 — Objection Handling
-        7: 80,   # Stage 7 — Proposal
-        8: 120,  # Stage 8 — Close
-    },
-}
-
-SIM_TASK_SKILL_AWARDS: dict[str, dict[int, dict[str, int]]] = {
-    "da-job-sim": {
-        1: {"sql": 10, "data_cleaning": 15},
-        2: {"python": 15, "analytics": 20, "data_viz": 10},
-        3: {"customer_analysis": 20, "segmentation": 15},
-        4: {"statistics": 25, "hypothesis_testing": 20},
-        5: {"communication": 15, "data_storytelling": 20},
-    },
-    "frontend-dev-sim": {
-        1: {"html_css": 15, "accessibility": 10},
-        2: {"javascript": 15, "accessibility": 10},
-        3: {"javascript": 15, "async_data": 15},
-        4: {"react": 20, "component_design": 15},
-        5: {"react": 15, "state_management": 25},
-    },
-    "sales-crm-sim": {
-        1: {"sales_research": 10, "crm_accuracy": 5},
-        2: {"sales_research": 20},
-        3: {"email_writing": 20, "communication": 10},
-        4: {"discovery": 25, "communication": 15},
-        5: {"crm_accuracy": 25},
-        6: {"objection_handling": 25, "negotiation": 10},
-        7: {"negotiation": 15, "communication": 10},
-        8: {"closing": 25, "negotiation": 15},
-    },
-}
+# Per-simulation, per-task XP/skill awards and task names used to live here as
+# hardcoded dicts (keyed by simulation_id then task_id). They're now columns
+# on SimulationTask (xp_award, skill_awards, title) — see app/models_cms.py
+# and app/services/skill_engine.py's award_task_completion(). The dicts below
+# are genuinely global product config (role-readiness thresholds, skill
+# display names), not per-simulation content, so they stay here.
 
 TARGET_ROLE_REQUIREMENTS: dict[str, dict[str, int]] = {
     "junior_da": {
@@ -200,35 +150,6 @@ SKILL_LABELS: dict[str, str] = {
     "objection_handling": "Objection Handling",
     "negotiation": "Negotiation",
     "closing": "Closing",
-}
-
-SIM_TASK_NAMES: dict[str, dict[int, str]] = {
-    "da-job-sim": {
-        0: "Onboarding",
-        1: "Task 1 — Clean the Data",
-        2: "Task 2 — Sales Report",
-        3: "Task 3 — RFM Segmentation",
-        4: "Task 4 — A/B Test Analysis",
-        5: "Task 5 — Executive Brief",
-    },
-    "frontend-dev-sim": {
-        0: "Onboarding",
-        1: "Task 1 — Landing Hero Section",
-        2: "Task 2 — Interactive Navigation",
-        3: "Task 3 — Fetch & Render Data",
-        4: "Task 4 — React Component",
-        5: "Task 5 — Task Manager App",
-    },
-    "sales-crm-sim": {
-        1: "Stage 1 — Lead Qualification",
-        2: "Stage 2 — Research",
-        3: "Stage 3 — Cold Outreach",
-        4: "Stage 4 — Discovery Call",
-        5: "Stage 5 — CRM Pipeline Management",
-        6: "Stage 6 — Objection Handling",
-        7: "Stage 7 — Proposal",
-        8: "Stage 8 — Close",
-    },
 }
 
 QUIZ_BONUS_THRESHOLD = 80

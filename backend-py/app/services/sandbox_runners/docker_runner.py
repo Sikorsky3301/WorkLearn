@@ -6,6 +6,7 @@ read back whatever artifact file the container wrote to the mounted
 workspace and grade THAT (see app/services/graders/).
 """
 import asyncio
+import logging
 import shutil
 import subprocess
 import tempfile
@@ -13,6 +14,8 @@ from pathlib import Path
 
 from app.config import settings
 from app.services.sandbox_runners.base import SandboxResult
+
+logger = logging.getLogger(__name__)
 
 
 def _run_docker(docker_args: list[str], timeout: int) -> tuple[bytes, bytes, int | None, bool]:
@@ -78,5 +81,6 @@ async def run_submission(
             workdir=workdir,
         )
     except Exception:
+        logger.exception("docker sandbox run failed, cleaning up workdir=%s", workdir)
         shutil.rmtree(workdir, ignore_errors=True)
         raise

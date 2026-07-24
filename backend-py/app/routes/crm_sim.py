@@ -1,6 +1,6 @@
 import json
+import logging
 import re
-import traceback
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from app.auth import get_current_user
@@ -11,6 +11,7 @@ from app.services.crm_sim_prompts import (
 )
 
 router = APIRouter(prefix="/api/crm-sim", tags=["crm-sim"])
+logger = logging.getLogger(__name__)
 
 
 def _extract_json(raw: str) -> dict:
@@ -53,7 +54,7 @@ async def grade_email(body: GradeEmailBody, token: dict = Depends(get_current_us
             raw = await generate(prompt, max_tokens=500, trace_name="crm-sim-grade-email")
         result = _extract_json(raw)
     except Exception:
-        print(f"[crm-sim] grade-email ERROR:\n{traceback.format_exc()}")
+        logger.exception("[crm-sim] grade-email failed")
         raise HTTPException(502, "Could not grade the email right now — try again.")
 
     return result
@@ -87,7 +88,7 @@ async def ai_customer(body: AiCustomerBody, token: dict = Depends(get_current_us
         with traced_context(user_id=token["sub"], tags=["crm-sim", "ai-customer", body.mode]):
             raw = await _collect_stream_chat(system, messages, max_tokens=350, trace_name="crm-sim-ai-customer")
     except Exception:
-        print(f"[crm-sim] ai-customer ERROR:\n{traceback.format_exc()}")
+        logger.exception("[crm-sim] ai-customer failed")
         raise HTTPException(502, "The AI customer is unavailable right now — try again.")
 
     reply, mood = _split_mood_tag(raw, fallback_mood=body.mood)
@@ -136,7 +137,7 @@ async def final_score(body: FinalScoreBody, token: dict = Depends(get_current_us
             raw = await generate(prompt, max_tokens=1200, trace_name="crm-sim-final-score")
         result = _extract_json(raw)
     except Exception:
-        print(f"[crm-sim] final-score ERROR:\n{traceback.format_exc()}")
+        logger.exception("[crm-sim] final-score failed")
         raise HTTPException(502, "Could not compute the final score right now — try again.")
 
     return result

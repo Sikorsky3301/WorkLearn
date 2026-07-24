@@ -4,8 +4,13 @@ env var. Every provider call is wrapped in a Langfuse "generation" observation
 (model, input, output, token usage) — see app/services/langfuse_client.py.
 Tracing is a no-op when Langfuse isn't configured (see langfuse_enabled).
 """
+import logging
+from typing import Awaitable, Callable
+
 from app.config import settings
 from app.services.langfuse_client import traced_observation
+
+logger = logging.getLogger(__name__)
 
 async def generate(prompt: str, max_tokens: int = 200, trace_name: str = "llm-generate") -> str:
     if settings.ai_provider == "gemini":
@@ -25,6 +30,25 @@ async def stream_chat(system: str, messages: list[dict], max_tokens: int = 800, 
     else:
         async for chunk in _anthropic_stream(system, messages, max_tokens, trace_name):
             yield chunk
+
+
+async def chat_with_tools(
+    system: str,
+    messages: list[dict],
+    tools: list[dict],
+    tool_executor: Callable[[str, str], Awaitable[dict]],
+    max_tokens: int = 800,
+    trace_name: str = "mentor-tool-resolve",
+) -> list[dict]:
+    """Resolve any tool calls the model wants to make before the caller does
+    its real (streaming) generation. Only Groq has a real implementation
+    below — other providers aren't configured for tool use in this app, so
+    this is a no-op for them rather than forcing symmetry onto paths that
+    aren't in use."""
+    if settings.ai_provider == "groq":
+        return await _groq_resolve_tool_calls(system, messages, tools, tool_executor, max_tokens, trace_name)
+    logger.debug("tool-calling not implemented for provider=%s, skipping resolution", settings.ai_provider)
+    return messages
 
 # ── Anthropic ────────────────────────────────────────────────────────────────
 
@@ -85,14 +109,77 @@ async def _groq(prompt: str, max_tokens: int, trace_name: str = "llm-generate") 
         gen.update(output=text, usage_details=usage)
         return text
 
+async def _groq_resolve_tool_calls(
+    system: str,
+    messages: list[dict],
+    tools: list[dict],
+    tool_executor: Callable[[str, str], Awaitable[dict]],
+    max_tokens: int,
+    trace_name: str,
+    max_iterations: int = 5,
+) -> list[dict]:
+    """Hand-written agentic loop for Groq's OpenAI-Chat-Completions-compatible
+    tool calling — there is no SDK-provided loop helper for this provider.
+    Non-streaming: each iteration is one blocking chat.completions.create()
+    call; the caller does its own final streaming call afterwards with
+    `tools` omitted (two-phase design — streaming + partial tool-call-argument
+    chunks are fiddly to reassemble, so this avoids that entirely)."""
+    import json as _json
+    from groq import AsyncGroq
+    model = "llama-3.3-70b-versatile"
+    client = AsyncGroq(api_key=settings.groq_api_key)
+    msgs = [{"role": "system", "content": system}] + list(messages)
+
+    with traced_observation("span", trace_name, input={"messages": messages}):
+        for i in range(max_iterations):
+            logger.debug("tool-resolution iteration %d/%d", i + 1, max_iterations)
+            resp = await client.chat.completions.create(
+                model=model,
+                messages=msgs,
+                tools=tools,
+                tool_choice="auto",
+                max_tokens=max_tokens,
+            )
+            message = resp.choices[0].message
+            if not message.tool_calls:
+                logger.info("tool-resolution complete after %d iteration(s), no further tool calls", i + 1)
+                break
+
+            msgs.append({
+                "role": "assistant",
+                "content": message.content,
+                "tool_calls": [
+                    {
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+                    }
+                    for tc in message.tool_calls
+                ],
+            })
+            for tc in message.tool_calls:
+                result = await tool_executor(tc.function.name, tc.function.arguments)
+                msgs.append({"role": "tool", "tool_call_id": tc.id, "content": _json.dumps(result)})
+            logger.debug(
+                "resolved %d tool call(s) this iteration: %s",
+                len(message.tool_calls), [tc.function.name for tc in message.tool_calls],
+            )
+        else:
+            logger.warning("tool-resolution hit max_iterations=%d cap, proceeding with partial results", max_iterations)
+
+    return msgs[1:]
+
+
 async def _groq_stream(system: str, messages: list[dict], max_tokens: int, trace_name: str = "llm-stream-chat"):
     from groq import AsyncGroq
     model = "llama-3.3-70b-versatile"
     with traced_observation("generation", trace_name, model=model, input={"system": system, "messages": messages}) as gen:
         client = AsyncGroq(api_key=settings.groq_api_key)
-        msgs = [{"role": "system", "content": system}] + [
-            {"role": m["role"], "content": m["content"]} for m in messages
-        ]
+        # Pass each message through as-is (not just role/content) so a
+        # tool-augmented history (tool_calls/tool_call_id keys from
+        # chat_with_tools) survives into this call. No-op for every other
+        # caller, which only ever puts role/content keys in these dicts.
+        msgs = [{"role": "system", "content": system}] + list(messages)
         stream = await client.chat.completions.create(
             model=model,
             messages=msgs,
@@ -156,7 +243,7 @@ async def _gemini_stream(system: str, messages: list[dict], max_tokens: int, tra
 
     with traced_observation("generation", trace_name, model=model, input={"system": system, "messages": messages}) as gen:
         client = _gemini_client()
-        print(f"[gemini] streaming {len(contents)} messages with {model}")
+        logger.debug("[gemini] streaming %d messages with %s", len(contents), model)
         full_text = []
         usage_meta = None
         async for chunk in await client.aio.models.generate_content_stream(

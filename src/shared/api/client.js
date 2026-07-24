@@ -26,15 +26,20 @@ async function request(path, options = {}) {
 
   const res = await fetch(`${BASE_URL}${path}`, { ...options, headers })
 
-  if (res.status === 401) {
+  // Only treat a 401 as "your session expired" when a token was actually
+  // attached to this request — a login/register call is unauthenticated by
+  // definition, so a wrong-password 401 from /api/auth/login/* must NOT
+  // trigger this: it should surface as a normal inline form error instead of
+  // wiping (harmless) state and hard-redirecting mid-login.
+  if (res.status === 401 && token) {
     clearToken()
     window.location.href = '/login'
     throw new Error('Unauthorized')
   }
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(err.error ?? 'Request failed')
+    const err = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new Error(err.detail ?? err.error ?? 'Request failed')
   }
 
   // SSE responses — caller handles the stream directly
@@ -46,7 +51,38 @@ async function request(path, options = {}) {
 export const api = {
   get: (path) => request(path),
   post: (path, body) => request(path, { method: 'POST', body: JSON.stringify(body) }),
+  patch: (path, body) => request(path, { method: 'PATCH', body: JSON.stringify(body) }),
   del: (path) => request(path, { method: 'DELETE' }),
+}
+
+// Uploads an image (multipart) for the Simulation CMS (company logos,
+// manager photos). No 'Content-Type' header — the browser sets the
+// multipart boundary itself when the body is a FormData instance.
+export async function uploadImage(file) {
+  const token = getToken()
+  const formData = new FormData()
+  formData.append('file', file)
+  const res = await fetch(`${BASE_URL}/api/admin/uploads/image`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(err.detail ?? err.error ?? 'Upload failed')
+  }
+  return res.json()
+}
+
+// Backend-uploaded images (logo_url/photo_url) are stored as paths relative
+// to the API origin (e.g. "/static/uploads/xyz.png"), not the frontend's own
+// origin — resolve them against BASE_URL so <img src> doesn't 404 against
+// the Vite dev server. Already-absolute URLs (http(s)://...) pass through
+// unchanged, so admin-pasted external image URLs keep working too.
+export function resolveMediaUrl(url) {
+  if (!url) return url
+  if (/^https?:\/\//i.test(url)) return url
+  return `${BASE_URL}${url}`
 }
 
 // Saves a file the backend serves as an attachment (Content-Disposition) to
@@ -58,8 +94,8 @@ export async function downloadFile(path, filename) {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   })
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(err.error ?? 'Download failed')
+    const err = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new Error(err.detail ?? err.error ?? 'Download failed')
   }
   const blob = await res.blob()
   const url = URL.createObjectURL(blob)

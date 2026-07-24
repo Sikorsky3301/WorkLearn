@@ -10,7 +10,8 @@ from sqlalchemy import select
 from datetime import datetime, timedelta, timezone
 from app.database import AsyncSessionLocal
 from app.models import User, Enrollment, TaskCompletion, AgentMessage, EnrollmentStatus, MessageType
-from app.config import SIM_TASK_NAMES, INACTIVITY_DAYS
+from app.models_cms import SimulationTask
+from app.config import INACTIVITY_DAYS
 
 scheduler = AsyncIOScheduler(timezone="UTC")
 
@@ -44,11 +45,23 @@ async def _active_enrollments():
         )
         return result.all()
 
+async def _next_task_name(sim_id: str, task_index: int, fallback: str) -> str:
+    """Task title now comes from the SimulationTask row instead of a
+    hardcoded per-sim_id dict — see app/models_cms.py."""
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(SimulationTask.title).where(
+                SimulationTask.simulation_id == sim_id, SimulationTask.task_index == task_index,
+            )
+        )
+        title = result.scalar_one_or_none()
+        return title or fallback
+
 # ── Daily task reminder ───────────────────────────────────────────────────────
 async def _daily_reminder():
     for enrollment, user in await _active_enrollments():
         done = await _completed_count(enrollment.id)
-        next_task = SIM_TASK_NAMES.get(enrollment.simulation_id, {}).get(done + 1, "your final review")
+        next_task = await _next_task_name(enrollment.simulation_id, done + 1, "your final review")
         content = (
             f"Reminder: your next task is \"{next_task}\". "
             f"You've completed {done}/5 tasks so far — keep the momentum going."
@@ -60,7 +73,7 @@ async def _deadline_check():
     now = datetime.now(timezone.utc)
     for enrollment, user in await _active_enrollments():
         done = await _completed_count(enrollment.id)
-        next_task = SIM_TASK_NAMES.get(enrollment.simulation_id, {}).get(done + 1, "your final review")
+        next_task = await _next_task_name(enrollment.simulation_id, done + 1, "your final review")
         deadline = enrollment.enrolled_at + timedelta(days=SIMULATION_DEADLINE_DAYS)
         days_left = (deadline - now).days
 
@@ -91,7 +104,7 @@ async def _inactivity_nudge():
         rows = result.all()
     for enrollment, user in rows:
         done = await _completed_count(enrollment.id)
-        next_task = SIM_TASK_NAMES.get(enrollment.simulation_id, {}).get(done + 1, "your simulation")
+        next_task = await _next_task_name(enrollment.simulation_id, done + 1, "your simulation")
         content = (
             f"You haven't logged in for {INACTIVITY_DAYS}+ days and \"{next_task}\" is still waiting. "
             f"Even 15 minutes today will move you forward."

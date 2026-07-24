@@ -1,9 +1,9 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from app.models import TaskCompletion, UserSkill, XpLedger, User, Enrollment, AgentMessage, EnrollmentStatus, MessageType
+from app.models_cms import SimulationTask
 from app.config import (
-    SIM_TASK_SKILL_AWARDS, SIM_TASK_XP_AWARDS, TARGET_ROLE_REQUIREMENTS,
-    SKILL_LABELS, QUIZ_BONUS_THRESHOLD, QUIZ_BONUS_XP
+    TARGET_ROLE_REQUIREMENTS, SKILL_LABELS, QUIZ_BONUS_THRESHOLD, QUIZ_BONUS_XP
 )
 from datetime import datetime, timezone
 
@@ -38,8 +38,16 @@ async def award_task_completion(
         )
         db.add(tc)
 
-    # Award skills
-    skill_awards = SIM_TASK_SKILL_AWARDS.get(simulation_id, {}).get(task_id, {})
+    # XP/skill awards now come from the task's own SimulationTask row instead
+    # of a hardcoded per-(simulation_id, task_id) dict — see app/models_cms.py.
+    sim_task_res = await db.execute(
+        select(SimulationTask).where(
+            SimulationTask.simulation_id == simulation_id, SimulationTask.task_index == task_id,
+        )
+    )
+    sim_task = sim_task_res.scalar_one_or_none()
+
+    skill_awards = sim_task.skill_awards if sim_task else {}
     for skill_key, delta in skill_awards.items():
         res = await db.execute(
             select(UserSkill).where(UserSkill.user_id == user_id, UserSkill.skill_key == skill_key)
@@ -51,7 +59,7 @@ async def award_task_completion(
             db.add(UserSkill(user_id=user_id, skill_key=skill_key, current_score=min(100, delta)))
 
     # Award XP
-    base_xp = SIM_TASK_XP_AWARDS.get(simulation_id, {}).get(task_id, 0)
+    base_xp = sim_task.xp_award if sim_task else 0
     bonus_xp = QUIZ_BONUS_XP if (quiz_score and quiz_score >= QUIZ_BONUS_THRESHOLD) else 0
     total_xp = base_xp + bonus_xp
 

@@ -1,28 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useOnboarding, useAcceptOnboarding } from '../../shared/api/hooks'
-import lumenLogoImg from '../../assets/lumen-logo.png'
-import enigmaLogoImg from '../../assets/enigma-logo.png'
-import nimbusLogoImg from '../../assets/nimbus-logo.png'
-import derekHoltPhoto from '../../assets/derek-holt.jpg'
+import { resolveMediaUrl } from '../../shared/api/client'
 
-// Brand mark per simulation — matches the logo used in that sim's own workspace.
-const SIM_LOGOS = {
-  'da-job-sim': { src: lumenLogoImg, alt: 'Lumen Corporation' },
-  'frontend-dev-sim': { src: enigmaLogoImg, alt: 'Enigma' },
-  'sales-crm-sim': { src: nimbusLogoImg, alt: 'Nimbus CRM' },
-}
-
-// Real manager headshots, where we have one — sims without an entry here
-// fall back to the initials avatar (see the manager intro card below).
-const SIM_MANAGER_PHOTOS = {
-  'sales-crm-sim': derekHoltPhoto,
-}
-
-function SimLogo({ sim, size = 'md' }) {
+function SimLogo({ logoUrl, alt, size = 'md' }) {
   const h = { sm: 'h-5', md: 'h-7', lg: 'h-9' }[size]
-  const logo = SIM_LOGOS[sim] ?? SIM_LOGOS['da-job-sim']
-  return <img src={logo.src} alt={logo.alt} className={`${h} w-auto object-contain shrink-0`} />
+  if (!logoUrl) return null
+  return <img src={resolveMediaUrl(logoUrl)} alt={alt} className={`${h} w-auto object-contain shrink-0`} />
 }
 
 export default function SimOnboarding({ sim = 'da-job-sim', onAccept }) {
@@ -46,7 +30,7 @@ export default function SimOnboarding({ sim = 'da-job-sim', onAccept }) {
     )
   }
 
-  const { company, manager, intro, learn = [], projects = [], offer } = data
+  const { company, manager, intro, learn = [], projects = [], offer, logo_url: logoUrl } = data
 
   // ── Badge celebration screen ────────────────────────────────────────────────
   if (celebrating) {
@@ -82,7 +66,7 @@ export default function SimOnboarding({ sim = 'da-job-sim', onAccept }) {
 
       {/* Company header */}
       <div className="flex items-center gap-3 mb-6 pb-5 border-b border-border">
-        <SimLogo sim={sim} size="lg" />
+        <SimLogo logoUrl={logoUrl} alt={company?.name} size="lg" />
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <span className="font-bold text-on-surface text-lg leading-tight">{company?.name}</span>
@@ -104,8 +88,8 @@ export default function SimOnboarding({ sim = 'da-job-sim', onAccept }) {
           {/* Manager intro */}
           <div className="card">
             <div className="flex items-center gap-3 mb-4 pb-4 border-b border-border">
-              {SIM_MANAGER_PHOTOS[sim] ? (
-                <img src={SIM_MANAGER_PHOTOS[sim]} alt={manager?.name} className="w-11 h-11 rounded-full object-cover shrink-0" />
+              {manager?.photo_url ? (
+                <img src={resolveMediaUrl(manager.photo_url)} alt={manager?.name} className="w-11 h-11 rounded-full object-cover shrink-0" />
               ) : (
                 <div className="w-11 h-11 bg-orange-500 rounded-full flex items-center justify-center shrink-0">
                   <span className="text-white text-sm font-bold">{manager?.avatar}</span>

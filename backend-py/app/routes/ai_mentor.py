@@ -1,5 +1,6 @@
+import functools
 import json
-import traceback
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,11 +8,14 @@ from sqlalchemy import select, delete
 from pydantic import BaseModel
 from app.database import get_db, AsyncSessionLocal
 from app.auth import get_current_user
-from app.models import User, Enrollment, TaskCompletion, MentorChatMessage, UserSkill, XpLedger
-from app.services.skill_engine import get_user_skills, compute_skill_gps
-from app.services.llm import stream_chat, generate
+from app.models import User, Enrollment, MentorChatMessage
+from app.services.skill_engine import compute_skill_gps
+from app.services.llm import stream_chat, generate, chat_with_tools
 from app.services.langfuse_client import traced_observation, traced_context
-from app.config import SKILL_LABELS, SIM_TASK_NAMES, TARGET_ROLE_REQUIREMENTS
+from app.services.mentor_tools import TOOL_SCHEMAS, execute_tool, MentorToolContext
+from app.routes.enrollments import _build_assignment
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["ai-mentor"])
 
@@ -46,100 +50,20 @@ Direct, warm, and practical. One good example beats a long explanation.\
 """
 
 
-def _week_for_task(task_id: int, sim_id: str) -> int:
-    from app.routes.enrollments import SIM_TASK_WEEKS
-    return SIM_TASK_WEEKS.get(sim_id, {}).get(task_id, 1)
-
-def _build_context(user: User, skills: dict, enrollment: "Enrollment | None",
-                   completed_task_ids: list[int], task_scores: dict, recent_xp: list,
-                   onboarding_accepted: bool = False) -> str:
-    target = user.target_role or "junior_da"
-    requirements = TARGET_ROLE_REQUIREMENTS.get(target, {})
-
-    # Skill summary with gap indicators
-    skill_lines = []
-    for key, label in SKILL_LABELS.items():
-        score = skills.get(key, 0)
-        req = requirements.get(key, 0)
-        gap = req - score
-        if gap > 0:
-            skill_lines.append(f"  - {label}: {score}/100 (needs +{gap} to reach {target} requirement of {req})")
-        else:
-            skill_lines.append(f"  - {label}: {score}/100 (requirement met)")
-
-    skill_block = "\n".join(skill_lines) if skill_lines else "  No skill data yet."
-
-    # Enrollment / simulation progress
-    if enrollment:
-        from app.routes.enrollments import SIM_WORK_TASK_IDS, SIM_TITLES
-        sim_id = enrollment.simulation_id
-        task_names = SIM_TASK_NAMES.get(sim_id, {})
-        work_task_ids = SIM_WORK_TASK_IDS.get(sim_id, [1, 2, 3, 4, 5])
-
-        current_task = enrollment.current_task_idx
-        current_task_name = task_names.get(current_task, f"Task {current_task}")
-        completed_names = [task_names.get(t, f"Task {t}") for t in sorted(completed_task_ids)]
-        remaining = [task_names.get(i, f"Task {i}") for i in work_task_ids if i not in completed_task_ids]
-
-        score_details = []
-        for task_id, info in task_scores.items():
-            name = task_names.get(task_id, f"Task {task_id}")
-            parts = []
-            if info.get("score") is not None:
-                parts.append(f"submission score {info['score']}/100")
-            if info.get("quiz_score") is not None:
-                parts.append(f"quiz {info['quiz_score']}/100")
-            if parts:
-                score_details.append(f"  - {name}: {', '.join(parts)}")
-
-        # Where the student is in the journey (onboarding → Week 1 → Week N)
-        work_completed = [t for t in completed_task_ids if t > 0]
-        next_work = next((i for i in work_task_ids if i not in work_completed), None)
-        if not onboarding_accepted:
-            journey_step = "Onboarding — has NOT accepted the offer letter yet (Week 1 not started)"
-        elif next_work is None:
-            journey_step = f"Finished — all {len(work_task_ids)} tasks complete"
-        else:
-            journey_step = f"Week {_week_for_task(next_work, sim_id)} — currently on {task_names.get(next_work, f'Task {next_work}')}"
-
-        sim_block = f"""\
-Simulation: {SIM_TITLES.get(sim_id, sim_id)} (status: {enrollment.status.value})
-Journey step: {journey_step}
-Onboarding accepted: {'yes' if onboarding_accepted else 'no'}
-Completed tasks ({len(work_completed)}/{len(work_task_ids)}): {', '.join(completed_names) if completed_names else 'None yet'}
-Remaining tasks: {', '.join(remaining) if remaining else 'All done!'}"""
-        if score_details:
-            sim_block += "\nTask performance:\n" + "\n".join(score_details)
-    else:
-        sim_block = "Simulation: Not enrolled in any simulation yet."
-
-    # Recent XP
-    if recent_xp:
-        xp_parts = [f"{x['source']} (+{x['amount']} XP)" for x in recent_xp[:3]]
-        xp_note = "\nRecent XP earned: " + ", ".join(xp_parts)
-    else:
-        xp_note = ""
-
-    institution_note = ""
-    if user.institution:
-        institution_note = f"\nInstitution: {user.institution}"
-        if user.department:
-            institution_note += f", Dept: {user.department}"
-        if user.year:
-            institution_note += f", Year: {user.year}"
-
-    return f"""
-## Student Profile
-Name: {user.name}
-Total XP: {user.xp}
-Target role: {target.replace('_', ' ').title()}{institution_note}
-
-## Simulation Progress
-{sim_block}
-
-## Skill Profile (vs {target.replace('_', ' ').title()} requirements)
-{skill_block}{xp_note}
-"""
+def _current_task_headline(assignment: dict | None) -> str:
+    """The one cheap, always-on piece of context almost every message needs —
+    everything else (skill gaps, full task history, XP) is tool-gated, see
+    app/services/mentor_tools.py."""
+    if not assignment:
+        return "not enrolled in any simulation yet"
+    if not assignment.get("has_assignment"):
+        reason = assignment.get("reason")
+        if reason == "onboarding_pending":
+            return f"enrolled in {assignment.get('simulation_title')} but hasn't accepted the offer letter yet"
+        if reason == "completed":
+            return f"has completed all tasks in {assignment.get('simulation_title')}"
+        return "not enrolled in any simulation yet"
+    return f"{assignment.get('task_name')} ({assignment.get('simulation_title')}) — {assignment.get('brief', '')}".strip()
 
 
 class ChatBody(BaseModel):
@@ -162,9 +86,6 @@ async def chat(body: ChatBody, db: AsyncSession = Depends(get_db), token: dict =
     if not user:
         raise HTTPException(404, "User not found")
 
-    # Fetch skills
-    skills = await get_user_skills(db, user_id)
-
     # Fetch active enrollment
     enroll_res = await db.execute(
         select(Enrollment)
@@ -174,33 +95,16 @@ async def chat(body: ChatBody, db: AsyncSession = Depends(get_db), token: dict =
     )
     enrollment = enroll_res.scalar_one_or_none()
 
-    # Fetch completed tasks + scores
-    completed_task_ids = []
-    task_scores: dict[int, dict] = {}
-    if enrollment:
-        tc_res = await db.execute(
-            select(TaskCompletion).where(TaskCompletion.enrollment_id == enrollment.id)
-        )
-        for tc in tc_res.scalars().all():
-            completed_task_ids.append(tc.task_id)
-            task_scores[tc.task_id] = {"score": tc.score, "quiz_score": tc.quiz_score}
-
-    # Recent XP ledger
-    xp_res = await db.execute(
-        select(XpLedger)
-        .where(XpLedger.user_id == user_id)
-        .order_by(XpLedger.created_at.desc())
-        .limit(5)
-    )
-    recent_xp = [{"source": x.source, "amount": x.amount} for x in xp_res.scalars().all()]
-
-    # Has the student accepted the simulation offer (onboarding done)?
-    onboarding_accepted = False
-    if enrollment:
-        from app.routes.enrollments import _has_journey_badge
-        onboarding_accepted = await _has_journey_badge(db, user_id, enrollment.simulation_id)
-
-    context_block = _build_context(user, skills, enrollment, completed_task_ids, task_scores, recent_xp, onboarding_accepted)
+    # One cheap query for the always-on "current task" headline — also
+    # stashed on the tool context so a `get_current_task` tool call within
+    # this same request reuses it instead of re-querying.
+    assignment = await _build_assignment(db, user_id, enrollment) if enrollment else None
+    target_role = (user.target_role or "junior_da").replace("_", " ").title()
+    context_block = f"""
+## Current Context
+Student: {user.name} | Target role: {target_role}
+Current task: {_current_task_headline(assignment)}
+"""
     system = SYSTEM_PROMPT + "\n" + context_block
 
     messages = [
@@ -212,6 +116,29 @@ async def chat(body: ChatBody, db: AsyncSession = Depends(get_db), token: dict =
     async with AsyncSessionLocal() as save_db:
         save_db.add(MentorChatMessage(user_id=user_id, role="user", content=body.message))
         await save_db.commit()
+
+    # Tool resolution needs the request-scoped `db` session, which FastAPI
+    # closes right after this handler returns — it must run here, before
+    # StreamingResponse starts iterating event_stream(), not inside it.
+    #
+    # A transient Groq hiccup (rate limit, timeout, connection reset) during
+    # this extra non-streaming call must not take down the whole chat turn —
+    # degrade to the plain (untooled) message list instead of raising, same
+    # posture as an individual tool failure in execute_tool. Without this,
+    # any tool-resolution error propagates unhandled into the global 500
+    # handler before the SSE stream even starts, which is exactly what a
+    # "Something went wrong" report with no visible cause looks like.
+    tool_ctx = MentorToolContext(db=db, user_id=user_id, user=user, enrollment=enrollment, cached_assignment=assignment)
+    try:
+        with traced_context(user_id=user_id, session_id=f"mentor-{user_id}", tags=["ai-mentor", "tool-resolution"]):
+            resolved_messages = await chat_with_tools(
+                system, messages, TOOL_SCHEMAS,
+                tool_executor=functools.partial(execute_tool, ctx=tool_ctx),
+                trace_name="mentor-tool-resolve",
+            )
+    except Exception:
+        logger.exception("tool resolution failed, falling back to untooled context")
+        resolved_messages = messages
 
     async def event_stream():
         full_response = []
@@ -226,11 +153,11 @@ async def chat(body: ChatBody, db: AsyncSession = Depends(get_db), token: dict =
             # history), so the user's own id is the natural session key.
             with traced_context(user_id=user_id, session_id=f"mentor-{user_id}", tags=["ai-mentor"]):
                 try:
-                    async for chunk in stream_chat(system, messages, trace_name="mentor-chat-generation"):
+                    async for chunk in stream_chat(system, resolved_messages, trace_name="mentor-chat-generation"):
                         full_response.append(chunk)
                         yield f"data: {json.dumps({'text': chunk})}\n\n"
                 except Exception as e:
-                    print(f"[chat] ERROR:\n{traceback.format_exc()}")
+                    logger.exception("mentor chat stream failed")
                     yield f"data: {json.dumps({'error': str(e)})}\n\n"
                 finally:
                     if full_response:
@@ -297,6 +224,7 @@ async def skill_gps(role: str = "junior_da", db: AsyncSession = Depends(get_db),
             match = re.search(r'\[.*\]', raw, re.DOTALL)
             next_actions = json.loads(match.group()) if match else []
         except Exception:
+            logger.warning("skill-gps next_actions generation/parsing failed, using fallback", exc_info=True)
             next_actions = [f"Improve your {g['skill']} by completing related simulation tasks" for g in gps["top_gaps"]]
 
     return {**gps, "target_role": target_role, "next_actions": next_actions}
