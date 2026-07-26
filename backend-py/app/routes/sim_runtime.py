@@ -22,31 +22,23 @@ from sqlalchemy import select
 from app.database import get_db
 from app.auth import get_current_user
 from app.models_cms import Simulation, SimulationTask, SimulationStatus
-from app.services.task_types import strip_secrets
 from app.services.llm import generate, stream_chat
 from app.services.langfuse_client import traced_context
+from app.services.sim_view import build_simulation_public_dict
 
 router = APIRouter(prefix="/api/simulations", tags=["sim-runtime"])
 logger = logging.getLogger(__name__)
-
-
-def _task_public_dict(t: SimulationTask) -> dict:
-    return {
-        "id": t.id, "task_index": t.task_index, "title": t.title, "type": t.type,
-        "objective": t.objective, "briefing": t.briefing,
-        "what_to_do": t.what_to_do, "what_to_submit": t.what_to_submit, "hints": t.hints,
-        "success_criteria": t.success_criteria,
-        "reference_data": t.reference_data, "model_solution": t.model_solution,
-        "rubric": t.rubric,
-        "config": strip_secrets(t.type, t.config), "week": t.week,
-    }
 
 
 @router.get("/{sim_id}/full")
 async def get_full_simulation(sim_id: str, db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
     """Everything GenericSimShell needs to render a simulation — sim metadata
     + every task, with grading secrets (grader_key, rules, llm_judge_prompt,
-    persona.personality_prompt, etc.) stripped out."""
+    persona.personality_prompt, etc.) stripped out. PUBLISHED-only — this is
+    the ONLY access control this endpoint has, so it must stay separate from
+    the admin-only draft-preview endpoint (see
+    admin_simulations.preview_full_simulation) rather than growing a bypass
+    flag here."""
     result = await db.execute(select(Simulation).where(Simulation.id == sim_id, Simulation.status == SimulationStatus.PUBLISHED))
     sim = result.scalar_one_or_none()
     if not sim:
@@ -55,19 +47,15 @@ async def get_full_simulation(sim_id: str, db: AsyncSession = Depends(get_db), t
         select(SimulationTask).where(SimulationTask.simulation_id == sim_id).order_by(SimulationTask.task_index)
     )
     tasks = tasks_res.scalars().all()
-    return {
-        "simulation": {
-            "id": sim.id, "title": sim.title, "description": sim.description, "company": sim.company,
-            "logo_url": sim.logo_url, "domain": sim.domain, "category": sim.category,
-            "accent_color": sim.accent_color, "difficulty": sim.difficulty,
-            "estimated_hours": sim.estimated_hours, "skills": sim.skills,
-            "rating": sim.rating, "rating_count": sim.rating_count, "manager": sim.manager,
-        },
-        "tasks": [_task_public_dict(t) for t in tasks],
-    }
+    return build_simulation_public_dict(sim, tasks)
 
 
 async def _get_task(db: AsyncSession, sim_id: str, task_index: int, task_type: str) -> SimulationTask:
+    """Intentionally status-agnostic (no PUBLISHED filter) — this is what
+    lets roleplay_message/grade_text below work against DRAFT simulations
+    for any authenticated user, which is exactly what makes the admin
+    builder's interactive preview possible without a separate AI endpoint.
+    Do not add a status filter here."""
     result = await db.execute(
         select(SimulationTask).where(
             SimulationTask.simulation_id == sim_id, SimulationTask.task_index == task_index,
@@ -87,9 +75,9 @@ def _extract_json(raw: str) -> dict:
     return json.loads(match.group())
 
 
-async def _collect_stream_chat(system: str, messages: list[dict], max_tokens: int, trace_name: str) -> str:
+async def _collect_stream_chat(system: str, messages: list[dict], max_tokens: int, trace_name: str, temperature: float | None = None) -> str:
     chunks = []
-    async for chunk in stream_chat(system, messages, max_tokens=max_tokens, trace_name=trace_name):
+    async for chunk in stream_chat(system, messages, max_tokens=max_tokens, trace_name=trace_name, temperature=temperature):
         chunks.append(chunk)
     return "".join(chunks)
 
@@ -124,6 +112,16 @@ def _build_roleplay_prompt(config: dict, mood: str, context_note: str) -> str:
         ),
     }.get(mode, "")
 
+    # Always appended regardless of mode — the admin's escape hatch for
+    # genre-specific scene-setting the two sales presets above don't cover.
+    additional_instructions = config.get("additional_instructions") or ""
+
+    documents = config.get("context_documents") or []
+    docs_section = ""
+    if documents:
+        docs_body = "\n\n".join(f"### {d['title']}\n{d['body']}" for d in documents)
+        docs_section = f"\n\n## Reference Materials\n{docs_body}"
+
     return f"""\
 ## Your character
 {persona['name']} — {persona['role']}
@@ -134,6 +132,7 @@ conversation in response to how well the rep is doing.
 ## Context
 {context_note}
 {mode_instructions}
+{additional_instructions}{docs_section}
 
 ## Rules
 - Stay fully in character. Never mention you are an AI, a simulation, or break the fourth wall.
@@ -171,7 +170,10 @@ async def roleplay_message(
     ]
     try:
         with traced_context(user_id=token["sub"], tags=["sim-runtime", "ai-roleplay", sim_id]):
-            raw = await _collect_stream_chat(system, messages, max_tokens=350, trace_name="sim-roleplay")
+            raw = await _collect_stream_chat(
+                system, messages, max_tokens=config.get("max_tokens") or 350, trace_name="sim-roleplay",
+                temperature=config.get("temperature"),
+            )
     except Exception:
         logger.exception("[sim-runtime] roleplay-message failed")
         raise HTTPException(502, "The AI customer is unavailable right now — try again.")
@@ -211,7 +213,10 @@ async def grade_text(
 
     try:
         with traced_context(user_id=token["sub"], tags=["sim-runtime", "text-rubric", sim_id]):
-            raw = await generate(prompt, max_tokens=500, trace_name="sim-grade-text")
+            raw = await generate(
+                prompt, max_tokens=config.get("max_tokens") or 500, trace_name="sim-grade-text",
+                temperature=config.get("temperature"),
+            )
         result = _extract_json(raw)
     except Exception:
         logger.exception("[sim-runtime] grade-text failed")

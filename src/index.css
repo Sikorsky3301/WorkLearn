@@ -14,11 +14,11 @@
 
 @layer components {
   .btn-primary {
-    @apply bg-primary text-white px-4 py-2 rounded text-sm font-semibold hover:bg-primary-dark transition-colors;
+    @apply bg-primary text-white px-4 py-2 rounded text-sm font-semibold hover:bg-primary-dark transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2;
   }
 
   .btn-secondary {
-    @apply bg-white text-on-surface border border-border px-4 py-2 rounded text-sm font-semibold hover:border-primary transition-colors;
+    @apply bg-white text-on-surface border border-border px-4 py-2 rounded text-sm font-semibold hover:border-primary transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2;
   }
 
   .btn-ghost {
@@ -34,7 +34,7 @@
   }
 
   .input {
-    @apply w-full bg-white border border-border rounded px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:border-primary transition-colors;
+    @apply w-full bg-white border border-border rounded px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition-colors;
   }
 
   .section-label {

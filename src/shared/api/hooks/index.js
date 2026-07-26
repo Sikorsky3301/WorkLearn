@@ -263,6 +263,22 @@ export function useAdminSimulation(id) {
   })
 }
 
+export function useSimulationTemplates() {
+  return useQuery({
+    queryKey: ['admin-sim-templates'],
+    queryFn: () => api.get('/api/admin/simulation-templates'),
+    staleTime: 60_000,
+  })
+}
+
+export function useCreateSimulationFromTemplate() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ templateKey, id, title }) => api.post(`/api/admin/simulations/from-template/${templateKey}`, { id, title }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-simulations'] }),
+  })
+}
+
 export function useCreateSimulation() {
   const qc = useQueryClient()
   return useMutation({
@@ -312,6 +328,14 @@ export function useDeleteSimulation() {
   })
 }
 
+export function useDuplicateSimulation(id) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (newId) => api.post(`/api/admin/simulations/${id}/duplicate`, { new_id: newId }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-simulations'] }),
+  })
+}
+
 export function useCreateTask(simId) {
   const qc = useQueryClient()
   return useMutation({
@@ -336,11 +360,33 @@ export function useDeleteTask(simId) {
   })
 }
 
+export function useDuplicateTask(simId) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (taskId) => api.post(`/api/admin/simulations/${simId}/tasks/${taskId}/duplicate`, {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-simulation', simId] }),
+  })
+}
+
 export function useReorderTasks(simId) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (taskIds) => api.post(`/api/admin/simulations/${simId}/tasks/reorder`, { task_ids: taskIds }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-simulation', simId] }),
+  })
+}
+
+export function usePreviewFullSimulation(simId) {
+  return useQuery({
+    queryKey: ['admin-sim-preview-full', simId],
+    queryFn: () => api.get(`/api/admin/simulations/${simId}/preview-full`),
+    enabled: !!simId,
+  })
+}
+
+export function usePreviewRunSandbox(simId, taskId) {
+  return useMutation({
+    mutationFn: (code) => api.post(`/api/admin/simulations/${simId}/tasks/${taskId}/preview-run-sandbox`, { code }),
   })
 }
 

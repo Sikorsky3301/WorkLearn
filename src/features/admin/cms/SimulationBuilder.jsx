@@ -6,10 +6,10 @@ import { useAdminSimulation, useCreateSimulation, useUpdateSimulation, usePublis
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../../shared/ui/shadcn/tabs'
 import { Badge } from '../../../shared/ui/shadcn/badge'
 import { Button } from '../../../shared/ui/shadcn/button'
-import MetadataTab from './MetadataTab'
-import ManagerOnboardingTab from './ManagerOnboardingTab'
-import StagesBuilderTab from './StagesBuilderTab'
-import PreviewTab from './PreviewTab'
+import MetadataTab from './tabs/MetadataTab'
+import ManagerOnboardingTab from './tabs/ManagerOnboardingTab'
+import StagesTab from './tabs/StagesTab'
+import PreviewTab from './tabs/PreviewTab'
 
 const BLANK_SIM = {
   id: '', title: '', description: '', company: '', domain: '', category: '',
@@ -128,7 +128,7 @@ export default function SimulationBuilder() {
                 <ManagerOnboardingTab draft={draft} setDraft={setDraft} onSave={handleSaveMetadata} saving={updateSim.isPending} />
               </TabsContent>
               <TabsContent value="stages" className="mt-6">
-                <StagesBuilderTab simId={realId} />
+                <StagesTab simId={realId} />
               </TabsContent>
               <TabsContent value="preview" className="mt-6">
                 <PreviewTab simId={realId} />

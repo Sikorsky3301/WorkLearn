@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { streamChat, api } from '../../shared/api/client'
 import { useAuth, ROLES } from '../auth/AuthContext'
@@ -27,8 +27,11 @@ export default function AIMentor() {
   const [streaming, setStreaming]         = useState(false)
   const [clearing, setClearing]           = useState(false)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
-  const bottomRef = useRef(null)
   const messagesRef = useRef(null)
+  // Whether we should auto-follow new content — true by default, but turned
+  // off the moment the user scrolls away from the bottom so reading earlier
+  // messages during a streaming reply doesn't keep getting yanked away.
+  const autoScrollRef = useRef(true)
 
   useEffect(() => {
     api.get('/api/chat/history')
@@ -37,12 +40,38 @@ export default function AIMentor() {
       .finally(() => setHistoryLoading(false))
   }, [])
 
+  // Snap to the bottom exactly once, instantly, right when history finishes
+  // loading — useLayoutEffect so it happens before paint, avoiding a visible
+  // flash of the top of the conversation before jumping down.
+  useLayoutEffect(() => {
+    if (historyLoading) return
+    const el = messagesRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [historyLoading])
+
+  // Auto-scroll during an active conversation — scrolls the chat container
+  // only (never the page), and only while the user hasn't manually scrolled
+  // up to re-read something.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    if (historyLoading) return
+    const el = messagesRef.current
+    if (!el || !autoScrollRef.current) return
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+  }, [messages, historyLoading])
+
+  function handleMessagesScroll() {
+    const el = messagesRef.current
+    if (!el) return
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    autoScrollRef.current = distanceFromBottom < 120
+  }
 
   async function sendMessage() {
     if (!input.trim() || streaming) return
+
+    // Sending a message is an intentional action — resume following the
+    // conversation even if the user had scrolled up beforehand.
+    autoScrollRef.current = true
 
     const userText = input.trim()
     setInput('')
@@ -198,7 +227,7 @@ export default function AIMentor() {
             </div>
 
             {/* Messages — fixed height, scrolls inside */}
-            <div ref={messagesRef} className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1 mb-4">
+            <div ref={messagesRef} onScroll={handleMessagesScroll} className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1 mb-4">
               {historyLoading ? (
                 <div className="flex items-center justify-center py-10">
                   <span className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -233,7 +262,6 @@ export default function AIMentor() {
                   </div>
                 </div>
               ))}
-              <div ref={bottomRef} />
             </div>
 
             {/* Input */}

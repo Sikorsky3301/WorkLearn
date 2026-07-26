@@ -1,10 +1,10 @@
 import { useRef, useState } from 'react'
 import { Loader2, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { uploadImage, resolveMediaUrl } from '../../../shared/api/client'
-import { Label } from '../../../shared/ui/shadcn/label'
-import { Input } from '../../../shared/ui/shadcn/input'
-import { Button } from '../../../shared/ui/shadcn/button'
+import { uploadImage, resolveMediaUrl } from '../../../../shared/api/client'
+import { Label } from '../../../../shared/ui/shadcn/label'
+import { Input } from '../../../../shared/ui/shadcn/input'
+import { Button } from '../../../../shared/ui/shadcn/button'
 
 /** Shared upload widget for the CMS's two image fields (Simulation.logo_url,
  * manager.photo_url) — file upload with a live preview, plus a plain URL

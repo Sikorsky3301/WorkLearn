@@ -45,7 +45,12 @@ TASK_TYPES: dict[str, TaskTypeSpec] = {
         secret_config_keys=("persona.personality_prompt",),
     ),
     "crm_workspace": TaskTypeSpec(
-        label="CRM Workspace",
+        # Renders a hardcoded sales-CRM shell (leads/accounts/contacts/
+        # opportunities/pipeline) regardless of the simulation's own domain —
+        # labeled explicitly so it doesn't look like a generic "workspace"
+        # option for non-sales genres. See app/schemas_cms.py's
+        # CrmWorkspaceConfig for the fixed module list this always renders.
+        label="CRM Workspace (Sales)",
         grades_via="rubric",
     ),
     "code_sandbox": TaskTypeSpec(

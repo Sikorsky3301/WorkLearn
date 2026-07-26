@@ -9,7 +9,7 @@ from app.config import settings
 from app.logging_config import configure_logging
 from app.request_context import RequestIdMiddleware
 from app.database import engine, Base
-from app.routes import auth, enrollments, ai_mentor, agent_messages, analytics, admin, mentor, sandbox, crm_sim, admin_simulations, sim_runtime, admin_uploads
+from app.routes import auth, enrollments, ai_mentor, agent_messages, analytics, admin, mentor, sandbox, crm_sim, admin_simulations, admin_simulation_templates, sim_runtime, admin_uploads
 from app import models_cms  # noqa: F401 — registers Simulation/SimulationTask on Base.metadata before create_all
 from app.agents.manager import start_scheduler
 from app.services.langfuse_client import init_langfuse, shutdown_langfuse, langfuse_enabled
@@ -100,6 +100,7 @@ app.include_router(mentor.router)
 app.include_router(sandbox.router)
 app.include_router(crm_sim.router)
 app.include_router(admin_simulations.router)
+app.include_router(admin_simulation_templates.router)
 app.include_router(sim_runtime.router)
 app.include_router(admin_uploads.router)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")

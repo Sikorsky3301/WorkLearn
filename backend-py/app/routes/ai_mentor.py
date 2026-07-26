@@ -100,9 +100,14 @@ async def chat(body: ChatBody, db: AsyncSession = Depends(get_db), token: dict =
     # this same request reuses it instead of re-querying.
     assignment = await _build_assignment(db, user_id, enrollment) if enrollment else None
     target_role = (user.target_role or "junior_da").replace("_", " ").title()
+    # Total XP is a free read off the already-loaded `user` row (the
+    # authoritative running total, not derived from the ledger) — worth
+    # making always-on rather than tool-gated since "how much XP do I have"
+    # is one of the most common questions, and a model summing only the
+    # capped recent-awards list from get_xp_ledger would otherwise undercount.
     context_block = f"""
 ## Current Context
-Student: {user.name} | Target role: {target_role}
+Student: {user.name} | Target role: {target_role} | Total XP: {user.xp}
 Current task: {_current_task_headline(assignment)}
 """
     system = SYSTEM_PROMPT + "\n" + context_block

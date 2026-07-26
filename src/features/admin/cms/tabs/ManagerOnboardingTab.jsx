@@ -1,10 +1,10 @@
 import { Loader2 } from 'lucide-react'
-import { Input } from '../../../shared/ui/shadcn/input'
-import { Textarea } from '../../../shared/ui/shadcn/textarea'
-import { Label } from '../../../shared/ui/shadcn/label'
-import { Card, CardContent } from '../../../shared/ui/shadcn/card'
-import { Button } from '../../../shared/ui/shadcn/button'
-import LogoUploadField from './LogoUploadField'
+import { Input } from '../../../../shared/ui/shadcn/input'
+import { Textarea } from '../../../../shared/ui/shadcn/textarea'
+import { Label } from '../../../../shared/ui/shadcn/label'
+import { Card, CardContent } from '../../../../shared/ui/shadcn/card'
+import { Button } from '../../../../shared/ui/shadcn/button'
+import LogoUploadField from '../shared/LogoUploadField'
 
 function patch(draft, setDraft, path, value) {
   const next = structuredClone(draft)

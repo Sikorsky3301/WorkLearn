@@ -69,7 +69,13 @@ TOOL_SCHEMAS: list[dict] = [
         "type": "function",
         "function": {
             "name": "get_xp_ledger",
-            "description": "Get the student's most recent XP awards, with source and amount.",
+            "description": (
+                "Get the student's all-time total XP (use this for any 'how much XP do I have / have I "
+                "earned in total' question) plus a short list of their most recent individual XP awards "
+                "with source and amount, for describing recent activity. The recent-awards list is capped "
+                "at `limit` entries and is NOT the full history — never sum it to answer a 'total' question, "
+                "use the separate total_xp field for that."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -80,7 +86,7 @@ TOOL_SCHEMAS: list[dict] = [
                     # completions.create() call with a 400 if the emitted
                     # type doesn't match a strict "integer" declaration —
                     # tool_get_xp_ledger coerces whichever shape arrives.
-                    "limit": {"type": ["integer", "string"], "description": "Max entries to return, default 5."},
+                    "limit": {"type": ["integer", "string"], "description": "Max recent-award entries to return, default 5. Does not affect total_xp."},
                 },
             },
         },
@@ -133,7 +139,12 @@ async def tool_get_xp_ledger(ctx: MentorToolContext, limit: int | str = 5, **_kw
         .limit(limit)
     )
     entries = [{"source": x.source, "amount": x.amount, "created_at": x.created_at.isoformat()} for x in result.scalars().all()]
-    return {"recent_xp": entries}
+    # ctx.user.xp is the authoritative running total (updated atomically in
+    # award_task_completion), not derived from the ledger — a model summing
+    # the capped `recent_xp` list below to answer "what's my total XP" would
+    # silently undercount for anyone with more than `limit` XP-earning
+    # events, which is exactly the bug this field exists to prevent.
+    return {"total_xp": ctx.user.xp, "recent_xp": entries}
 
 
 TOOL_DISPATCH = {

@@ -20,7 +20,15 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     gemini_api_key: str = ""
     groq_api_key: str = ""
-    ai_provider: str = "anthropic"  # anthropic | gemini | groq
+    ai_provider: str = "anthropic"  # anthropic | gemini | groq | openai
+
+    # "openai" here means any OpenAI-Chat-Completions-compatible endpoint,
+    # not necessarily api.openai.com — e.g. a self-hosted vLLM/ngrok server.
+    # base_url/model must both be set for this provider to work.
+    openai_base_url: str = "https://api.openai.com/v1"
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o-mini"
+
     frontend_url: str = "http://localhost:5173"
     port: int = 3001
 

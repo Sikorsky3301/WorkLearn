@@ -1,15 +1,17 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Building2, UserCircle2, GraduationCap, Blocks, ShieldCheck,
   ClipboardList, LogOut, Search, Trash2, Users, Award, Activity as ActivityIcon,
+  AlertTriangle, X,
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
 import {
   useAdminStats, useAdminUniversities, useAdminUsers, useAdminActivity,
   useUserEnrollments, useDeleteUser, useDeleteEnrollment,
 } from '../../shared/api/hooks'
-import SimulationsListPanel from './simulations/SimulationsListPanel'
+import SimulationsListPanel from './cms/SimulationsListPanel'
+import logo from '../../assets/logo.png'
 
 const FEATURE_GATES = [
   { id: 'python_sandbox',   label: 'Python Sandbox',        description: 'Run and execute Python code in an isolated sandbox.',   directUser: true,  uniStudent: false, mentor: true  },
@@ -22,20 +24,22 @@ const FEATURE_GATES = [
 ]
 
 const SECTIONS = [
-  { name: 'Overview',      Icon: LayoutDashboard },
-  { name: 'Universities',  Icon: Building2 },
-  { name: 'Direct Users',  Icon: UserCircle2 },
-  { name: 'All Students',  Icon: GraduationCap },
-  { name: 'Simulations',   Icon: Blocks },
-  { name: 'Feature Gates', Icon: ShieldCheck },
-  { name: 'Activity Log',  Icon: ClipboardList },
+  { name: 'Overview',      Icon: LayoutDashboard, group: null },
+  { name: 'Universities',  Icon: Building2,       group: 'People' },
+  { name: 'Direct Users',  Icon: UserCircle2,     group: 'People' },
+  { name: 'All Students',  Icon: GraduationCap,   group: 'People' },
+  { name: 'Simulations',   Icon: Blocks,          group: 'Content' },
+  { name: 'Feature Gates', Icon: ShieldCheck,     group: 'Content' },
+  { name: 'Activity Log',  Icon: ClipboardList,   group: 'Monitoring' },
 ]
 
 function Toggle({ on, onChange }) {
   return (
     <button
       onClick={() => onChange(!on)}
-      className={`w-11 h-6 rounded-full relative transition-colors ${on ? 'bg-emerald-500' : 'bg-surface-high'}`}
+      role="switch"
+      aria-checked={on}
+      className={`w-11 h-6 rounded-full relative transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 ${on ? 'bg-emerald-500' : 'bg-surface-high'}`}
     >
       <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${on ? 'translate-x-5' : ''}`} />
     </button>
@@ -92,34 +96,43 @@ export default function SuperAdmin() {
     <div className="min-h-screen bg-surface-low flex">
 
       {/* ── Sidebar ── */}
-      <aside className="w-60 bg-[#15132b] text-white flex flex-col fixed inset-y-0">
+      <aside className="w-60 bg-primary-dark text-white flex flex-col fixed inset-y-0 shadow-xl z-10">
         <div className="p-5 border-b border-white/10">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-secondary rounded-lg flex items-center justify-center shrink-0">
-              <span className="text-white font-bold text-sm">W</span>
-            </div>
-            <div>
-              <p className="font-bold text-sm leading-tight">WorkLearn AI</p>
+            <img src={logo} alt="WorkLearn AI" className="w-9 h-9 rounded-lg object-cover shrink-0 shadow-sm ring-1 ring-white/10" />
+            <div className="min-w-0">
+              <p className="font-bold text-sm leading-tight truncate">WorkLearn AI</p>
               <p className="text-[10px] text-white/40 leading-tight">Super Admin</p>
             </div>
           </div>
         </div>
 
-        <nav className="flex-1 p-3 space-y-0.5">
-          {SECTIONS.map(({ name, Icon }) => {
+        <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
+          {SECTIONS.map(({ name, Icon, group }, i) => {
             const active = section === name
+            const showGroupLabel = group && group !== SECTIONS[i - 1]?.group
             return (
-              <button
-                key={name}
-                onClick={() => setSection(name)}
-                className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
-                  active ? 'bg-white/10 text-white font-semibold' : 'text-white/55 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                {active && <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-secondary" />}
-                <Icon className="h-4 w-4 shrink-0" strokeWidth={2} />
-                {name}
-              </button>
+              <div key={name}>
+                {showGroupLabel && (
+                  <p className={`px-3 text-[10px] font-bold uppercase tracking-widest text-white/30 ${i === 0 ? 'mb-1.5' : 'mt-5 mb-1.5'}`}>
+                    {group}
+                  </p>
+                )}
+                <button
+                  onClick={() => setSection(name)}
+                  aria-current={active ? 'page' : undefined}
+                  className={`group relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-secondary/70 ${
+                    active ? 'bg-white/10 text-white font-semibold shadow-sm' : 'text-white/55 hover:text-white hover:bg-white/5 hover:translate-x-0.5'
+                  }`}
+                >
+                  {active && <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-secondary" />}
+                  <Icon
+                    className={`h-4 w-4 shrink-0 transition-colors ${active ? 'text-secondary' : 'text-white/40 group-hover:text-white/70'}`}
+                    strokeWidth={2}
+                  />
+                  {name}
+                </button>
+              </div>
             )
           })}
         </nav>
@@ -136,7 +149,7 @@ export default function SuperAdmin() {
           </div>
           <button
             onClick={() => { logout(); navigate('/admin') }}
-            className="w-full flex items-center gap-2 text-xs text-white/50 hover:text-white transition-colors text-left px-2 py-1.5 rounded-md hover:bg-white/5"
+            className="w-full flex items-center gap-2 text-xs text-white/50 hover:text-white transition-colors text-left px-2 py-1.5 rounded-md hover:bg-white/5 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-secondary/70"
           >
             <LogOut className="h-3.5 w-3.5" /> Sign out
           </button>
@@ -157,6 +170,7 @@ export default function SuperAdmin() {
               <p className="text-sm text-on-surface-variant mt-0.5">Platform management · WorkLearn AI</p>
             </div>
           </div>
+          <span className="chip bg-primary/10 text-primary shrink-0">Super Admin</span>
         </div>
 
         {/* ── OVERVIEW ── */}
@@ -292,8 +306,11 @@ export default function SuperAdmin() {
               />
             </div>
             {uniLoading ? <Skeleton h="h-64" /> : filteredUnis.length === 0 ? (
-              <div className="card shadow-sm text-center py-12">
-                <p className="text-sm text-on-surface-variant">No universities found.</p>
+              <div className="card shadow-sm text-center py-14">
+                <div className="h-12 w-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-3">
+                  <Building2 className="h-5 w-5" />
+                </div>
+                <p className="text-sm font-medium text-on-surface">No universities found</p>
                 <p className="text-xs text-outline mt-1">Universities appear here when university students register.</p>
               </div>
             ) : (
@@ -343,8 +360,11 @@ export default function SuperAdmin() {
               />
             </div>
             {usersLoading ? <Skeleton h="h-64" /> : (directUsers ?? []).length === 0 ? (
-              <div className="card shadow-sm text-center py-12">
-                <p className="text-sm text-on-surface-variant">No direct users yet.</p>
+              <div className="card shadow-sm text-center py-14">
+                <div className="h-12 w-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-3">
+                  <UserCircle2 className="h-5 w-5" />
+                </div>
+                <p className="text-sm font-medium text-on-surface">No direct users yet</p>
               </div>
             ) : (
               <div className="card shadow-sm p-0 overflow-hidden">
@@ -373,7 +393,7 @@ export default function SuperAdmin() {
                         <td className="px-4 py-3 text-right">
                           <button
                             onClick={() => setManageUser(u)}
-                            className="text-xs font-semibold text-primary hover:underline"
+                            className="text-xs font-semibold text-primary hover:underline cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded"
                           >
                             Manage
                           </button>
@@ -454,8 +474,11 @@ export default function SuperAdmin() {
         {section === 'Activity Log' && (
           <div className="card shadow-sm">
             {actLoading ? <Skeleton h="h-64" /> : (activity ?? []).length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-sm text-on-surface-variant">No activity yet.</p>
+              <div className="text-center py-14">
+                <div className="h-12 w-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-3">
+                  <ClipboardList className="h-5 w-5" />
+                </div>
+                <p className="text-sm font-medium text-on-surface">No activity yet</p>
                 <p className="text-xs text-outline mt-1">XP events will appear here as users complete tasks.</p>
               </div>
             ) : (
@@ -491,25 +514,52 @@ function ManageUserModal({ user, onClose }) {
 
   const enrollments = data?.enrollments ?? []
 
+  useEffect(() => {
+    const onKeyDown = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKeyDown)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = prevOverflow
+    }
+  }, [onClose])
+
   const handleDeleteUser = async () => {
     await deleteUser.mutateAsync(user.id)
     onClose()
   }
 
   return (
-    <div className="fixed inset-0 bg-on-surface/40 backdrop-blur-[2px] flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-xl" onClick={e => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 bg-on-surface/40 backdrop-blur-[2px] flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        className="bg-white rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-xl"
+        onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="manage-user-title"
+      >
 
         {/* Header */}
         <div className="flex items-start justify-between p-5 border-b border-border">
           <div className="flex items-center gap-3">
             <Avatar name={user.name} size="h-10 w-10" />
             <div>
-              <h3 className="font-bold text-on-surface">{user.name}</h3>
+              <h3 id="manage-user-title" className="font-bold text-on-surface">{user.name}</h3>
               <p className="text-xs text-on-surface-variant">{user.email}</p>
             </div>
           </div>
-          <button onClick={onClose} className="text-outline hover:text-on-surface text-xl leading-none">×</button>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="text-outline hover:text-on-surface transition-colors shrink-0 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-md p-1"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
 
         {/* Enrollments */}
@@ -532,7 +582,7 @@ function ManageUserModal({ user, onClose }) {
                   <button
                     onClick={() => deleteEnrollment.mutate(e.id)}
                     disabled={deleteEnrollment.isPending}
-                    className="flex items-center gap-1 text-xs font-semibold text-red-500 hover:text-red-700 shrink-0 ml-3 disabled:opacity-50"
+                    className="flex items-center gap-1 text-xs font-semibold text-red-500 hover:text-red-700 shrink-0 ml-3 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300 rounded"
                   >
                     <Trash2 className="h-3 w-3" /> Remove
                   </button>
@@ -544,11 +594,13 @@ function ManageUserModal({ user, onClose }) {
 
         {/* Danger zone */}
         <div className="p-5 border-t border-border bg-red-50/50">
-          <p className="text-xs font-semibold text-red-600 uppercase tracking-wide mb-2">Danger Zone</p>
+          <p className="flex items-center gap-1.5 text-xs font-semibold text-red-600 uppercase tracking-wide mb-2">
+            <AlertTriangle className="h-3.5 w-3.5" /> Danger Zone
+          </p>
           {!confirmDelete ? (
             <button
               onClick={() => setConfirmDelete(true)}
-              className="text-sm font-semibold text-red-600 border border-red-200 rounded-lg px-4 py-2 hover:bg-red-100 transition-colors"
+              className="text-sm font-semibold text-red-600 border border-red-200 rounded-lg px-4 py-2 hover:bg-red-100 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
             >
               Delete this user
             </button>
@@ -558,11 +610,11 @@ function ManageUserModal({ user, onClose }) {
               <button
                 onClick={handleDeleteUser}
                 disabled={deleteUser.isPending}
-                className="text-sm text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-lg font-semibold disabled:opacity-50"
+                className="text-sm text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-lg font-semibold disabled:opacity-50 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
               >
                 {deleteUser.isPending ? 'Deleting…' : 'Yes, delete'}
               </button>
-              <button onClick={() => setConfirmDelete(false)} className="text-sm text-on-surface-variant hover:text-on-surface font-medium">
+              <button onClick={() => setConfirmDelete(false)} className="text-sm text-on-surface-variant hover:text-on-surface font-medium cursor-pointer">
                 Cancel
               </button>
             </div>

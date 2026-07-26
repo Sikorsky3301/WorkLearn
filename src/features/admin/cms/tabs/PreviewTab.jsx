@@ -1,30 +1,43 @@
-import { Loader2 } from 'lucide-react'
-import { useAdminSimulation } from '../../../shared/api/hooks'
-import { Card, CardContent } from '../../../shared/ui/shadcn/card'
-import { Badge } from '../../../shared/ui/shadcn/badge'
-import RatingStars from '../../../shared/ui/RatingStars'
-import { taskTypeRegistry } from '../../simulations/generic/taskTypeRegistry'
+import { useState } from 'react'
+import { Loader2, PlayCircle } from 'lucide-react'
+import { useAdminSimulation } from '../../../../shared/api/hooks'
+import { Card, CardContent } from '../../../../shared/ui/shadcn/card'
+import { Badge } from '../../../../shared/ui/shadcn/badge'
+import RatingStars from '../../../../shared/ui/RatingStars'
+import { taskTypeRegistry } from '../../../simulations/generic/taskTypeRegistry'
+import InteractiveSimPreview from '../../../simulations/generic/InteractiveSimPreview'
 
-/** Read-only content review before publishing — shows every stage's
- * title/objective/briefing/hints/success-criteria/rubric/xp+skills exactly
- * as the generic runtime will render them. A fully interactive live-run
- * preview (rendering GenericSimShell against the in-progress draft with no
- * enrollment/grading side effects) is a natural next step, deferred here
- * since it needs the public runtime endpoint to accept draft simulations for
- * a superadmin token — not built in this pass. */
+/** Read-only content review before publishing (skim-check) — shows every
+ * stage's title/objective/briefing/hints/success-criteria/rubric/xp+skills
+ * exactly as the generic runtime will render them — plus a full interactive
+ * run-through launched via InteractiveSimPreview, rendering the actual
+ * student-facing components against the draft with no enrollment/grading
+ * side effects (see admin_simulations.py's preview-full/preview-run-sandbox). */
 export default function PreviewTab({ simId }) {
   const { data: sim, isLoading } = useAdminSimulation(simId)
+  const [interactiveOpen, setInteractiveOpen] = useState(false)
 
   if (isLoading) return <div className="py-12 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
   if (!sim) return null
 
   return (
     <div className="space-y-4">
+      {interactiveOpen && <InteractiveSimPreview simId={simId} onClose={() => setInteractiveOpen(false)} />}
+
       <Card>
         <CardContent className="p-5">
-          <div className="flex items-center gap-2 mb-1">
-            <Badge>{sim.domain}</Badge>
-            <Badge variant="secondary">{sim.difficulty}</Badge>
+          <div className="flex items-center justify-between gap-3 mb-1">
+            <div className="flex items-center gap-2">
+              <Badge>{sim.domain}</Badge>
+              <Badge variant="secondary">{sim.difficulty}</Badge>
+            </div>
+            <button
+              onClick={() => setInteractiveOpen(true)}
+              disabled={sim.tasks.length === 0}
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-primary hover:bg-primary-dark px-4 py-2 rounded-lg disabled:opacity-40 cursor-pointer"
+            >
+              <PlayCircle className="h-4 w-4" /> Launch Interactive Preview
+            </button>
           </div>
           <h2 className="text-lg font-bold text-on-surface">{sim.title}</h2>
           <p className="text-sm text-on-surface-variant mb-1.5">{sim.company} · {sim.estimated_hours} · {sim.tasks.length} tasks</p>

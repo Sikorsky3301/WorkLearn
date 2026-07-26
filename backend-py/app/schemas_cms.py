@@ -6,7 +6,7 @@ sales-crm-sim's actual UX (a quiz *gate* after a stage's real work, not a
 separate stage) rather than forcing quizzes into standalone rows.
 """
 from typing import Literal
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 
 # ── Shared sub-shapes ────────────────────────────────────────────────────────
@@ -48,6 +48,10 @@ class TextRubricConfig(TaskConfigBase):
     # are combined into one string for min_words/keyword checks, and passed
     # individually to grade-text's `fields` dict for prompt-template filling.
     fields: list[FormField] = Field(default_factory=list)
+    # LLM call tuning for the "llm" grading_mode — both optional, provider
+    # defaults apply when unset. See app/services/llm.py's temperature plumbing.
+    temperature: float | None = Field(None, ge=0, le=2)
+    max_tokens: int | None = None
 
 
 class StructuredFormConfig(TaskConfigBase):
@@ -66,11 +70,28 @@ class RoleplayPersona(BaseModel):
     opening_mood: str = "neutral"
 
 
+class ContextDocument(BaseModel):
+    """A structured "reference material" the persona can be given beyond the
+    flat `context` dict — rendered as its own prompt section by
+    _build_roleplay_prompt (app/routes/sim_runtime.py), generalizing the
+    "who you're talking to" dossier concept to any genre."""
+    title: str
+    body: str
+
+
 class AiRoleplayChatConfig(TaskConfigBase):
     persona: RoleplayPersona
     context: dict = Field(default_factory=dict)
+    context_documents: list[ContextDocument] = Field(default_factory=list)
     mode: Literal["discovery", "objection", "custom"] = "custom"
+    # Always appended after whatever the `mode` preset produces (or on its
+    # own for "custom") — gives every genre an escape hatch without having
+    # to pretend everything is "custom" mode.
+    additional_instructions: str = ""
     min_messages_for_completion: int = 6
+    # LLM call tuning — both optional, provider defaults apply when unset.
+    temperature: float | None = Field(None, ge=0, le=2)
+    max_tokens: int | None = None
 
 
 class CrmWorkspaceConfig(TaskConfigBase):
@@ -116,14 +137,10 @@ class CodeSandboxConfig(TaskConfigBase):
     dataset_key: str | None = None
     # declarative_rules strategy
     static_input_files: dict[str, str] = Field(default_factory=dict)
+    # Points are NOT required to sum to 100 at save time (allows saving a
+    # half-finished rule set mid-edit) — enforced instead at publish time,
+    # see admin_simulations.py's publish_simulation.
     rules: list[DeclarativeRule] = Field(default_factory=list)
-
-    @field_validator("rules")
-    @classmethod
-    def _rules_sum_to_100(cls, rules: list[DeclarativeRule]) -> list[DeclarativeRule]:
-        if rules and sum(r.points for r in rules) != 100:
-            raise ValueError("Declarative grading rules' points must sum to exactly 100")
-        return rules
 
 
 CONFIG_MODELS: dict[str, type[TaskConfigBase]] = {
@@ -188,6 +205,7 @@ class SimulationCreate(BaseModel):
     manager: ManagerPersona
     onboarding: OnboardingContent
     onboarding_xp_award: int = 0
+    section_labels: dict[str, str] = Field(default_factory=dict)
 
 
 class SimulationUpdate(BaseModel):
@@ -209,6 +227,7 @@ class SimulationUpdate(BaseModel):
     manager: ManagerPersona | None = None
     onboarding: OnboardingContent | None = None
     onboarding_xp_award: int | None = None
+    section_labels: dict[str, str] | None = None
 
 
 class ReferenceField(BaseModel):
@@ -246,18 +265,14 @@ class SimulationTaskCreate(BaseModel):
     success_criteria: list[str] = Field(default_factory=list)
     reference_data: ReferenceData | None = None
     model_solution: ModelSolution | None = None
+    # NOT required to sum to 1.0 at save time (allows saving a half-finished
+    # rubric mid-edit) — enforced instead at publish time, see
+    # admin_simulations.py's publish_simulation.
     rubric: dict[str, float] | None = None
     config: dict = Field(default_factory=dict)
     xp_award: int = 0
     skill_awards: dict[str, int] = Field(default_factory=dict)
     week: int | None = None
-
-    @field_validator("rubric")
-    @classmethod
-    def _rubric_sums_to_one(cls, rubric: dict[str, float] | None) -> dict[str, float] | None:
-        if rubric is not None and abs(sum(rubric.values()) - 1.0) > 1e-6:
-            raise ValueError("rubric weights must sum to 1.0")
-        return rubric
 
 
 class SimulationTaskUpdate(BaseModel):
@@ -279,6 +294,15 @@ class SimulationTaskUpdate(BaseModel):
 
 class ReorderTasksBody(BaseModel):
     task_ids: list[str]
+
+
+class DuplicateSimulationBody(BaseModel):
+    new_id: str = Field(pattern=SLUG_PATTERN)
+
+
+class CreateFromTemplateBody(BaseModel):
+    id: str = Field(pattern=SLUG_PATTERN)
+    title: str | None = None
 
 
 def validate_task_config(task_type: str, config: dict) -> dict:

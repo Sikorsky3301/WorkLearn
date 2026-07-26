@@ -1,9 +1,9 @@
-import { useAdminSimulations } from '../../../shared/api/hooks'
-import { Input } from '../../../shared/ui/shadcn/input'
-import { Textarea } from '../../../shared/ui/shadcn/textarea'
-import { Label } from '../../../shared/ui/shadcn/label'
-import { Card, CardContent } from '../../../shared/ui/shadcn/card'
-import LogoUploadField from './LogoUploadField'
+import { useAdminSimulations } from '../../../../shared/api/hooks'
+import { Input } from '../../../../shared/ui/shadcn/input'
+import { Textarea } from '../../../../shared/ui/shadcn/textarea'
+import { Label } from '../../../../shared/ui/shadcn/label'
+import { Card, CardContent } from '../../../../shared/ui/shadcn/card'
+import LogoUploadField from '../shared/LogoUploadField'
 
 const ACCENT_COLORS = ['bg-primary', 'bg-orange-500', 'bg-blue-600', 'bg-emerald-600', 'bg-purple-600', 'bg-rose-600']
 const DIFFICULTIES = ['Beginner', 'Intermediate', 'Advanced']

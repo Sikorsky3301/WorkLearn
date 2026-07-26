@@ -15,7 +15,7 @@ import MentorLogin      from './features/auth/university/MentorLogin'
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
 import SuperAdmin from './features/admin/SuperAdmin'
-import SimulationBuilder from './features/admin/simulations/SimulationBuilder'
+import SimulationBuilder from './features/admin/cms/SimulationBuilder'
 
 // ── Mentor ────────────────────────────────────────────────────────────────────
 import ClassMentor from './features/mentor/ClassMentor'
@@ -102,8 +102,8 @@ function AdminRoute() {
   const { user, loading } = useAuth()
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-950">
-        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-surface-low">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -119,8 +119,8 @@ function AdminBuilderRoute() {
   const { user, loading } = useAuth()
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-950">
-        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-surface-low">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }

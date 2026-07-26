@@ -12,6 +12,9 @@ export const taskTypeRegistry = {
   structured_form: { RendererComponent: StructuredFormTask, label: 'Structured Form' },
   quiz: { RendererComponent: QuizTask, label: 'Quiz' },
   ai_roleplay_chat: { RendererComponent: AiRoleplayChatTask, label: 'AI Roleplay Chat' },
-  crm_workspace: { RendererComponent: CrmWorkspaceTask, label: 'CRM Workspace' },
+  // Renders a hardcoded sales-CRM shell regardless of the simulation's
+  // domain — labeled explicitly so it isn't mistaken for a generic
+  // "workspace" option when authoring a non-sales simulation.
+  crm_workspace: { RendererComponent: CrmWorkspaceTask, label: 'CRM Workspace (Sales)' },
   code_sandbox: { RendererComponent: CodeSandboxTask, label: 'Code Sandbox' },
 }

@@ -63,6 +63,11 @@ class Simulation(Base):
     manager:          Mapped[dict]                = mapped_column(JSON, nullable=False)
     onboarding:       Mapped[dict]                = mapped_column(JSON, nullable=False)
     onboarding_xp_award: Mapped[int]              = mapped_column(Integer, nullable=False, default=0)
+    # Optional display names for `SimulationTask.week` groupings, e.g.
+    # {"1": "Week 1: Onboarding"} — purely cosmetic, task_index stays the only
+    # real ordering mechanism. Untouched (defaults to {}) for sims that don't
+    # group tasks by week.
+    section_labels:   Mapped[dict]                = mapped_column(JSON, nullable=False, default=dict)
     status:           Mapped[SimulationStatus]   = mapped_column(SAEnum(SimulationStatus), default=SimulationStatus.DRAFT)
     created_by:       Mapped[str | None]         = mapped_column(String, nullable=True)  # SuperAdminCredential.id — not a FK, matches UnlockedFeature.granted_by's convention
     created_at:       Mapped[datetime]           = mapped_column(DateTime(timezone=True), default=utcnow)
