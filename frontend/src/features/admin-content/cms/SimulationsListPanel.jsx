@@ -1,0 +1,169 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Search, Plus, Copy } from 'lucide-react'
+import { useAdminSimulations, usePublishSimulation, useUnpublishSimulation, useDeleteSimulation, useDuplicateSimulation } from '../../../shared/api/hooks'
+import NewSimulationDialog from './NewSimulationDialog'
+
+/** Simulations page inside the Admin portal — list/search/publish/delete.
+ * The builder itself is a dedicated route (/admin/simulations/:id), not
+ * nested here — see SimulationBuilder.jsx. */
+export default function SimulationsListPanel() {
+  const navigate = useNavigate()
+  const [search, setSearch] = useState('')
+  const [newDialogOpen, setNewDialogOpen] = useState(false)
+  const { data, isLoading } = useAdminSimulations()
+  const deleteSim = useDeleteSimulation()
+
+  const sims = (data?.simulations ?? []).filter((s) =>
+    s.title.toLowerCase().includes(search.toLowerCase()) || s.domain?.toLowerCase().includes(search.toLowerCase())
+  )
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="relative w-72">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-outline" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search simulations…"
+            className="input pl-9"
+          />
+        </div>
+        <button
+          onClick={() => setNewDialogOpen(true)}
+          className="flex items-center gap-1.5 text-sm font-semibold text-white bg-primary hover:bg-primary-dark px-4 py-2 rounded-lg transition-colors shadow-sm cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2"
+        >
+          <Plus className="h-4 w-4" /> New Simulation
+        </button>
+      </div>
+
+      <NewSimulationDialog open={newDialogOpen} onOpenChange={setNewDialogOpen} />
+
+      {isLoading ? (
+        <div className="card shadow-sm"><div className="h-40 bg-surface-high rounded animate-pulse" /></div>
+      ) : sims.length === 0 ? (
+        <div className="card shadow-sm text-center py-12">
+          <p className="text-sm text-on-surface-variant">No simulations found.</p>
+        </div>
+      ) : (
+        <div className="card shadow-sm p-0 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-surface-low border-b border-border">
+              <tr>
+                {['Title', 'Domain', 'Status', 'Tasks', 'Updated', ''].map((h) => (
+                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-on-surface-variant">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/60">
+              {sims.map((s) => (
+                <SimRow
+                  key={s.id} sim={s}
+                  onEdit={() => navigate(`/admin/simulations/${s.id}`)}
+                  onDuplicated={(newSim) => navigate(`/admin/simulations/${newSim.id}`)}
+                  deleteSim={deleteSim}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SimRow({ sim, onEdit, onDuplicated, deleteSim }) {
+  const publish = usePublishSimulation(sim.id)
+  const unpublish = useUnpublishSimulation(sim.id)
+  const duplicateSim = useDuplicateSimulation(sim.id)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [duplicating, setDuplicating] = useState(false)
+  const [newId, setNewId] = useState('')
+
+  function startDuplicate() {
+    setNewId(`${sim.id}-copy`)
+    setDuplicating(true)
+  }
+
+  function confirmDuplicate() {
+    if (!newId.trim()) return
+    duplicateSim.mutate(newId.trim(), {
+      onSuccess: (res) => { setDuplicating(false); onDuplicated(res) },
+      onError: (e) => alert(e?.message || 'Could not duplicate — that id may already exist.'),
+    })
+  }
+
+  return (
+    <tr className="hover:bg-surface-low transition-colors">
+      <td className="px-4 py-3 font-medium text-on-surface">{sim.title}</td>
+      <td className="px-4 py-3 text-xs text-on-surface-variant">{sim.domain}</td>
+      <td className="px-4 py-3">
+        <span className={`chip text-[10px] ${sim.status === 'PUBLISHED' ? 'bg-emerald-100 text-emerald-700' : 'bg-surface-high text-on-surface-variant'}`}>
+          {sim.status}
+        </span>
+      </td>
+      <td className="px-4 py-3 text-on-surface-variant tabular-nums">{sim.task_count}</td>
+      <td className="px-4 py-3 text-xs text-outline">{new Date(sim.updated_at).toLocaleDateString()}</td>
+      <td className="px-4 py-3 text-right whitespace-nowrap">
+        {duplicating ? (
+          <span className="inline-flex items-center gap-1.5">
+            <input
+              autoFocus
+              value={newId}
+              onChange={(e) => setNewId(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && confirmDuplicate()}
+              className="input py-1 px-2 text-xs w-40"
+              placeholder="new-simulation-id"
+            />
+            <button
+              onClick={confirmDuplicate}
+              disabled={duplicateSim.isPending || !newId.trim()}
+              className="text-xs font-semibold text-white bg-primary px-2 py-0.5 rounded disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            >
+              {duplicateSim.isPending ? 'Copying…' : 'Create'}
+            </button>
+            <button onClick={() => setDuplicating(false)} className="text-xs text-outline cursor-pointer hover:text-on-surface-variant transition-colors">Cancel</button>
+          </span>
+        ) : (
+          <>
+            <button onClick={onEdit} className="text-xs font-semibold text-primary hover:underline mr-3 cursor-pointer">Edit</button>
+            <button
+              onClick={startDuplicate}
+              title="Duplicate this simulation"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-on-surface-variant hover:text-on-surface mr-3 cursor-pointer"
+            >
+              <Copy className="h-3 w-3" /> Duplicate
+            </button>
+            {sim.status === 'PUBLISHED' ? (
+              <button onClick={() => unpublish.mutate()} disabled={unpublish.isPending} className="text-xs font-semibold text-on-surface-variant hover:text-on-surface mr-3 cursor-pointer disabled:cursor-not-allowed">
+                Unpublish
+              </button>
+            ) : (
+              <button
+                onClick={() => publish.mutate(undefined, { onError: (e) => alert(e?.message || 'Could not publish this simulation.') })}
+                disabled={publish.isPending || sim.task_count === 0}
+                className="text-xs font-semibold text-emerald-600 hover:text-emerald-800 mr-3 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                Publish
+              </button>
+            )}
+            {!confirmDelete ? (
+              <button onClick={() => setConfirmDelete(true)} className="text-xs font-semibold text-red-500 hover:text-red-700 cursor-pointer">Delete</button>
+            ) : (
+              <span className="inline-flex items-center gap-1.5">
+                <button
+                  onClick={() => deleteSim.mutate(sim.id, { onError: () => alert('Cannot delete — this simulation has existing enrollments.') })}
+                  className="text-xs font-semibold text-white bg-red-600 px-2 py-0.5 rounded cursor-pointer"
+                >
+                  Confirm
+                </button>
+                <button onClick={() => setConfirmDelete(false)} className="text-xs text-outline cursor-pointer hover:text-on-surface-variant transition-colors">Cancel</button>
+              </span>
+            )}
+          </>
+        )}
+      </td>
+    </tr>
+  )
+}

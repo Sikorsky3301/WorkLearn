@@ -25,8 +25,8 @@ backing the cluster) since Jobs use `imagePullPolicy: Never` — nothing is
 pushed to a registry.
 
 ```
-docker build -t worklearn-backend:latest backend-py
-docker build -t worklearn-sandbox-python:latest backend-py/sandboxes/python
+docker build -t worklearn-backend:latest backend
+docker build -t worklearn-sandbox-python:latest backend/sandboxes/python
 ```
 
 ## 2. Apply the base manifests
@@ -37,10 +37,10 @@ kubectl apply -f k8s/namespaces.yaml
 
 ## 3. Create the backend Secret
 
-Not committed to the repo — created from your existing `backend-py/.env`:
+Not committed to the repo — created from your existing `backend/.env`:
 
 ```
-kubectl create secret generic worklearn-backend-env -n worklearn --from-env-file=backend-py/.env
+kubectl create secret generic worklearn-backend-env -n worklearn --from-env-file=backend/.env
 ```
 
 Re-run with `kubectl delete secret ... ; kubectl create secret ...` (or
