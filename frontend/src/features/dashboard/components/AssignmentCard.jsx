@@ -19,7 +19,7 @@ export default function AssignmentCard({ assignment, onGo }) {
 
   if (assignment.has_assignment) {
     return (
-      <div className="card">
+      <div className="card card-shadow">
         {simChip}
         <div className="flex items-center gap-2.5 mb-3">
           {branding?.managerPhoto ? (
@@ -60,7 +60,7 @@ export default function AssignmentCard({ assignment, onGo }) {
 
   if (assignment.reason === 'completed') {
     return (
-      <div className="card flex flex-col items-center justify-center py-8 text-center">
+      <div className="card card-shadow flex flex-col items-center justify-center py-8 text-center">
         {simChip}
         <div className="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center mb-3 text-lg">✓</div>
         <p className="text-sm font-medium text-on-surface mb-1">All tasks completed!</p>
@@ -73,7 +73,7 @@ export default function AssignmentCard({ assignment, onGo }) {
 
   if (assignment.reason === 'onboarding_pending') {
     return (
-      <div className="card flex flex-col items-center justify-center py-8 text-center">
+      <div className="card card-shadow flex flex-col items-center justify-center py-8 text-center">
         {simChip}
         <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mb-3 text-lg">📩</div>
         <p className="text-sm font-medium text-on-surface mb-1">You have an offer to accept</p>

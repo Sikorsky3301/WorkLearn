@@ -10,12 +10,12 @@ import SimulationCard from './SimulationCard'
  * regardless of domain. */
 export default function JobSimulationsSection({ simulations, loading, preferredDomain }) {
   if (loading) {
-    return <div className="card p-0 h-32 animate-pulse bg-surface-high" />
+    return <div className="card card-shadow p-0 h-32 animate-pulse bg-surface-high" />
   }
 
   if (simulations.length === 0) {
     return (
-      <div className="card flex flex-col items-center justify-center py-10 text-center text-on-surface-variant">
+      <div className="card card-shadow flex flex-col items-center justify-center py-10 text-center text-on-surface-variant">
         <p className="text-sm font-medium">No job simulations published yet — check back soon.</p>
       </div>
     )

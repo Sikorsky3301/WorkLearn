@@ -38,6 +38,14 @@
     @apply bg-white border border-border rounded-lg p-6;
   }
 
+  /* Soft "floating" elevation — border-less, shadow-only depth (see the
+     Dashboard's cards). Its own class rather than folded into `.card`,
+     since `.card`'s bordered look is still used everywhere else in the app
+     — combine as `card card-shadow` wherever this softer look is wanted. */
+  .card-shadow {
+    @apply border-transparent shadow-[0_1px_3px_rgba(16,24,40,0.08),0_1px_2px_rgba(16,24,40,0.04)];
+  }
+
   .chip {
     @apply bg-gray-100 text-gray-600 text-xs font-semibold px-2 py-0.5 rounded tracking-wide uppercase;
   }

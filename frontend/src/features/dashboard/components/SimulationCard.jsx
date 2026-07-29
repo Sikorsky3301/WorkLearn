@@ -14,7 +14,7 @@ export default function SimulationCard({ sim, highlighted }) {
 
   return (
     <div
-      className={`card p-0 overflow-hidden hover:border-primary transition-colors cursor-pointer group ${highlighted ? 'ring-2 ring-primary/15' : ''}`}
+      className={`card card-shadow p-0 overflow-hidden hover:border-primary hover:shadow-md transition-all cursor-pointer group ${highlighted ? 'ring-2 ring-primary/15' : ''}`}
       onClick={() => navigate(`/simulations/${sim.id}`)}
     >
       <div className={`h-1.5 w-full ${branding?.accentColor ?? 'bg-primary'}`} />

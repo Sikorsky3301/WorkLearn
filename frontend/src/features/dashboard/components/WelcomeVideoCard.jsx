@@ -1,20 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Play, X } from 'lucide-react'
 
-const DISMISS_KEY = 'wl_welcome_video_dismissed'
 const VIDEO_SRC = '/videos/welcome-to-worklearn.mp4'
 const THUMBNAIL_SRC = '/videos/welcome-to-worklearn-thumb.jpg'
 
-/** Compact, dismissible explainer-video row at the top of the Dashboard —
- * small thumbnail + play button on the left, copy on the right, so it reads
- * as a quick invite rather than a full banner competing with the rest of the
- * page. Lazy by design — the <video> element (and its ~8MB source) only
- * mounts once the student actually clicks Play, so just loading the
- * Dashboard never fetches it. Dismissal is remembered in localStorage (this
- * browser only, not a per-account preference) so it stops showing once
- * watched or closed. */
+/** Compact explainer-video row at the top of the Dashboard — small thumbnail
+ * + play button on the left, copy on the right, so it reads as a quick
+ * invite rather than a full banner competing with the rest of the page.
+ * Always shown (no dismiss) — lazy by design instead: the <video> element
+ * (and its ~8MB source) only mounts once the student actually clicks Play,
+ * so just loading the Dashboard never fetches it. */
 export default function WelcomeVideoCard() {
-  const [dismissed, setDismissed] = useState(() => localStorage.getItem(DISMISS_KEY) === '1')
   const [playing, setPlaying] = useState(false)
 
   useEffect(() => {
@@ -28,25 +24,9 @@ export default function WelcomeVideoCard() {
     }
   }, [playing])
 
-  if (dismissed) return null
-
-  function dismiss(e) {
-    e.stopPropagation()
-    localStorage.setItem(DISMISS_KEY, '1')
-    setDismissed(true)
-  }
-
   return (
     <>
-      <div className="relative card p-0 overflow-hidden mb-6 group">
-        <button
-          onClick={dismiss}
-          aria-label="Dismiss welcome video"
-          className="absolute top-1.5 right-1.5 z-10 w-6 h-6 rounded-full bg-black/20 hover:bg-black/40 text-white flex items-center justify-center transition-colors cursor-pointer"
-        >
-          <X className="h-3 w-3" />
-        </button>
-
+      <div className="relative card card-shadow p-0 overflow-hidden mb-6 group">
         <button onClick={() => setPlaying(true)} className="w-full flex items-center gap-4 p-3 text-left cursor-pointer">
           {/* Thumbnail — a real frame from the video, kept small so this reads
               as a quick prompt rather than a full banner. */}

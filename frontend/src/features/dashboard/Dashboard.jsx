@@ -72,11 +72,11 @@ export default function Dashboard() {
             </div>
 
             {assignmentsLoading ? (
-              <div className="card flex items-center justify-center py-10">
+              <div className="card card-shadow flex items-center justify-center py-10">
                 <span className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
             ) : assignments.length === 0 ? (
-              <div className="card flex flex-col items-center justify-center py-8 text-center text-on-surface-variant">
+              <div className="card card-shadow flex flex-col items-center justify-center py-8 text-center text-on-surface-variant">
                 <div className="w-10 h-10 rounded-full bg-surface-high flex items-center justify-center mb-3">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
@@ -98,7 +98,7 @@ export default function Dashboard() {
           </div>
 
           {/* XP / progress card */}
-          <div className="card">
+          <div className="card card-shadow">
             <span className="section-label">Your Progress</span>
             <div className="mt-3 flex items-end gap-2 mb-4">
               <p className="text-3xl font-bold text-primary">{xp.toLocaleString()}</p>
