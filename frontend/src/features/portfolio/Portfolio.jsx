@@ -1,6 +1,14 @@
 import { useState } from 'react'
+import {
+  Pencil, Share2, Mail, Phone, MapPin, Briefcase, FolderGit2, Globe,
+  Download, FileText, Plus, GraduationCap, Trash2, Trophy, Award,
+} from 'lucide-react'
 import { useAuth, ROLES } from '../auth/AuthContext'
-import { useUserSkills, useUserBadges } from '../../shared/api/hooks'
+import { useUserSkills, useUserBadges, useDeleteEducation } from '../../shared/api/hooks'
+import { downloadFile, resolveMediaUrl } from '../../shared/api/client'
+import EditProfileModal from './components/EditProfileModal'
+import EducationModal from './components/EducationModal'
+import BadgeTile from './components/BadgeTile'
 
 const SKILL_LABELS = {
   sql:                'SQL Queries',
@@ -37,15 +45,22 @@ const categoryColors = {
   Domain:     'bg-teal-100 text-teal-700',
 }
 
-const TABS = ['Overview', 'Competencies', 'Projects']
+const TABS = ['Overview', 'Competencies', 'Education', 'Projects']
 
 export default function Portfolio() {
   const { user }                 = useAuth()
   const { data: rawSkills = [] } = useUserSkills()
   const { data: badgeData }      = useUserBadges()
   const [tab, setTab]            = useState('Overview')
+  const [showEditProfile, setShowEditProfile] = useState(false)
+  const [showAddEducation, setShowAddEducation] = useState(false)
+  const [editingEducation, setEditingEducation] = useState(null)
+  const [copied, setCopied] = useState(false)
+
+  const deleteEducation = useDeleteEducation()
 
   const badges = badgeData?.badges ?? user?.badges ?? []
+  const education = user?.education ?? []
 
   const xp       = user?.xp ?? 0
   const level    = Math.floor(xp / 500) + 1
@@ -58,47 +73,116 @@ export default function Portfolio() {
 
   const topSkills = [...skills].sort((a, b) => b.current_score - a.current_score).slice(0, 6)
 
+  function handleShare() {
+    navigator.clipboard?.writeText(window.location.href)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1800)
+  }
+
+  function handleDownloadResume() {
+    if (!user?.resume_url) return
+    downloadFile(user.resume_url, user.resume_filename || 'resume.pdf')
+  }
+
+  async function handleDeleteEducation(id) {
+    if (!window.confirm('Remove this education entry?')) return
+    await deleteEducation.mutateAsync(id)
+  }
+
   return (
     <div className="max-w-container mx-auto px-6 py-8">
 
-      {/* ── Header ── */}
-      <div className="flex items-start justify-between mb-8">
-        <div className="flex items-center gap-5">
-          <div className="w-16 h-16 bg-primary rounded-xl flex items-center justify-center shrink-0">
-            <span className="text-white text-xl font-bold">{initials}</span>
+      {/* ── Hero ── */}
+      <div className="relative rounded-2xl border border-border overflow-hidden mb-8 bg-white">
+        <div className="h-28 sm:h-36 relative overflow-hidden bg-gradient-to-r from-primary via-indigo-600 to-violet-600">
+          <div
+            className="absolute inset-0 opacity-25"
+            style={{ backgroundImage: 'radial-gradient(circle at 15% 25%, white 0, transparent 38%), radial-gradient(circle at 85% 75%, white 0, transparent 32%)' }}
+          />
+        </div>
+
+        <div className="px-6 pb-6">
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 -mt-11 sm:-mt-12">
+            <div className="flex items-end gap-4">
+              <div className="relative shrink-0">
+                {user?.photo_url ? (
+                  <img
+                    src={resolveMediaUrl(user.photo_url)}
+                    alt=""
+                    className="w-24 h-24 rounded-2xl object-cover border-4 border-white shadow-lg"
+                  />
+                ) : (
+                  <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-primary to-indigo-500 border-4 border-white shadow-lg flex items-center justify-center text-white text-2xl font-bold">
+                    {initials}
+                  </div>
+                )}
+              </div>
+              <div className="pb-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-2xl font-bold text-on-surface truncate">{user?.name || 'Your Portfolio'}</h1>
+                  {xp > 0 && <span className="chip bg-primary/10 text-primary text-xs">Active Learner</span>}
+                  {badges.length > 0 && (
+                    <span className="chip bg-amber-100 text-amber-700 text-xs">{badges.length} Badge{badges.length > 1 ? 's' : ''}</span>
+                  )}
+                </div>
+                <p className="text-sm font-semibold text-primary mt-0.5">
+                  {user?.headline || (user?.role === ROLES.UNIVERSITY_STUDENT ? `${user.institution} · ${user.department}` : 'WorkLearn Platform')}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button onClick={() => setShowEditProfile(true)} className="btn-secondary text-xs px-4 py-2 flex items-center gap-1.5 cursor-pointer">
+                <Pencil className="h-3.5 w-3.5" /> Edit Profile
+              </button>
+              <button onClick={handleShare} className="btn-secondary text-xs px-4 py-2 flex items-center gap-1.5 cursor-pointer">
+                <Share2 className="h-3.5 w-3.5" /> {copied ? 'Copied!' : 'Share'}
+              </button>
+            </div>
           </div>
-          <div>
-            <div className="flex items-center gap-2 mb-0.5">
-              <h1 className="text-2xl font-bold text-on-surface">{user?.name || 'Your Portfolio'}</h1>
-              {xp > 0 && <span className="chip bg-primary/10 text-primary text-xs">Active Learner</span>}
-              {badges.length > 0 && (
-                <span className="chip bg-amber-100 text-amber-700 text-xs">🎖️ {badges.length} Badge{badges.length > 1 ? 's' : ''}</span>
-              )}
-            </div>
-            <p className="text-sm text-on-surface-variant">
-              {user?.role === ROLES.UNIVERSITY_STUDENT
-                ? `${user.institution} · ${user.department}`
-                : 'WorkLearn Platform'}
-            </p>
-            <div className="flex items-center gap-4 mt-2">
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm font-bold text-primary">{xp.toLocaleString()}</span>
-                <span className="text-xs text-on-surface-variant">XP</span>
+
+          {user?.bio && <p className="text-sm text-on-surface-variant mt-4 max-w-2xl leading-relaxed">{user.bio}</p>}
+
+          {/* Contact + resume pills */}
+          <div className="flex flex-wrap items-center gap-2 mt-4">
+            {user?.email && <ContactPill icon={Mail} label={user.email} href={`mailto:${user.email}`} />}
+            {user?.phone && <ContactPill icon={Phone} label={user.phone} />}
+            {user?.location && <ContactPill icon={MapPin} label={user.location} />}
+            {user?.linkedin_url && <ContactPill icon={Briefcase} label="LinkedIn" href={user.linkedin_url} />}
+            {user?.github_url && <ContactPill icon={FolderGit2} label="GitHub" href={user.github_url} />}
+            {user?.website_url && <ContactPill icon={Globe} label="Website" href={user.website_url} />}
+            {user?.resume_url ? (
+              <button
+                onClick={handleDownloadResume}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-primary text-white hover:bg-primary-dark transition-colors cursor-pointer"
+              >
+                <Download className="h-3 w-3" /> Resume
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowEditProfile(true)}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border border-dashed border-border text-on-surface-variant hover:border-primary hover:text-primary transition-colors cursor-pointer"
+              >
+                <FileText className="h-3 w-3" /> Add resume
+              </button>
+            )}
+          </div>
+
+          {/* Stats strip */}
+          <div className="grid grid-cols-4 gap-3 mt-5 pt-5 border-t border-border">
+            {[
+              { val: xp.toLocaleString(), label: 'XP Earned' },
+              { val: `Lv.${level}`, label: 'Level' },
+              { val: skills.length.toString(), label: 'Skills' },
+              { val: badges.length.toString(), label: 'Badges' },
+            ].map(s => (
+              <div key={s.label} className="text-center">
+                <p className="text-lg font-bold text-primary">{s.val}</p>
+                <p className="text-[11px] text-on-surface-variant">{s.label}</p>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm font-bold text-primary">Lv.{level}</span>
-                <span className="text-xs text-on-surface-variant">Level</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm font-bold text-primary">{skills.length}</span>
-                <span className="text-xs text-on-surface-variant">Skills</span>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
-        <button className="btn-secondary text-xs px-4 py-2 flex items-center gap-1.5 shrink-0">
-          <LinkIcon /> Share Portfolio
-        </button>
       </div>
 
       {/* ── Tabs ── */}
@@ -107,7 +191,7 @@ export default function Portfolio() {
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-5 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+            className={`px-5 py-2.5 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${
               tab === t ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant hover:text-on-surface'
             }`}
           >
@@ -132,13 +216,7 @@ export default function Portfolio() {
               </div>
 
               {topSkills.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 text-center text-on-surface-variant">
-                  <div className="w-12 h-12 rounded-full bg-surface-high flex items-center justify-center mb-3">
-                    <TrophyIcon />
-                  </div>
-                  <p className="text-sm font-medium mb-1">No skills earned yet</p>
-                  <p className="text-xs max-w-xs">Complete simulation tasks to earn verified skill points that appear here.</p>
-                </div>
+                <EmptyState icon={Trophy} title="No skills earned yet" desc="Complete simulation tasks to earn verified skill points that appear here." />
               ) : (
                 <div className="grid grid-cols-2 gap-3">
                   {topSkills.map(s => <SkillBar key={s.skill_key} skillKey={s.skill_key} score={s.current_score} />)}
@@ -148,29 +226,17 @@ export default function Portfolio() {
 
             {/* Journey Badges */}
             <div className="card">
-              <div className="mb-4">
-                <span className="section-label">Journey Badges</span>
-                <p className="text-sm font-bold text-on-surface mt-0.5">Milestones earned on the platform</p>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <span className="section-label">Journey Badges</span>
+                  <p className="text-sm font-bold text-on-surface mt-0.5">Milestones earned on the platform</p>
+                </div>
               </div>
               {badges.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 text-center text-on-surface-variant">
-                  <div className="w-12 h-12 rounded-full bg-surface-high flex items-center justify-center mb-3 text-xl">🎖️</div>
-                  <p className="text-sm font-medium mb-1">No badges yet</p>
-                  <p className="text-xs max-w-xs">Accept a job simulation offer to earn your first Simulation Journey badge.</p>
-                </div>
+                <EmptyState icon={Award} title="No badges yet" desc="Accept a job simulation offer to earn your first Simulation Journey badge." />
               ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  {badges.map(b => (
-                    <div key={b.id} className="flex items-center gap-3 border border-border rounded-xl p-3 bg-surface-low">
-                      <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-xl shrink-0">{b.icon}</div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-on-surface leading-tight truncate">{b.label}</p>
-                        <p className="text-[11px] text-on-surface-variant">
-                          {new Date(b.granted_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {badges.map(b => <BadgeTile key={b.id} badge={b} />)}
                 </div>
               )}
             </div>
@@ -184,13 +250,7 @@ export default function Portfolio() {
                 </div>
                 <button className="btn-ghost text-xs" onClick={() => setTab('Projects')}>View all →</button>
               </div>
-              <div className="flex flex-col items-center justify-center py-10 text-center text-on-surface-variant">
-                <div className="w-12 h-12 rounded-full bg-surface-high flex items-center justify-center mb-3">
-                  <DocIcon />
-                </div>
-                <p className="text-sm font-medium mb-1">No projects yet</p>
-                <p className="text-xs max-w-xs">Submit simulation tasks to generate verified project artifacts for your portfolio.</p>
-              </div>
+              <EmptyState icon={FileText} title="No projects yet" desc="Submit simulation tasks to generate verified project artifacts for your portfolio." />
             </div>
 
             {/* Progress card */}
@@ -269,6 +329,16 @@ export default function Portfolio() {
                 </p>
               )}
             </div>
+
+            {education.length === 0 && (
+              <div className="card border-dashed">
+                <span className="section-label mb-2 block">Education</span>
+                <p className="text-xs text-on-surface-variant mb-3">Add your academic background to round out your portfolio.</p>
+                <button onClick={() => setShowAddEducation(true)} className="btn-ghost text-xs flex items-center gap-1 cursor-pointer">
+                  <Plus className="h-3.5 w-3.5" /> Add education
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -276,12 +346,8 @@ export default function Portfolio() {
       {/* ── COMPETENCIES ── */}
       {tab === 'Competencies' && (
         skills.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center text-on-surface-variant">
-            <div className="w-14 h-14 rounded-full bg-surface-high flex items-center justify-center mb-4">
-              <TrophyIcon large />
-            </div>
-            <p className="text-base font-semibold mb-2">No skills earned yet</p>
-            <p className="text-sm max-w-sm">Complete simulation tasks to earn verified skill points. Each task awards points in specific skills relevant to your target role.</p>
+          <div className="py-16">
+            <EmptyState icon={Trophy} large title="No skills earned yet" desc="Complete simulation tasks to earn verified skill points. Each task awards points in specific skills relevant to your target role." />
           </div>
         ) : (
           <div className="grid grid-cols-4 gap-4">
@@ -315,19 +381,97 @@ export default function Portfolio() {
         )
       )}
 
-      {/* ── PROJECTS ── */}
-      {tab === 'Projects' && (
-        <div className="flex flex-col items-center justify-center py-20 text-center text-on-surface-variant">
-          <div className="w-14 h-14 rounded-full bg-surface-high flex items-center justify-center mb-4">
-            <DocIcon large />
+      {/* ── EDUCATION ── */}
+      {tab === 'Education' && (
+        <div className="max-w-2xl">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <span className="section-label">Academic Background</span>
+              <p className="text-sm font-bold text-on-surface mt-0.5">Schools, degrees, and coursework</p>
+            </div>
+            <button onClick={() => setShowAddEducation(true)} className="btn-primary text-xs px-4 py-2 flex items-center gap-1.5 cursor-pointer">
+              <Plus className="h-3.5 w-3.5" /> Add Education
+            </button>
           </div>
-          <p className="text-base font-semibold mb-2">No project artifacts yet</p>
-          <p className="text-sm max-w-sm">
-            When you submit simulation tasks, AI-evaluated project artifacts will appear here — verified and shareable with recruiters.
-          </p>
+
+          {education.length === 0 ? (
+            <div className="card">
+              <EmptyState icon={GraduationCap} title="No education added yet" desc="Add your schools and degrees so recruiters get the full picture." />
+            </div>
+          ) : (
+            <div className="relative pl-8 space-y-6">
+              <div className="absolute left-[11px] top-2 bottom-2 w-px bg-border" />
+              {education.map(e => (
+                <div key={e.id} className="relative">
+                  <div className="absolute -left-8 top-1 w-6 h-6 rounded-full bg-primary/10 border-2 border-primary flex items-center justify-center">
+                    <GraduationCap className="h-3 w-3 text-primary" />
+                  </div>
+                  <div className="card group">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-on-surface">{e.institution}</p>
+                        {(e.degree || e.field_of_study) && (
+                          <p className="text-xs text-on-surface-variant mt-0.5">
+                            {[e.degree, e.field_of_study].filter(Boolean).join(', ')}
+                          </p>
+                        )}
+                        <p className="text-[11px] text-on-surface-variant mt-1 font-medium">
+                          {e.start_year || '—'} – {e.is_current ? 'Present' : (e.end_year || '—')}
+                        </p>
+                        {e.description && <p className="text-xs text-on-surface-variant mt-2 leading-relaxed">{e.description}</p>}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => setEditingEducation(e)} className="p-1.5 rounded-md hover:bg-surface-low text-on-surface-variant hover:text-primary cursor-pointer" aria-label="Edit">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button onClick={() => handleDeleteEducation(e.id)} className="p-1.5 rounded-md hover:bg-red-50 text-on-surface-variant hover:text-red-600 cursor-pointer" aria-label="Delete">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
+      {/* ── PROJECTS ── */}
+      {tab === 'Projects' && (
+        <div className="py-16">
+          <EmptyState
+            icon={FileText} large title="No project artifacts yet"
+            desc="When you submit simulation tasks, AI-evaluated project artifacts will appear here — verified and shareable with recruiters."
+          />
+        </div>
+      )}
+
+      {showEditProfile && <EditProfileModal onClose={() => setShowEditProfile(false)} />}
+      {showAddEducation && <EducationModal onClose={() => setShowAddEducation(false)} />}
+      {editingEducation && <EducationModal entry={editingEducation} onClose={() => setEditingEducation(null)} />}
+    </div>
+  )
+}
+
+function ContactPill({ icon: Icon, label, href }) {
+  const content = (
+    <span className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border border-border text-on-surface-variant hover:border-primary hover:text-primary transition-colors">
+      <Icon className="h-3 w-3" /> {label}
+    </span>
+  )
+  if (!href) return content
+  return <a href={href} target={href.startsWith('mailto:') ? undefined : '_blank'} rel="noreferrer" className="cursor-pointer">{content}</a>
+}
+
+function EmptyState({ icon: Icon, title, desc, large }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-10 text-center text-on-surface-variant">
+      <div className={`${large ? 'w-14 h-14' : 'w-12 h-12'} rounded-full bg-surface-high flex items-center justify-center mb-3`}>
+        <Icon className={large ? 'h-6 w-6' : 'h-[18px] w-[18px]'} strokeWidth={1.5} />
+      </div>
+      <p className={`${large ? 'text-base' : 'text-sm'} font-semibold mb-1 text-on-surface`}>{title}</p>
+      <p className={`${large ? 'text-sm max-w-sm' : 'text-xs max-w-xs'}`}>{desc}</p>
     </div>
   )
 }
@@ -358,39 +502,6 @@ function BarIcon({ size = 14 }) {
       <line x1="18" y1="20" x2="18" y2="10" />
       <line x1="12" y1="20" x2="12" y2="4" />
       <line x1="6" y1="20" x2="6" y2="14" />
-    </svg>
-  )
-}
-
-function TrophyIcon({ large } = {}) {
-  const size = large ? 24 : 18
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="8 19 12 22 16 19" />
-      <line x1="12" y1="22" x2="12" y2="17" />
-      <path d="M6.5 15H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-1.5" />
-      <circle cx="12" cy="13" r="4" />
-    </svg>
-  )
-}
-
-function DocIcon({ large } = {}) {
-  const size = large ? 24 : 14
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-      <line x1="16" y1="13" x2="8" y2="13" />
-      <line x1="16" y1="17" x2="8" y2="17" />
-    </svg>
-  )
-}
-
-function LinkIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
     </svg>
   )
 }

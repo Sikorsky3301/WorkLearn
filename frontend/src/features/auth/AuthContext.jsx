@@ -104,6 +104,17 @@ export function AuthProvider({ children }) {
     setUser(null)
   }
 
+  // Re-fetches /me — used after profile/photo/resume/education edits so the
+  // rest of the app (Navbar avatar, Portfolio, etc.) sees the change without
+  // a full page reload. Silently no-ops on failure; callers already have the
+  // mutation's own success/error state to react to.
+  const refreshUser = async () => {
+    try {
+      const u = await api.get('/api/auth/me')
+      setUser(u)
+    } catch { /* keep stale user rather than wiping the session */ }
+  }
+
   // Real, DB-backed feature flags (see backend's app/services/feature_flags.py)
   // resolved server-side and returned on every login/`/me` response as
   // `user.feature_flags` — replaces the old hardcoded ROLE_FEATURES map.
@@ -138,7 +149,7 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider value={{
       user, loading, register, loginDirect, loginSuperAdmin, loginAdmin, loginUniversity, loginMentor,
-      logout, hasFeature, unlockFeature, hasPermission,
+      logout, hasFeature, unlockFeature, hasPermission, refreshUser,
     }}>
       {children}
     </AuthContext.Provider>

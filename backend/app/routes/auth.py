@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from app.database import get_db
 from app.models import User, UnlockedFeature, Role, SuperAdminCredential, UserBadge
 from app.models_rbac import AdminRole, AdminRolePermission
+from app.models_profile import EducationEntry
 from app.auth import verify_password, hash_password, create_token, get_current_user
 from app.config import settings
 from app.services.feature_flags import resolve_feature_flags
@@ -36,6 +37,15 @@ def _safe_user(user: User) -> dict:
         "institution": user.institution, "department": user.department,
         "section": user.section, "year": user.year, "avatar": user.avatar,
         "xp": user.xp, "target_role": user.target_role,
+        # Portfolio profile fields — see models.py's docstring on User and
+        # routes/profile.py, which is what actually writes these.
+        "headline": user.headline, "bio": user.bio, "phone": user.phone,
+        "location": user.location, "linkedin_url": user.linkedin_url,
+        "github_url": user.github_url, "website_url": user.website_url,
+        "photo_url": user.photo_url, "resume_url": user.resume_url,
+        "resume_filename": user.resume_filename,
+        "resume_uploaded_at": user.resume_uploaded_at.isoformat() if user.resume_uploaded_at else None,
+        "onboarding_completed": user.onboarding_completed, "preferred_domain": user.preferred_domain,
     }
 
 async def _touch(db: AsyncSession, user_id: str):
@@ -176,15 +186,28 @@ async def me(db: AsyncSession = Depends(get_db), token: dict = Depends(get_curre
     features = [f.feature for f in unlocked.scalars().all()]
     badges_res = await db.execute(select(UserBadge).where(UserBadge.user_id == user.id))
     badges = [_badge_dict(b) for b in badges_res.scalars().all()]
+    education_res = await db.execute(
+        select(EducationEntry).where(EducationEntry.user_id == user.id)
+        .order_by(EducationEntry.sort_order, EducationEntry.start_year.desc())
+    )
+    education = [_education_dict(e) for e in education_res.scalars().all()]
     extra = {"feature_flags": await resolve_feature_flags(db, user)}
     if user.role == Role.ADMIN:
         extra["permissions"] = await _resolve_admin_permissions(db, user.admin_role_id)
         extra["admin_role_name"] = await _resolve_admin_role_name(db, user.admin_role_id)
-    return {**_safe_user(user), "unlocked_features": features, "badges": badges, **extra}
+    return {**_safe_user(user), "unlocked_features": features, "badges": badges, "education": education, **extra}
 
 
 def _badge_dict(b: UserBadge) -> dict:
     return {
         "id": b.id, "badge_key": b.badge_key, "label": b.label, "icon": b.icon,
         "simulation_id": b.simulation_id, "granted_at": b.granted_at.isoformat(),
+    }
+
+
+def _education_dict(e: EducationEntry) -> dict:
+    return {
+        "id": e.id, "institution": e.institution, "degree": e.degree,
+        "field_of_study": e.field_of_study, "start_year": e.start_year, "end_year": e.end_year,
+        "is_current": e.is_current, "description": e.description, "sort_order": e.sort_order,
     }

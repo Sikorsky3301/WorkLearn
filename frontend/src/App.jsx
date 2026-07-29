@@ -48,6 +48,9 @@ import EvaluationResult    from './features/simulations/EvaluationResult'
 import GenericSimOverview  from './features/simulations/generic/GenericSimOverview'
 import GenericSimShell     from './features/simulations/generic/GenericSimShell'
 
+// ── Onboarding ────────────────────────────────────────────────────────────────
+import OnboardingWizard from './features/onboarding/OnboardingWizard'
+
 // ── Other platform features ───────────────────────────────────────────────────
 import Portfolio    from './features/portfolio/Portfolio'
 import AIMentor     from './features/ai-mentor/CareerTwin'
@@ -103,11 +106,19 @@ function PortalSpinner() {
 
 function ProtectedRoute() {
   const { user, loading } = useAuth()
+  const location = useLocation()
   if (loading) return <PortalSpinner />
   if (!user) return <Navigate to="/login" replace />
   // Admins/SuperAdmins have no student profile — keep them in their own portal
   if (user.role === 'SUPER_ADMIN') return <Navigate to="/super-admin" replace />
   if (user.role === 'ADMIN') return <Navigate to="/admin" replace />
+  // First-login onboarding wizard (features/onboarding/) — gated to the two
+  // student-facing roles; CLASS_MENTOR never sees it (mentors aren't picking
+  // a job-simulation domain). Existing accounts were backfilled to
+  // onboarding_completed=true by migration 0005, so this only ever fires for
+  // genuinely new sign-ups.
+  const needsOnboarding = (user.role === 'DIRECT_USER' || user.role === 'UNIVERSITY_STUDENT') && !user.onboarding_completed
+  if (needsOnboarding && location.pathname !== '/onboarding') return <Navigate to="/onboarding" replace />
   return <Outlet />
 }
 
@@ -180,6 +191,8 @@ export default function App() {
       {/* Protected — require login */}
       <Route element={<ProtectedRoute />}>
         <Route path="/mentor"     element={<ClassMentor />} />
+        {/* Full-screen — no Navbar/Footer, see OnboardingLayout */}
+        <Route path="/onboarding" element={<OnboardingWizard />} />
 
         <Route element={<MainLayout />}>
           <Route path="/"                        element={<Navigate to="/dashboard" replace />} />

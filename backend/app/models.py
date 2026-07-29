@@ -59,6 +59,34 @@ class User(Base):
     last_seen_at:    Mapped[datetime]      = mapped_column(DateTime(timezone=True), default=utcnow)
     created_at:      Mapped[datetime]      = mapped_column(DateTime(timezone=True), default=utcnow)
 
+    # First-login onboarding wizard (routes/profile.py's complete_onboarding,
+    # App.jsx's ProtectedRoute gate). Defaults to False for every newly
+    # created row so a fresh sign-up sees the wizard; migration
+    # 0005_users_onboarding backfills every account that predates this
+    # feature to True so existing users are never retroactively forced
+    # through it. `preferred_domain` is the domain the student picked during
+    # the wizard (matches Simulation.domain — see models_cms.py), used to
+    # highlight matching job simulations on the Dashboard.
+    onboarding_completed: Mapped[bool]        = mapped_column(Boolean, default=False)
+    preferred_domain:     Mapped[str | None]  = mapped_column(String, nullable=True)
+
+    # Portfolio profile fields — self-service, edited by the user via
+    # routes/profile.py (distinct from `avatar`, which stays a 2-letter
+    # initials fallback used all over the manager/mentor UI; `photo_url` is a
+    # real uploaded image and takes visual priority over `avatar` wherever a
+    # portfolio-style profile is rendered).
+    headline:          Mapped[str | None] = mapped_column(String, nullable=True)
+    bio:               Mapped[str | None] = mapped_column(String, nullable=True)
+    phone:             Mapped[str | None] = mapped_column(String, nullable=True)
+    location:          Mapped[str | None] = mapped_column(String, nullable=True)
+    linkedin_url:      Mapped[str | None] = mapped_column(String, nullable=True)
+    github_url:        Mapped[str | None] = mapped_column(String, nullable=True)
+    website_url:       Mapped[str | None] = mapped_column(String, nullable=True)
+    photo_url:         Mapped[str | None] = mapped_column(String, nullable=True)
+    resume_url:        Mapped[str | None] = mapped_column(String, nullable=True)
+    resume_filename:   Mapped[str | None] = mapped_column(String, nullable=True)
+    resume_uploaded_at:Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     enrollments:       Mapped[list["Enrollment"]]      = relationship(back_populates="user", cascade="all, delete")
     skills:            Mapped[list["UserSkill"]]        = relationship(back_populates="user", cascade="all, delete")
     xp_ledger:         Mapped[list["XpLedger"]]         = relationship(back_populates="user", cascade="all, delete")

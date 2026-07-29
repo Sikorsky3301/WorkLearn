@@ -1,12 +1,50 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import logo from '../assets/logo.png'
 import { useAuth } from '../features/auth/AuthContext'
+import { useSimulations, useMyAssignments } from '../shared/api/hooks'
+import { resolveDomainIcon } from '../shared/utils/domainIcons'
+import { domainDescription } from '../shared/utils/domainMeta'
+
+// Not tied to any real simulation yet — shown as muted "Coming soon" entries
+// in the domain menu so it previews where the platform is headed without
+// pretending there's content behind them. Mirrors the AI Mentor's existing
+// persona domains (backend's app/ai/services/mentor_personas.py), so a
+// future simulation in one of these areas slots into a concept that already
+// exists elsewhere in the product rather than introducing a new one.
+const FUTURE_DOMAINS = [
+  'Product Management',
+  'Marketing',
+  'Customer Support',
+  'Finance',
+  'HR & Recruiting',
+  'Healthcare Administration',
+]
 
 export default function Navbar() {
   const navigate   = useNavigate()
   const location   = useLocation()
   const { user, logout } = useAuth()
+  const { data: simsData }        = useSimulations()
+  const { data: assignmentsData } = useMyAssignments()
+  const simulations = simsData?.simulations || []
+  const assignments = assignmentsData?.assignments || []
+
+  // Domains actually in use across published simulations — same source
+  // SimulationWorkspace's DomainFilterBar reads, so a new CMS-authored
+  // domain shows up here automatically.
+  const domains = useMemo(() => {
+    const set = new Set()
+    for (const sim of simulations) {
+      if (sim.domain) set.add(sim.domain)
+    }
+    return [...set].sort((a, b) => a.localeCompare(b))
+  }, [simulations])
+
+  const futureDomains = useMemo(
+    () => FUTURE_DOMAINS.filter((d) => !domains.includes(d)),
+    [domains]
+  )
 
   const avatarInitials = user?.name
     ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
@@ -65,7 +103,13 @@ export default function Navbar() {
         <div className="h-full bg-primary transition-all" style={{ width: `${xpPct}%` }} />
       </div>
 
-      <div className="max-w-container mx-auto px-6 flex items-center gap-1" style={{ height: 52 }}>
+      {/* Full-bleed — unlike the page content below (which stays capped at
+          max-w-container), the header itself spans the entire viewport so
+          the nav links sit flush against the left edge and the XP/avatar
+          cluster sits flush against the right edge, instead of both being
+          stranded inside a centered 1280px column with dead space on either
+          side on wide screens. */}
+      <div className="w-full px-6 flex items-center gap-1" style={{ height: 52 }}>
 
         {/* Logo */}
         <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 shrink-0 mr-4">
@@ -106,39 +150,100 @@ export default function Navbar() {
 
             {simOpen && (
               <div
-                className="absolute left-0 top-full pt-2 w-72 z-50"
+                className="absolute left-0 top-full pt-2 w-[640px] z-50"
                 onMouseEnter={openSim}
                 onMouseLeave={closeSim}
               >
-                <div className="bg-white border border-border rounded-xl shadow-xl py-2">
+                <div className="bg-white border border-border rounded-xl shadow-xl overflow-hidden">
+                  <div className="grid grid-cols-3 gap-x-6 p-5">
 
-                  <p className="px-3 pt-1 pb-1.5 text-[11px] font-semibold text-on-surface-variant uppercase tracking-widest">
-                    My Simulations
-                  </p>
-                  <button
-                    onClick={() => { navigate('/simulations?filter=enrolled'); setSimOpen(false) }}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-surface-low transition-colors text-left group"
-                  >
-                    <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-on-surface group-hover:text-primary transition-colors">
-                        My Enrolled Simulations
+                    {/* Domains, not individual simulations — clicking one goes
+                        to the browse page pre-filtered to it (each card
+                        there is tagged with its domain, same treatment as
+                        the Dashboard's JobSimulationsSection). */}
+                    <div className="col-span-2">
+                      <p className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-widest mb-2">
+                        Job Simulations by Domain
                       </p>
-                      <p className="text-xs text-on-surface-variant">View progress across active simulations</p>
-                    </div>
-                  </button>
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                        {domains.map((domain) => {
+                          const Icon = resolveDomainIcon(domain)
+                          return (
+                            <button
+                              key={domain}
+                              onClick={() => { navigate(`/simulations?domain=${encodeURIComponent(domain)}`); setSimOpen(false) }}
+                              className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-surface-low transition-colors text-left group"
+                            >
+                              <Icon className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold text-on-surface group-hover:text-primary transition-colors">
+                                  {domain}
+                                </p>
+                                <p className="text-xs text-on-surface-variant leading-snug">
+                                  {domainDescription(domain)}
+                                </p>
+                              </div>
+                            </button>
+                          )
+                        })}
 
-                  <div className="mx-3 my-2 border-t border-border" />
+                        {futureDomains.map((domain) => {
+                          const Icon = resolveDomainIcon(domain)
+                          return (
+                            <div key={domain} className="flex items-start gap-3 p-2.5 rounded-lg opacity-50 cursor-default">
+                              <Icon className="h-5 w-5 text-on-surface-variant shrink-0 mt-0.5" />
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold text-on-surface flex items-center gap-1.5">
+                                  {domain}
+                                  <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-surface-high text-on-surface-variant">
+                                    Soon
+                                  </span>
+                                </p>
+                                <p className="text-xs text-on-surface-variant leading-snug">
+                                  {domainDescription(domain)}
+                                </p>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Simulations the student is already enrolled in */}
+                    <div className="col-span-1 border-l border-border pl-5">
+                      <p className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-widest mb-2">
+                        Enrolled
+                      </p>
+                      {assignments.length === 0 ? (
+                        <p className="text-xs text-on-surface-variant leading-relaxed pt-1">
+                          You haven't enrolled in a simulation yet.
+                        </p>
+                      ) : (
+                        <div className="space-y-3">
+                          {assignments.map((a) => (
+                            <button
+                              key={a.simulation_id}
+                              onClick={() => { navigate(`/simulations/${a.simulation_id}/overview`); setSimOpen(false) }}
+                              className="w-full text-left group"
+                            >
+                              <p className="text-sm font-semibold text-on-surface group-hover:text-primary transition-colors truncate">
+                                {a.simulation_title}
+                              </p>
+                              <p className="text-[11px] text-on-surface-variant mt-0.5">
+                                {a.completed_count}/{a.total_tasks} tasks done
+                              </p>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
                   <button
                     onClick={() => { navigate('/simulations'); setSimOpen(false) }}
-                    className="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold text-primary hover:bg-surface-low transition-colors rounded"
+                    className="w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold text-primary bg-surface-low hover:bg-surface-container transition-colors border-t border-border"
                   >
-                    Browse all simulations
+                    View all simulations
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                       <polyline points="9 18 15 12 9 6" />
                     </svg>

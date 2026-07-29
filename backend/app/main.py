@@ -9,7 +9,7 @@ from app.config import settings
 from app.logging_config import configure_logging
 from app.request_context import RequestIdMiddleware
 from app.database import engine, Base, AsyncSessionLocal
-from app.routes import auth, enrollments, agent_messages, analytics, admin, mentor, sandbox, admin_simulations, admin_simulation_templates, admin_uploads, admin_sim_builder, admin_management, feature_flags, platform_analytics, platform_config
+from app.routes import auth, enrollments, agent_messages, analytics, admin, mentor, sandbox, admin_simulations, admin_simulation_templates, admin_uploads, admin_sim_builder, admin_management, feature_flags, platform_analytics, platform_config, profile
 # AI-specific routes (LLM-backed: AI Mentor, CRM-sim AI customer/grading,
 # generic sim-runtime AI roleplay/grading) live in their own package — see
 # app/ai/'s docstring.
@@ -19,6 +19,7 @@ from app import models_sim_builder  # noqa: F401 — registers SimBuilder* table
 from app import models_rbac  # noqa: F401 — registers AdminRole/Permission/AdminRolePermission/AuditLog on Base.metadata before create_all
 from app import models_feature_flags  # noqa: F401 — registers FeatureFlag/FeatureFlagOverride on Base.metadata before create_all
 from app import models_platform_config  # noqa: F401 — registers PlatformConfig on Base.metadata before create_all
+from app import models_profile  # noqa: F401 — registers EducationEntry on Base.metadata before create_all
 from app.agents.manager import start_scheduler
 from app.ai.services.langfuse_client import init_langfuse, shutdown_langfuse, langfuse_enabled
 from app.services.permissions_seed import seed_permissions
@@ -136,6 +137,7 @@ app.include_router(admin_management.router)
 app.include_router(feature_flags.router)
 app.include_router(platform_analytics.router)
 app.include_router(platform_config.router)
+app.include_router(profile.router)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 @app.get("/health")

@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueries } from '@tanstack/react-query'
 import { useSimulations, useEnrollment } from '../../shared/api/hooks'
 import { api, resolveMediaUrl } from '../../shared/api/client'
+import { resolveDomainIcon } from '../../shared/utils/domainIcons'
 import DomainFilterBar from './DomainFilterBar'
 import RatingStars from '../../shared/ui/RatingStars'
 
@@ -21,7 +22,15 @@ export default function SimulationWorkspace() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const enrolledOnly = searchParams.get('filter') === 'enrolled'
-  const [selectedDomain, setSelectedDomain] = useState('All')
+  const [selectedDomain, setSelectedDomain] = useState(() => searchParams.get('domain') || 'All')
+
+  // Coming from the Navbar's domain mega-menu re-navigates to this same
+  // route with a different `?domain=` — since the component doesn't
+  // remount, sync the filter to match rather than leaving it stale.
+  useEffect(() => {
+    const domainParam = searchParams.get('domain')
+    if (domainParam && domainParam !== selectedDomain) setSelectedDomain(domainParam)
+  }, [searchParams])
 
   const { data, isLoading: simsLoading } = useSimulations()
   const simulations = data?.simulations || []
@@ -89,6 +98,7 @@ export default function SimulationWorkspace() {
 function SimCard({ sim }) {
   const navigate = useNavigate()
   const { data: enrollment, isLoading } = useEnrollment(sim.id)
+  const DomainIcon = resolveDomainIcon(sim.domain || sim.category)
 
   const status = enrollment?.status
   const tasksDone = enrollment?.task_completions?.length ?? 0
@@ -116,9 +126,11 @@ function SimCard({ sim }) {
             )}
             <div className="min-w-0">
               <p className="text-sm font-bold text-on-surface truncate">{sim.company}</p>
-              <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-surface-high text-on-surface-variant">
-                {sim.category}
-              </span>
+              {sim.domain && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                  <DomainIcon className="h-2.5 w-2.5" /> {sim.domain}
+                </span>
+              )}
             </div>
           </div>
           {status && (

@@ -75,6 +75,25 @@ export async function uploadImage(file) {
   return res.json()
 }
 
+// Generic multipart upload — same pattern as uploadImage above, parameterised
+// by endpoint so profile photo/resume uploads (which aren't gated by
+// simulations.edit, unlike the CMS's image upload) can reuse it.
+export async function uploadFile(path, file) {
+  const token = getToken()
+  const formData = new FormData()
+  formData.append('file', file)
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(err.detail ?? err.error ?? 'Upload failed')
+  }
+  return res.json()
+}
+
 // Backend-uploaded images (logo_url/photo_url) are stored as paths relative
 // to the API origin (e.g. "/static/uploads/xyz.png"), not the frontend's own
 // origin — resolve them against BASE_URL so <img src> doesn't 404 against

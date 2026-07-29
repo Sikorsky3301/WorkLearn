@@ -3,6 +3,15 @@
 @tailwind utilities;
 
 @layer base {
+  /* Tailwind's utilities are almost entirely rem-based, so bumping the root
+     size scales text/padding/gaps/radii across the whole app proportionally
+     — a cheap, global "zoom" without touching every component. Only the rare
+     hardcoded px value (inline SVG dimensions, a couple of fixed-height
+     bars) won't scale with it. */
+  html {
+    font-size: 18px;
+  }
+
   body {
     @apply font-sans bg-white text-on-surface antialiased;
   }
