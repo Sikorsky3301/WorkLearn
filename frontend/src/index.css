@@ -119,6 +119,17 @@
   .scroller .animate-scroll {
     animation-play-state: paused;
   }
+  .portfolio-fade-in {
+    animation: none;
+  }
+}
+
+/* One-shot staggered reveal for the Portfolio's bento tiles — not a
+   continuous/decorative loop (see the reduced-motion override above), just
+   a single fade+rise on mount. Pair with an inline `animationDelay` per
+   tile for the stagger. */
+.portfolio-fade-in {
+  animation: fadeIn 0.35s ease-out both;
 }
 
 /* AI Mentor "thinking" state — colors sampled from the actual mentor logo

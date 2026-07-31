@@ -2,8 +2,16 @@ const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
 
 // sessionStorage (not localStorage) — scoped per browser tab, not per
 // origin, so logging in as a different role in another tab doesn't stomp
-// on this tab's session. Trade-off: the session doesn't survive closing
-// the tab (only a same-tab refresh), which is the point.
+// on this tab's session (e.g. testing SuperAdmin in one tab and Admin in
+// another). Trade-off: the session doesn't survive closing the tab, only a
+// same-tab refresh — that's the point. (A "Remember me" checkbox on the
+// login form previously put the token in localStorage instead, which
+// persists across browser restarts — but localStorage is shared by every
+// tab, so it silently overrode this per-tab isolation the moment any
+// account had ever "remembered" a login: opening a fresh /super-admin tab
+// would pick up that leftover token and bounce to whatever role it
+// belonged to. Reverted — the multi-tab isolation matters more here than
+// surviving a browser restart.)
 function getToken() {
   return sessionStorage.getItem('wl_token')
 }

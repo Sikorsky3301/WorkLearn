@@ -21,6 +21,14 @@ export function AuthProvider({ children }) {
 
   // Restore session from stored token on mount
   useEffect(() => {
+    // One-time cleanup: a short-lived "Remember me" feature used to also
+    // write the token to localStorage, which — being shared across every
+    // tab, unlike sessionStorage — silently overrode per-tab role
+    // isolation (a fresh /super-admin tab would inherit whatever role was
+    // "remembered" and get redirected). That feature's been reverted; this
+    // just clears out any token it may have left behind on this machine.
+    localStorage.removeItem('wl_token')
+
     const token = sessionStorage.getItem('wl_token')
     if (!token) { setLoading(false); return }
 

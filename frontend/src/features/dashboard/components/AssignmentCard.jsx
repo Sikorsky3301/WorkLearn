@@ -1,4 +1,4 @@
-import { SIM_BRANDING } from './simBranding'
+import { SIM_BRANDING } from '../../../shared/simBranding'
 
 /** One manager/task summary for a single enrolled simulation — Dashboard
  * renders one of these per entry in useMyAssignments() so a student running

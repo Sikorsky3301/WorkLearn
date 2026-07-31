@@ -1,9 +1,22 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { Eye, EyeOff } from 'lucide-react'
 import { useAuth, ROLES } from '../AuthContext'
+import logo from '../../../assets/logo.png'
+
+function GoogleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 48 48">
+      <path fill="#FFC107" d="M43.6 20.5H42V20.4H24v7.2h11.3C33.7 32 29.3 35 24 35c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.1 8 3.1l5.1-5.1C33.9 5.5 29.2 3.5 24 3.5 12.7 3.5 3.5 12.7 3.5 24S12.7 44.5 24 44.5 44.5 35.3 44.5 24c0-1.2-.1-2.4-.3-3.5Z" />
+      <path fill="#FF3D00" d="m6.3 14.7 5.9 4.3C13.7 15.6 18.5 12.5 24 12.5c3.1 0 5.9 1.1 8 3.1l5.1-5.1C33.9 6.5 29.2 4.5 24 4.5c-7.6 0-14.1 4.3-17.7 10.2Z" />
+      <path fill="#4CAF50" d="M24 44.5c5.1 0 9.8-1.9 13.3-5.1l-6.1-5.2c-2 1.5-4.6 2.4-7.2 2.4-5.3 0-9.7-3.4-11.3-8.1l-6.1 4.7C9.8 40.1 16.4 44.5 24 44.5Z" />
+      <path fill="#1976D2" d="M43.6 20.5H42V20.4H24v7.2h11.3c-.8 2.3-2.3 4.3-4.2 5.7l6.1 5.2C40.7 35.9 44.5 30.5 44.5 24c0-1.2-.1-2.4-.3-3.5Z" />
+    </svg>
+  )
+}
 
 export default function Login() {
-  const navigate             = useNavigate()
+  const navigate                  = useNavigate()
   const { loginDirect, register } = useAuth()
 
   const [mode,     setMode]     = useState('signin') // 'signin' | 'signup'
@@ -11,11 +24,13 @@ export default function Login() {
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
   const [confirm,  setConfirm]  = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error,    setError]    = useState('')
   const [loading,  setLoading]  = useState(false)
+  const [notice,   setNotice]   = useState('')
 
   const switchMode = (m) => {
-    setMode(m); setError('')
+    setMode(m); setError(''); setNotice('')
     setName(''); setEmail(''); setPassword(''); setConfirm('')
   }
 
@@ -37,114 +52,69 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="h-screen flex overflow-hidden">
 
-      {/* ── Left brand panel ── */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary to-indigo-700 flex-col justify-between p-12 text-white">
-        <div>
-          <div className="flex items-center gap-3 mb-16">
-            <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold text-sm">W</span>
-            </div>
-            <span className="font-bold text-xl">WorkLearn AI</span>
-          </div>
-          <h1 className="text-4xl font-bold leading-tight mb-4">
-            Learn by doing real<br />professional work.
-          </h1>
-          <p className="text-white/70 text-lg leading-relaxed">
-            Job simulations, AI mentoring, and portfolio-building tools — built for every career path.
-          </p>
-        </div>
-
-        <div className="space-y-3">
-          <div className="bg-white/10 rounded-2xl p-5">
-            <p className="text-sm font-semibold mb-1">Hands-on job simulations</p>
-            <p className="text-white/60 text-xs leading-relaxed">Work on real tasks from top roles across tech, data, business, and more.</p>
-          </div>
-          <div className="bg-white/10 rounded-2xl p-5">
-            <p className="text-sm font-semibold mb-1">AI mentor, always available</p>
-            <p className="text-white/60 text-xs leading-relaxed">Get unstuck instantly. Your AI mentor knows exactly where you are in your journey.</p>
-          </div>
-          <div className="bg-white/10 rounded-2xl p-5">
-            <p className="text-sm font-semibold mb-1">Skills that show, not just tell</p>
-            <p className="text-white/60 text-xs leading-relaxed">Build a verified portfolio recruiters can trust — no matter your field.</p>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Right form ── */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-white">
+      {/* ── Left: form — its own scroll container, so a tall signup form
+          (or a short viewport) never breaks the page layout; the right
+          image always stays fixed at full height. ── */}
+      <div className="flex-1 overflow-y-auto flex items-center justify-center px-8 py-6 bg-white">
         <div className="w-full max-w-sm">
 
-          {/* Mobile logo */}
-          <div className="flex items-center gap-2 mb-8 lg:hidden">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">W</span>
-            </div>
-            <span className="font-bold text-on-surface">WorkLearn AI</span>
-          </div>
+          <img src={logo} alt="WorkLearn" className="w-10 h-10 rounded-xl object-cover mb-5" />
 
-          {/* Mode toggle */}
-          <div className="flex bg-surface-low rounded-xl p-1 mb-8">
-            <button
-              onClick={() => switchMode('signin')}
-              className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${mode === 'signin' ? 'bg-white text-on-surface shadow-sm' : 'text-on-surface-variant'}`}
-            >
-              Sign In
-            </button>
-            <button
-              onClick={() => switchMode('signup')}
-              className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${mode === 'signup' ? 'bg-white text-on-surface shadow-sm' : 'text-on-surface-variant'}`}
-            >
-              Create Account
-            </button>
-          </div>
-
-          <h2 className="text-2xl font-bold text-on-surface mb-1">
-            {mode === 'signin' ? 'Welcome back' : 'Get started free'}
-          </h2>
-          <p className="text-sm text-on-surface-variant mb-6">
-            {mode === 'signin' ? 'Sign in to continue learning.' : 'Create your account in seconds.'}
+          <h1 className="text-2xl font-bold text-on-surface mb-1">
+            {mode === 'signin' ? 'Welcome back!' : 'Get started free!'}
+          </h1>
+          <p className="text-sm text-on-surface-variant mb-5">
+            {mode === 'signin'
+              ? 'Enter to get unlimited access to job simulations & AI mentoring.'
+              : 'Create your account in seconds — no card required.'}
           </p>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-3">
             {mode === 'signup' && (
               <div>
-                <label className="text-xs font-semibold text-on-surface block mb-1.5">Full Name</label>
+                <label className="text-xs font-semibold text-on-surface block mb-1.5">
+                  Full Name <span className="text-red-500">*</span>
+                </label>
                 <input
-                  type="text"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  placeholder="Your name"
-                  required
-                  className="input w-full"
+                  type="text" value={name} onChange={(e) => setName(e.target.value)}
+                  placeholder="Your name" required className="input w-full"
                 />
               </div>
             )}
 
             <div>
-              <label className="text-xs font-semibold text-on-surface block mb-1.5">Email</label>
+              <label className="text-xs font-semibold text-on-surface block mb-1.5">
+                Email <span className="text-red-500">*</span>
+              </label>
               <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                required
-                className="input w-full"
+                type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your mail address" required className="input w-full"
               />
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-on-surface block mb-1.5">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                minLength={mode === 'signup' ? 6 : undefined}
-                className="input w-full"
-              />
+              <label className="text-xs font-semibold text-on-surface block mb-1.5">
+                Password <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password} onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter password" required
+                  minLength={mode === 'signup' ? 6 : undefined}
+                  className="input w-full pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface cursor-pointer"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
               {mode === 'signup' && (
                 <p className="text-[11px] text-on-surface-variant mt-1">Minimum 6 characters</p>
               )}
@@ -152,45 +122,118 @@ export default function Login() {
 
             {mode === 'signup' && (
               <div>
-                <label className="text-xs font-semibold text-on-surface block mb-1.5">Confirm Password</label>
+                <label className="text-xs font-semibold text-on-surface block mb-1.5">
+                  Confirm Password <span className="text-red-500">*</span>
+                </label>
                 <input
-                  type="password"
-                  value={confirm}
-                  onChange={e => setConfirm(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  className="input w-full"
+                  type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)}
+                  placeholder="Enter password again" required className="input w-full"
                 />
+              </div>
+            )}
+
+            {mode === 'signin' && (
+              <div className="flex items-center justify-end">
+                <a
+                  href="mailto:support@worklearn.ai?subject=Password%20Reset%20Request"
+                  className="text-xs font-semibold text-primary hover:underline"
+                >
+                  Forgot your password?
+                </a>
               </div>
             )}
 
             {error && (
               <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
             )}
+            {notice && (
+              <p className="text-xs text-primary bg-primary/5 border border-primary/20 rounded-lg px-3 py-2">{notice}</p>
+            )}
 
             <button
-              type="submit"
-              disabled={loading}
+              type="submit" disabled={loading}
               className="btn-primary w-full py-3 text-sm flex items-center justify-center gap-2"
             >
               {loading && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
               {loading
-                ? (mode === 'signin' ? 'Signing in…' : 'Creating account…')
-                : (mode === 'signin' ? 'Sign In' : 'Create Account')}
+                ? (mode === 'signin' ? 'Logging in…' : 'Creating account…')
+                : (mode === 'signin' ? 'Log In' : 'Create Account')}
             </button>
           </form>
 
+          {mode === 'signin' && (
+            <>
+              <div className="flex items-center gap-3 my-4">
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-xs text-on-surface-variant">Or, Login with</span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
 
-          {/* University link */}
-          <div className="mt-6 text-center">
-            <p className="text-xs text-on-surface-variant">
-              Joining through a university?{' '}
-              <Link to="/university/login" className="text-primary font-semibold hover:underline">
-                University Login →
-              </Link>
-            </p>
-          </div>
+              <button
+                type="button"
+                onClick={() => setNotice("Google sign-in isn't set up yet — please continue with email and password above.")}
+                className="btn-secondary w-full py-2.5 text-sm flex items-center justify-center gap-2.5 cursor-pointer"
+              >
+                <GoogleIcon /> Sign in with Google
+              </button>
+            </>
+          )}
+
+          <p className="text-center text-sm text-on-surface mt-4">
+            {mode === 'signin' ? (
+              <>Don't have an account?{' '}
+                <button onClick={() => switchMode('signup')} className="text-primary font-semibold hover:underline cursor-pointer">
+                  Register here
+                </button>
+              </>
+            ) : (
+              <>Already have an account?{' '}
+                <button onClick={() => switchMode('signin')} className="text-primary font-semibold hover:underline cursor-pointer">
+                  Log in
+                </button>
+              </>
+            )}
+          </p>
+
+          <p className="text-center text-xs text-on-surface-variant mt-2">
+            Joining through a university?{' '}
+            <Link to="/university/login" className="text-primary font-semibold hover:underline">
+              University Login →
+            </Link>
+          </p>
         </div>
+      </div>
+
+      {/* ── Right: collage — all three source files are shown at their true
+          native pixel size (no width/height scaling anywhere below), so
+          none of them gets blurred by upscaling. They're staggered and
+          rotated like an overlapping photo stack rather than tiled edge to
+          edge, since none of the three shares the same aspect ratio and
+          the panel isn't wide enough to lay all three out side by side at
+          full size without overlap. The two accent images intentionally
+          bleed past the panel edges into the surrounding backdrop — the
+          container clips them rather than shrinking them. */}
+      <div className="hidden lg:flex lg:w-1/2 h-full items-center justify-center bg-[#132b8c] overflow-hidden relative">
+        <img
+          src="/images/collage-warm.jpg"
+          alt=""
+          width={736} height={1314}
+          className="absolute rounded-xl shadow-2xl"
+          style={{ top: '-160px', left: '-280px', transform: 'rotate(-9deg)' }}
+        />
+        <img
+          src="/images/collage-blue.jpg"
+          alt=""
+          width={736} height={736}
+          className="absolute rounded-xl shadow-2xl"
+          style={{ bottom: '-140px', right: '-240px', transform: 'rotate(10deg)' }}
+        />
+        <img
+          src="/images/login-illustration.jpg"
+          alt=""
+          width={735} height={1040}
+          className="relative z-10 rounded-xl shadow-2xl"
+        />
       </div>
     </div>
   )

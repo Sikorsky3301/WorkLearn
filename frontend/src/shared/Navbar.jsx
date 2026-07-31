@@ -1,10 +1,33 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
+import {
+  User, GraduationCap, SlidersHorizontal, CreditCard, Receipt, Globe, LifeBuoy, LogOut,
+} from 'lucide-react'
 import logo from '../assets/logo.png'
 import { useAuth } from '../features/auth/AuthContext'
 import { useSimulations, useMyAssignments } from '../shared/api/hooks'
 import { resolveDomainIcon } from '../shared/utils/domainIcons'
 import { domainDescription } from '../shared/utils/domainMeta'
+
+// Real, working destinations today. `to` is a route; `href` is used instead
+// for the one item (Help & Support) that isn't a page in this app.
+const PROFILE_MENU_ITEMS = [
+  { label: 'Profile', icon: User, to: '/portfolio' },
+  { label: 'My Learning', icon: GraduationCap, to: '/simulations?filter=enrolled' },
+  { label: 'Account Settings', icon: SlidersHorizontal, to: '/settings' },
+]
+
+// Requested, but there's no billing/i18n system behind any of these yet
+// (no payment provider is wired up anywhere in the app — see the
+// SuperAdmin Configuration Center's own "not yet wired" notices — and there
+// is no i18n/translation layer at all). Shown disabled with a "Soon" tag,
+// same honest-preview treatment as the Navbar's future-domain entries,
+// rather than linking somewhere that doesn't exist or faking the feature.
+const PROFILE_MENU_SOON = [
+  { label: 'Payment Methods', icon: CreditCard },
+  { label: 'Purchase History', icon: Receipt },
+  { label: 'Language', icon: Globe, note: 'English (US)' },
+]
 
 // Not tied to any real simulation yet — shown as muted "Coming soon" entries
 // in the domain menu so it previews where the platform is headed without
@@ -53,8 +76,9 @@ export default function Navbar() {
   const [profileOpen, setProfileOpen] = useState(false)
   const [simOpen,     setSimOpen]     = useState(false)
 
-  const profileRef   = useRef(null)
-  const simCloseTimer = useRef(null)
+  const profileRef        = useRef(null)
+  const simCloseTimer      = useRef(null)
+  const profileCloseTimer  = useRef(null)
 
   const xp      = user?.xp ?? 0
   const level   = Math.floor(xp / 500) + 1
@@ -82,6 +106,18 @@ export default function Navbar() {
 
   const closeSim = useCallback(() => {
     simCloseTimer.current = setTimeout(() => setSimOpen(false), 80)
+  }, [])
+
+  // Profile dropdown: same hover-with-bridge-delay pattern as the
+  // Simulations menu, layered on top of the existing click-toggle/
+  // outside-click-close behavior (both still work).
+  const openProfile  = useCallback(() => {
+    clearTimeout(profileCloseTimer.current)
+    setProfileOpen(true)
+  }, [])
+
+  const closeProfile = useCallback(() => {
+    profileCloseTimer.current = setTimeout(() => setProfileOpen(false), 80)
   }, [])
 
   function handleLogout() {
@@ -275,34 +311,84 @@ export default function Navbar() {
             <span className="text-xs text-on-surface-variant">{xp.toLocaleString()} XP</span>
           </button>
 
-          {/* Avatar + profile dropdown */}
-          <div className="relative" ref={profileRef}>
+          {/* Avatar + profile dropdown — opens on hover (with a bridge
+              delay, same pattern as the Simulations menu) or on click;
+              closes on outside click, mouse-leave, or Escape. */}
+          <div
+            className="relative"
+            ref={profileRef}
+            onMouseEnter={openProfile}
+            onMouseLeave={closeProfile}
+          >
             <button
-              onClick={() => setProfileOpen(v => !v)}
-              className="w-8 h-8 bg-primary rounded-full flex items-center justify-center hover:opacity-90 transition-opacity"
+              onClick={() => setProfileOpen((v) => !v)}
+              className={`w-8 h-8 bg-primary rounded-full flex items-center justify-center transition-all ring-offset-2 ${
+                profileOpen ? 'ring-2 ring-primary/40' : 'hover:opacity-90 hover:scale-105'
+              }`}
               title={user?.name || 'Profile'}
             >
               <span className="text-white text-xs font-bold">{avatarInitials}</span>
             </button>
 
+            {/* Invisible bridge: fills the gap so mouse doesn't leave the hover zone */}
+            {profileOpen && <div className="absolute right-0 top-full h-2 w-full" />}
+
             {profileOpen && (
-              <div className="absolute right-0 top-full mt-2 w-52 bg-white border border-border rounded-xl shadow-lg z-50 py-1">
-                <div className="px-3 py-2.5 border-b border-border">
-                  <p className="text-sm font-semibold text-on-surface">{user?.name}</p>
+              <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-border rounded-xl shadow-xl z-50 py-1.5">
+                <div className="px-3.5 py-3 border-b border-border">
+                  <p className="text-sm font-semibold text-on-surface truncate">{user?.name}</p>
                   <p className="text-xs text-on-surface-variant truncate">{user?.email || user?.roll_no}</p>
                 </div>
-                <button
-                  onClick={() => { navigate('/settings'); setProfileOpen(false) }}
-                  className="w-full text-left px-3 py-2 text-sm text-on-surface hover:bg-surface-low transition-colors"
-                >
-                  Settings
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                >
-                  Sign out
-                </button>
+
+                <div className="py-1">
+                  {PROFILE_MENU_ITEMS.map((item) => (
+                    <button
+                      key={item.label}
+                      onClick={() => { navigate(item.to); setProfileOpen(false) }}
+                      className="w-full flex items-center gap-2.5 text-left px-3.5 py-2 text-sm text-on-surface hover:bg-surface-low transition-colors cursor-pointer"
+                    >
+                      <item.icon className="h-4 w-4 text-on-surface-variant shrink-0" />
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="py-1 border-t border-border">
+                  {PROFILE_MENU_SOON.map((item) => (
+                    <div
+                      key={item.label}
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-on-surface-variant opacity-60 cursor-default"
+                    >
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      <span className="flex-1">{item.label}</span>
+                      {item.note ? (
+                        <span className="text-xs">{item.note}</span>
+                      ) : (
+                        <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-surface-high">
+                          Soon
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="py-1 border-t border-border">
+                  <a
+                    href="mailto:support@worklearn.ai"
+                    onClick={() => setProfileOpen(false)}
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-on-surface hover:bg-surface-low transition-colors cursor-pointer"
+                  >
+                    <LifeBuoy className="h-4 w-4 text-on-surface-variant shrink-0" />
+                    Help &amp; Support
+                  </a>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-2.5 text-left px-3.5 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                  >
+                    <LogOut className="h-4 w-4 shrink-0" />
+                    Sign out
+                  </button>
+                </div>
               </div>
             )}
           </div>

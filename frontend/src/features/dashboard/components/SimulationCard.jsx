@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { SIM_BRANDING } from './simBranding'
+import { SIM_BRANDING } from '../../../shared/simBranding'
 import { resolveDomainIcon } from '../../../shared/utils/domainIcons'
 
 /** One job-simulation card in JobSimulationsSection's domain groups. Tagged
