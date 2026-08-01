@@ -17,3 +17,4 @@ backend/wvenv/
 # Editor / OS noise
 .DS_Store
 *.log
+.claude
