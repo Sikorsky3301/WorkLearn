@@ -6,15 +6,15 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 from pydantic import BaseModel
-from app.database import get_db, AsyncSessionLocal
-from app.auth import get_current_user
+from app.db.database import get_db, AsyncSessionLocal
+from app.core.auth import get_current_user
 from app.models import User, Enrollment, MentorChatMessage
 from app.services.skill_engine import compute_skill_gps
 from app.ai.services.llm import stream_chat, generate, chat_with_tools
 from app.ai.services.langfuse_client import traced_observation, traced_context, get_current_trace_id, score_trace
 from app.ai.services.mentor_tools import TOOL_SCHEMAS, execute_tool, MentorToolContext
 from app.ai.services.mentor_personas import build_system_prompt, get_persona
-from app.routes.enrollments import _build_assignment
+from app.routes.v1.enrollments import _build_assignment
 
 logger = logging.getLogger(__name__)
 

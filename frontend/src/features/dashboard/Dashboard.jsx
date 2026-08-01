@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth, ROLES } from '../auth/AuthContext'
-import { useMyAssignments, useSimulations } from '../../shared/api/hooks'
+import { useMyAssignments, useSimulations } from '../../hooks'
 import AssignmentCard from './components/AssignmentCard'
 import JobSimulationsSection from './components/JobSimulationsSection'
 import WelcomeVideoCard from './components/WelcomeVideoCard'

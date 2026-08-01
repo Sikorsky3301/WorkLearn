@@ -1,0 +1,47 @@
+# Non-secret model routing — mirrors backend/litellm-proxy/config.yaml
+# exactly. Keep the two in sync by hand; there's no build step wiring them
+# together (same as how k8s/backend/deployment.yaml's env values are kept
+# in sync with app/config.py by hand, not generated).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: worklearn-litellm-config
+  namespace: worklearn
+data:
+  config.yaml: |
+    model_list:
+      - model_name: claude-sonnet
+        litellm_params:
+          model: anthropic/claude-sonnet-4-6
+          api_key: os.environ/ANTHROPIC_API_KEY
+
+      - model_name: llama-groq
+        litellm_params:
+          model: groq/llama-3.3-70b-versatile
+          api_key: os.environ/GROQ_API_KEY
+
+      - model_name: gemini-flash
+        litellm_params:
+          model: gemini/gemini-2.5-flash-lite
+          api_key: os.environ/GEMINI_API_KEY
+
+      # Mirrors backend/litellm-proxy/config.yaml's local-qwen entry. This is
+      # a personal dev machine's ngrok tunnel to a self-hosted model — it
+      # will stop resolving the moment that tunnel/machine goes away, so
+      # don't rely on this entry surviving in a real cluster deployment;
+      # replace with a real self-hosted inference endpoint's URL if needed.
+      - model_name: local-qwen
+        litellm_params:
+          model: openai/Qwen/Qwen2.5-14B-Instruct-AWQ
+          api_base: os.environ/OPENAI_BASE_URL
+          api_key: os.environ/OPENAI_API_KEY
+
+    general_settings:
+      master_key: os.environ/LITELLM_MASTER_KEY
+      database_url: os.environ/LITELLM_PROXY_DATABASE_URL
+      store_model_in_db: true
+
+    litellm_settings:
+      # See backend/litellm-proxy/config.yaml's comment — deliberately no
+      # Langfuse callback here; the backend's own tracing already covers it.
+      drop_params: true

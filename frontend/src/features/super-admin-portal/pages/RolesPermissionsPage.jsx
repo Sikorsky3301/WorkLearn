@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Plus, KeyRound, X, Trash2 } from 'lucide-react'
-import { useAdminRoles, usePermissionCatalog, useCreateAdminRole, useUpdateAdminRole, useDeleteAdminRole } from '../../../shared/api/hooks'
+import { useAdminRoles, usePermissionCatalog, useCreateAdminRole, useUpdateAdminRole, useDeleteAdminRole } from '../../../hooks'
 import DataTable from '../../../shared/design-system/DataTable'
 
 /** RBAC role editor — the built-in "Administrator" role (all permissions,

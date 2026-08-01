@@ -1,7 +1,7 @@
 import { ExternalLink } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { SIM_BRANDING } from '../../../shared/simBranding'
-import { resolveMediaUrl } from '../../../shared/api/client'
+import { resolveMediaUrl } from '../../../lib/client'
 
 /** One completed job simulation, styled like a "case study" card — real
  * data only (title/company/accent color/logo all come from the backend's

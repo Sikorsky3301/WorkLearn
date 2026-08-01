@@ -6,7 +6,7 @@ metadata:
 spec:
   # Docker Desktop's Kubernetes binds LoadBalancer services to localhost, so
   # this matches the frontend's default VITE_API_URL of http://localhost:3001
-  # (src/shared/api/client.js) with no frontend changes. NodePort 30001 is a
+  # (src/lib/client.js) with no frontend changes. NodePort 30001 is a
   # fallback for clusters without LoadBalancer support.
   type: LoadBalancer
   selector:

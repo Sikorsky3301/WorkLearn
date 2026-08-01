@@ -1,6 +1,6 @@
 import { Loader2, FileText, Lightbulb, Plus, Settings2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useUpdateTask } from '../../../../../shared/api/hooks'
+import { useUpdateTask } from '../../../../../hooks'
 import { Input } from '../../../../../shared/ui/shadcn/input'
 import { Textarea } from '../../../../../shared/ui/shadcn/textarea'
 import { Label } from '../../../../../shared/ui/shadcn/label'

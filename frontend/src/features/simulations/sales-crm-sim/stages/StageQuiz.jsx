@@ -3,7 +3,7 @@ import { Brain, CheckCircle2, XCircle, ArrowRight, PartyPopper } from 'lucide-re
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../../../shared/ui/shadcn/dialog'
 import { Button } from '../../../../shared/ui/shadcn/button'
 import { Progress } from '../../../../shared/ui/shadcn/progress'
-import { cn } from '../../../../shared/utils/cn'
+import { cn } from '../../../../lib/cn'
 
 const OPTION_LETTERS = ['A', 'B', 'C', 'D']
 

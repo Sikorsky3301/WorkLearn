@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { ChevronDown, ChevronRight, Pencil } from 'lucide-react'
-import { cn } from '../../../../shared/utils/cn'
+import { cn } from '../../../../lib/cn'
 import StageCard from './StageCard'
 
 /** List view of the Stages canvas — week-grouped, collapsible sections of

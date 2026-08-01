@@ -2,7 +2,7 @@
 // WorkLearn's indigo/violet palette instead of the default pink/orange/blue.
 // Source: https://ui.aceternity.com/components/google-gemini-effect
 import { motion } from 'motion/react'
-import { cn } from '../utils/cn'
+import { cn } from '../../lib/cn'
 
 const transition = { duration: 0, ease: 'linear' }
 

@@ -1,12 +1,12 @@
-"""Write-path for the admin action audit trail (app/models_rbac.py::AuditLog).
+"""Write-path for the admin action audit trail (app/models/rbac.py::AuditLog).
 Phase 1 only wires this into admin-management/user-lifecycle mutations —
 a searchable audit-log UI across every entity is Phase 2's job; the table and
 this helper exist now so that phase needs no schema change."""
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import User, SuperAdminCredential
-from app.models_rbac import AuditLog
-from app.request_context import request_id_var
+from app.models.rbac import AuditLog
+from app.core.request_context import request_id_var
 
 
 async def resolve_actor_info(token: dict, db: AsyncSession) -> tuple[str, str, str]:

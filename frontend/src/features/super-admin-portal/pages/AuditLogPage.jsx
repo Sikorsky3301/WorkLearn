@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ClipboardList, Search } from 'lucide-react'
-import { useAdminAuditLog } from '../../../shared/api/hooks'
+import { useAdminAuditLog } from '../../../hooks'
 import DataTable from '../../../shared/design-system/DataTable'
 
 /** Full searchable admin-action audit trail — distinct from the XP-ledger

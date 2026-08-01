@@ -1,7 +1,7 @@
 // Aceternity UI — 3D Card Effect, ported to plain JSX.
 // Source: https://ui.aceternity.com/components/3d-card-effect
 import React, { createContext, useState, useContext, useRef, useEffect } from 'react'
-import { cn } from '../utils/cn'
+import { cn } from '../../lib/cn'
 
 const MouseEnterContext = createContext(undefined)
 

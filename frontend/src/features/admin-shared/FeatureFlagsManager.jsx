@@ -3,7 +3,7 @@ import { Plus, Flag, X, Trash2 } from 'lucide-react'
 import {
   useFeatureFlags, useCreateFeatureFlag, useUpdateFeatureFlag, useDeleteFeatureFlag,
   useFlagOverrides, useSetFlagOverride, useDeleteFlagOverride,
-} from '../../shared/api/hooks'
+} from '../../hooks'
 import DataTable from '../../shared/design-system/DataTable'
 import PermissionGate from '../../shared/design-system/PermissionGate'
 

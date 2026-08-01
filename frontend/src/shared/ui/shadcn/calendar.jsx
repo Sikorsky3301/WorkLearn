@@ -4,7 +4,7 @@ import {
   format, isSameMonth, isSameDay, isToday,
 } from 'date-fns'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { cn } from '../../utils/cn'
+import { cn } from '../../../lib/cn'
 import { Button } from './button'
 
 const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']

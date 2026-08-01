@@ -1,4 +1,4 @@
-import { useAdminSimulations } from '../../../../shared/api/hooks'
+import { useAdminSimulations } from '../../../../hooks'
 import { Input } from '../../../../shared/ui/shadcn/input'
 import { Textarea } from '../../../../shared/ui/shadcn/textarea'
 import { Label } from '../../../../shared/ui/shadcn/label'

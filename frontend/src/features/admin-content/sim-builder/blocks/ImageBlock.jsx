@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { Image as ImageIcon, Upload, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { uploadImage, resolveMediaUrl } from '../../../../shared/api/client'
+import { uploadImage, resolveMediaUrl } from '../../../../lib/client'
 import { Input } from '../../../../shared/ui/shadcn/input'
 import { Label } from '../../../../shared/ui/shadcn/label'
 import { Button } from '../../../../shared/ui/shadcn/button'

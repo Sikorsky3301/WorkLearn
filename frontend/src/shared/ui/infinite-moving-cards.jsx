@@ -4,7 +4,7 @@
 // is adapted to render a logo image instead of a testimonial quote.
 // Source: https://ui.aceternity.com/components/infinite-moving-cards
 import React, { useEffect, useState, useRef } from 'react'
-import { cn } from '../utils/cn'
+import { cn } from '../../lib/cn'
 
 export const InfiniteMovingCards = ({
   items,

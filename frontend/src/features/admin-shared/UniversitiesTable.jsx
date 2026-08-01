@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Search, Building2 } from 'lucide-react'
-import { useAdminUniversities } from '../../shared/api/hooks'
+import { useAdminUniversities } from '../../hooks'
 import DataTable from '../../shared/design-system/DataTable'
 
 function Avatar({ name }) {

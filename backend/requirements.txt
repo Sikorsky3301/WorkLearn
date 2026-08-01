@@ -5,11 +5,21 @@ asyncpg==0.30.0
 alembic==1.14.0
 pydantic>=2.11.7
 pydantic-settings>=2.6.1
+# Required by pydantic's EmailStr (used in app/schemas_rbac.py — and, as of
+# adding litellm below, by litellm's own proxy-related pydantic models too).
+# Was a pre-existing gap — EmailStr silently doesn't validate the schema
+# until something actually forces pydantic to build it, which nothing did
+# until now.
+email-validator==2.3.0
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
-anthropic==0.40.0
-groq==1.5.0
+# litellm is the only LLM-calling library the app imports directly now (see
+# app/ai/services/llm.py) — it talks to Anthropic/Groq/Gemini itself over
+# HTTP rather than needing their SDKs installed. `openai` stays pinned only
+# because litellm depends on it internally (many providers, including its
+# own "openai" passthrough, reuse the OpenAI wire format/SDK types).
+litellm==1.94.1
 openai==2.48.0
 langfuse==4.14.0
 apscheduler==3.10.4

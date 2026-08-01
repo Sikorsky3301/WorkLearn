@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { CheckCircle2, Circle, ArrowRight, Brain, Lightbulb } from 'lucide-react'
 import { Button } from '../../../shared/ui/shadcn/button'
-import { cn } from '../../../shared/utils/cn'
+import { cn } from '../../../lib/cn'
 import StageQuiz from '../sales-crm-sim/stages/StageQuiz'
 
 /** Generic per-task header — title/objective/briefing/what-to-do/what-to-

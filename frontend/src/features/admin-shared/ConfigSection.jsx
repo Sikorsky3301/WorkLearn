@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Check, Save } from 'lucide-react'
-import { usePlatformConfig, useSetPlatformConfig } from '../../shared/api/hooks'
+import { usePlatformConfig, useSetPlatformConfig } from '../../hooks'
 
 /** Renders one Configuration Center category (AI / Billing / Database) —
  * real save/load against PlatformConfig rows. Secrets are write-only: the

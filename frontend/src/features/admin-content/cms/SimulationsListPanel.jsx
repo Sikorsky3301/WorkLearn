@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Plus, Copy } from 'lucide-react'
-import { useAdminSimulations, usePublishSimulation, useUnpublishSimulation, useDeleteSimulation, useDuplicateSimulation } from '../../../shared/api/hooks'
+import { Search, Plus, Copy, Users } from 'lucide-react'
+import { useAdminSimulations, usePublishSimulation, useUnpublishSimulation, useDeleteSimulation, useDuplicateSimulation, useUnenrollAllStudents } from '../../../hooks'
 import NewSimulationDialog from './NewSimulationDialog'
 
 /** Simulations page inside the Admin portal — list/search/publish/delete.
@@ -51,7 +51,7 @@ export default function SimulationsListPanel() {
           <table className="w-full text-sm">
             <thead className="bg-surface-low border-b border-border">
               <tr>
-                {['Title', 'Domain', 'Status', 'Tasks', 'Updated', ''].map((h) => (
+                {['Title', 'Domain', 'Status', 'Tasks', 'Enrollments', 'Updated', ''].map((h) => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-on-surface-variant">{h}</th>
                 ))}
               </tr>
@@ -77,7 +77,9 @@ function SimRow({ sim, onEdit, onDuplicated, deleteSim }) {
   const publish = usePublishSimulation(sim.id)
   const unpublish = useUnpublishSimulation(sim.id)
   const duplicateSim = useDuplicateSimulation(sim.id)
+  const unenrollAll = useUnenrollAllStudents(sim.id)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmUnenroll, setConfirmUnenroll] = useState(false)
   const [duplicating, setDuplicating] = useState(false)
   const [newId, setNewId] = useState('')
 
@@ -104,6 +106,7 @@ function SimRow({ sim, onEdit, onDuplicated, deleteSim }) {
         </span>
       </td>
       <td className="px-4 py-3 text-on-surface-variant tabular-nums">{sim.task_count}</td>
+      <td className="px-4 py-3 text-on-surface-variant tabular-nums">{sim.enrollment_count ?? 0}</td>
       <td className="px-4 py-3 text-xs text-outline">{new Date(sim.updated_at).toLocaleDateString()}</td>
       <td className="px-4 py-3 text-right whitespace-nowrap">
         {duplicating ? (
@@ -148,8 +151,36 @@ function SimRow({ sim, onEdit, onDuplicated, deleteSim }) {
                 Publish
               </button>
             )}
+            {sim.enrollment_count > 0 && (
+              !confirmUnenroll ? (
+                <button
+                  onClick={() => { setConfirmDelete(false); setConfirmUnenroll(true) }}
+                  title="Remove every student's enrollment so this simulation can be deleted"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-amber-600 hover:text-amber-800 mr-3 cursor-pointer"
+                >
+                  <Users className="h-3 w-3" /> De-enroll all
+                </button>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 mr-3">
+                  <span className="text-xs text-on-surface-variant">
+                    Remove all {sim.enrollment_count} enrollment{sim.enrollment_count !== 1 ? 's' : ''}?
+                  </span>
+                  <button
+                    onClick={() => unenrollAll.mutate(undefined, {
+                      onSuccess: () => setConfirmUnenroll(false),
+                      onError: (e) => alert(e?.message || 'Could not remove enrollments.'),
+                    })}
+                    disabled={unenrollAll.isPending}
+                    className="text-xs font-semibold text-white bg-amber-600 px-2 py-0.5 rounded cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {unenrollAll.isPending ? 'Removing…' : 'Confirm'}
+                  </button>
+                  <button onClick={() => setConfirmUnenroll(false)} className="text-xs text-outline cursor-pointer hover:text-on-surface-variant transition-colors">Cancel</button>
+                </span>
+              )
+            )}
             {!confirmDelete ? (
-              <button onClick={() => setConfirmDelete(true)} className="text-xs font-semibold text-red-500 hover:text-red-700 cursor-pointer">Delete</button>
+              <button onClick={() => { setConfirmUnenroll(false); setConfirmDelete(true) }} className="text-xs font-semibold text-red-500 hover:text-red-700 cursor-pointer">Delete</button>
             ) : (
               <span className="inline-flex items-center gap-1.5">
                 <button

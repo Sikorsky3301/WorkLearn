@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useOnboarding, useAcceptOnboarding } from '../../shared/api/hooks'
-import { resolveMediaUrl } from '../../shared/api/client'
+import { useOnboarding, useAcceptOnboarding } from '../../hooks'
+import { resolveMediaUrl } from '../../lib/client'
 
 function SimLogo({ logoUrl, alt, size = 'md' }) {
   const h = { sm: 'h-5', md: 'h-7', lg: 'h-9' }[size]

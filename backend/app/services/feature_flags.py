@@ -5,14 +5,14 @@ Feature-flag catalog, seeding, and resolution.
 hardcoded ROLE_FEATURES map (src/features/auth/AuthContext.jsx) — seeded once
 so behavior doesn't change the moment this migration lands; admins then
 manage flags for real via the Feature Flags UI. `admin_panel` from that old
-map isn't carried over — RBAC (app/models_rbac.py) now governs admin-surface
+map isn't carried over — RBAC (app/models/rbac.py) now governs admin-surface
 access entirely, so a feature flag for it would be redundant/confusing.
 """
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from app.models import User
-from app.models_feature_flags import FeatureFlag, FeatureFlagOverride
+from app.models.feature_flags import FeatureFlag, FeatureFlagOverride
 
 FEATURE_FLAG_CATALOG: list[dict] = [
     {"key": "python_sandbox", "label": "Python Sandbox", "category": "Core",

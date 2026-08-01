@@ -11,4 +11,14 @@ export default defineConfig({
     host: '127.0.0.1',
     strictPort: true,
   },
+  test: {
+    // happy-dom, not jsdom: the jsdom 27 currently on npm pulls in
+    // @asamuzakjp/css-color, which require()s an ESM-only @csstools
+    // package and crashes every worker before a single test runs
+    // (ERR_REQUIRE_ESM) — happy-dom gives the same DOM-in-Node environment
+    // Testing Library needs without that broken dependency chain.
+    environment: 'happy-dom',
+    globals: true,
+    setupFiles: './src/test/setup.js',
+  },
 })

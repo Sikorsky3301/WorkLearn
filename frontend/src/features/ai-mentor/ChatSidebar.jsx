@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, MessageCircle, TrendingUp, Settings, LayoutDashboard, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
-import { useSkillGPS } from '../../shared/api/hooks'
+import { useSkillGPS } from '../../hooks'
 
 /** Left nav shell for the AI Mentor page, matching the reference app-shell
  * layout (New Chat / Features nav / Settings & Help / profile card). Items

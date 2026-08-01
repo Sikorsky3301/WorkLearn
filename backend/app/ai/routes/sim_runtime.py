@@ -19,9 +19,9 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.database import get_db
-from app.auth import get_current_user
-from app.models_cms import Simulation, SimulationTask, SimulationStatus
+from app.db.database import get_db
+from app.core.auth import get_current_user
+from app.models.cms import Simulation, SimulationTask, SimulationStatus
 from app.ai.services.llm import generate, stream_chat
 from app.ai.services.langfuse_client import traced_context
 from app.services.sim_view import build_simulation_public_dict

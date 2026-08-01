@@ -1,14 +1,14 @@
 """
 One-time, idempotent migration of the 3 hardcoded job simulations
 (da-job-sim, frontend-dev-sim, sales-crm-sim) into the new CMS schema
-(Simulation/SimulationTask — see app/models_cms.py). Transcribed by hand from
+(Simulation/SimulationTask — see app/models/cms.py). Transcribed by hand from
 today's hardcoded sources, since sales-crm-sim's engine/simulationConfig.js
 and stageQuizzes.js are frontend JS, not importable Python:
-  - backend/app/routes/enrollments.py (SIMULATIONS, SIM_MANAGERS,
+  - backend/app/routes/v1/enrollments.py (SIMULATIONS, SIM_MANAGERS,
     SIM_TASK_BRIEFS, SIM_ONBOARDING)
-  - backend/app/config.py (SIM_TASK_XP_AWARDS, SIM_TASK_SKILL_AWARDS,
+  - backend/app/core/config.py (SIM_TASK_XP_AWARDS, SIM_TASK_SKILL_AWARDS,
     SIM_TASK_WEEKS via SIM_TASK_NAMES's task-0 "Onboarding" entries)
-  - backend/app/routes/sandbox.py (SIM_TASK_IO) — informs grader_key/
+  - backend/app/routes/v1/sandbox.py (SIM_TASK_IO) — informs grader_key/
     dataset_key/language per code_sandbox task
   - backend/app/ai/services/crm_sim_prompts.py (PERSONALITIES, EMAIL_GRADING_PROMPT)
   - src/features/simulations/da-job-sim/DASimulationWorkspace.jsx (TASKS,
@@ -32,8 +32,8 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select
 
-from app.database import AsyncSessionLocal
-from app.models_cms import Simulation, SimulationTask, SimulationStatus
+from app.db.database import AsyncSessionLocal
+from app.models.cms import Simulation, SimulationTask, SimulationStatus
 
 
 # ── da-job-sim ────────────────────────────────────────────────────────────────

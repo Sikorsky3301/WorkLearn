@@ -3,7 +3,7 @@ import { Plus, UsersRound, Ban, CheckCircle2, KeyRound, Trash2, X } from 'lucide
 import {
   useAdmins, useAdminRoles, useCreateAdmin, useSuspendAdmin, useActivateAdmin,
   useDeleteAdmin, useResetAdminPassword, useUpdateAdmin,
-} from '../../../shared/api/hooks'
+} from '../../../hooks'
 import DataTable from '../../../shared/design-system/DataTable'
 import PermissionGate from '../../../shared/design-system/PermissionGate'
 

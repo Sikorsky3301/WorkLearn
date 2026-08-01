@@ -1,5 +1,5 @@
 import { Users, Building2, Activity as ActivityIcon, Award, GraduationCap, TrendingUp } from 'lucide-react'
-import { usePlatformAnalytics } from '../../shared/api/hooks'
+import { usePlatformAnalytics } from '../../hooks'
 import StatCard from '../../shared/design-system/StatCard'
 import GrowthChart from './GrowthChart'
 

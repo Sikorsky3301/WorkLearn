@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronRight, Plus, Trash2, FileText, Image as ImageIcon, LayoutTemplate } from 'lucide-react'
-import { cn } from '../../../shared/utils/cn'
+import { cn } from '../../../lib/cn'
 
 const TABS = [
   { id: 'pages', label: 'Pages', Icon: FileText },

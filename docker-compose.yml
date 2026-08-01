@@ -1,0 +1,90 @@
+# Spins up the whole local stack in one command. The frontend is
+# deliberately NOT containerized here — same convention as k8s/README.md:
+# `cd frontend && npm run dev` (Vite, port 5173) against whichever backend
+# is running, compose or otherwise.
+#
+# Usage:
+#   docker compose up postgres backend           # app only
+#   docker compose up                            # app + LiteLLM Proxy
+#   docker compose exec backend python seed.py   # once, after first `up`, to get demo accounts
+#
+# `backend` reads backend/.env for everything (AI provider keys, JWT secret,
+# etc. — see backend/.env.example) except DATABASE_URL, which is overridden
+# below to point at the `postgres` service instead of whatever
+# Supabase/localhost URL backend/.env has for running uvicorn directly.
+#
+# litellm-proxy/litellm-proxy-db are optional (see
+# backend/litellm-proxy/README.md) — needs LITELLM_MASTER_KEY and the
+# provider API keys set in your shell or a .env file in this same directory.
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: worklearn
+    volumes:
+      - worklearn_db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3001:3001"
+    env_file:
+      - backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/worklearn
+
+  litellm-proxy-db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: litellm
+      POSTGRES_PASSWORD: ${LITELLM_PROXY_DB_PASSWORD:-litellm}
+      POSTGRES_DB: litellm
+    volumes:
+      - litellm_proxy_db_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432" # 5433, not 5432 — avoids colliding with any local Postgres already used for the app's own DATABASE_URL
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U litellm"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  litellm-proxy:
+    image: ghcr.io/berriai/litellm-database:latest
+    restart: unless-stopped
+    depends_on:
+      litellm-proxy-db:
+        condition: service_healthy
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./backend/litellm-proxy/config.yaml:/app/config.yaml:ro
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
+      LITELLM_PROXY_DATABASE_URL: postgresql://litellm:${LITELLM_PROXY_DB_PASSWORD:-litellm}@litellm-proxy-db:5432/litellm
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    command: ["--config", "/app/config.yaml"]
+
+volumes:
+  worklearn_db_data:
+  litellm_proxy_db_data:

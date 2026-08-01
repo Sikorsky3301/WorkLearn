@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { isSameDay, format } from 'date-fns'
 import { Plus, CalendarDays } from 'lucide-react'
-import { useCrmSimStore } from '../../store/useCrmSimStore'
+import { useCrmSimStore } from '../../../../../stores/useCrmSimStore'
 import { Calendar } from '../../../../../shared/ui/shadcn/calendar'
 import { Card, CardContent } from '../../../../../shared/ui/shadcn/card'
 import { Input } from '../../../../../shared/ui/shadcn/input'

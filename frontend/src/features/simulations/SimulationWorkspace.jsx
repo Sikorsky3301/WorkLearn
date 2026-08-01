@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueries } from '@tanstack/react-query'
-import { useSimulations, useEnrollment } from '../../shared/api/hooks'
-import { api, resolveMediaUrl } from '../../shared/api/client'
-import { resolveDomainIcon } from '../../shared/utils/domainIcons'
+import { useSimulations, useEnrollment } from '../../hooks'
+import { api, resolveMediaUrl } from '../../lib/client'
+import { resolveDomainIcon } from '../../lib/domainIcons'
 import DomainFilterBar from './DomainFilterBar'
 import RatingStars from '../../shared/ui/RatingStars'
 

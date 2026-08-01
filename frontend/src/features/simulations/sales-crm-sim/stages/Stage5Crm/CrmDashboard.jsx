@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { DollarSign, Target, CheckSquare, Activity as ActivityIcon } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts'
-import { useCrmSimStore } from '../../store/useCrmSimStore'
+import { useCrmSimStore } from '../../../../../stores/useCrmSimStore'
 import { Card, CardContent, CardHeader, CardTitle } from '../../../../../shared/ui/shadcn/card'
 import { PIPELINE_STAGES, formatCurrency } from './crmConstants'
 

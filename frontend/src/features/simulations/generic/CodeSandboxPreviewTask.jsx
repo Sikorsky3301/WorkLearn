@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import Editor from '@monaco-editor/react'
 import { Play, Loader2, CheckCircle2, XCircle } from 'lucide-react'
-import { usePreviewRunSandbox } from '../../../shared/api/hooks'
+import { usePreviewRunSandbox } from '../../../hooks'
 
 /** Preview-mode stand-in for CodeSandboxTask — deliberately does NOT reuse
  * JupyterPlayground/FrontendPlayground, since both are wired directly to

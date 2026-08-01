@@ -5,9 +5,9 @@ import {
 } from 'lucide-react'
 import logo from '../assets/logo.png'
 import { useAuth } from '../features/auth/AuthContext'
-import { useSimulations, useMyAssignments } from '../shared/api/hooks'
-import { resolveDomainIcon } from '../shared/utils/domainIcons'
-import { domainDescription } from '../shared/utils/domainMeta'
+import { useSimulations, useMyAssignments } from '../hooks'
+import { resolveDomainIcon } from '../lib/domainIcons'
+import { domainDescription } from '../lib/domainMeta'
 
 // Real, working destinations today. `to` is a route; `href` is used instead
 // for the one item (Help & Support) that isn't a page in this app.

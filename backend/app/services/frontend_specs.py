@@ -1,7 +1,7 @@
 """Hidden Jest test specs for the Frontend Developer job simulation —
 server-side only, never sent to the student. Each entry is the full source
 of a submission.test.js that the sandbox writes alongside the student's
-submission file before running Jest (see app/routes/sandbox.py's
+submission file before running Jest (see app/routes/v1/sandbox.py's
 _submit_frontend_dev_sim). This is the frontend sim's equivalent of the DA
 sim's computed reference solution in app/services/dataset.py: the actual
 "answer key" that the student's code is graded against.
@@ -9,7 +9,7 @@ sim's computed reference solution in app/services/dataset.py: the actual
 Every element id / data-testid / function signature referenced below is
 part of the task's public contract and must match what's shown to the
 student in the task brief (see SIM_TASK_BRIEFS["frontend-dev-sim"] in
-app/routes/enrollments.py) — the hidden test can only assert on names the
+app/routes/v1/enrollments.py) — the hidden test can only assert on names the
 student was actually told to use.
 """
 

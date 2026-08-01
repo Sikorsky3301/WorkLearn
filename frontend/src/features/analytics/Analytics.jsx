@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useAnalytics } from '../../shared/api/hooks'
+import { useAnalytics } from '../../hooks'
 
 const intensityColors = ['bg-surface-high', 'bg-primary/30', 'bg-primary/60', 'bg-primary']
 

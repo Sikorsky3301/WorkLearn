@@ -39,6 +39,18 @@ spec:
               mountPath: /sandbox-work
             - name: data
               mountPath: /app/data
+          # Starting point, not load-tested — tune against real traffic
+          # before treating these as production numbers. Without a limit set
+          # at all, one runaway request (or a leak) can starve every other
+          # pod on the node; without a request, the scheduler can't reason
+          # about bin-packing this pod at all.
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
           livenessProbe:
             httpGet:
               path: /health

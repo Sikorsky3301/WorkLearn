@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { X, Trash2, AlertTriangle, Ban, CheckCircle2 } from 'lucide-react'
-import { useUserEnrollments, useDeleteUser, useDeleteEnrollment, useSuspendUser, useActivateUser } from '../../shared/api/hooks'
+import { useUserEnrollments, useDeleteUser, useDeleteEnrollment, useSuspendUser, useActivateUser } from '../../hooks'
 
 /** Shared by both portals' user tables — course enrollments, real
  * suspend/activate (previously only hard delete existed), and delete. */

@@ -3,7 +3,7 @@ student runtime (GET /api/simulations/{sim_id}/full, PUBLISHED-only) and the
 admin-only draft preview (GET /api/admin/simulations/{sim_id}/preview-full,
 any status). Factored out so the two trust boundaries can't silently drift
 apart in what shape they return."""
-from app.models_cms import Simulation, SimulationTask
+from app.models.cms import Simulation, SimulationTask
 from app.services.task_types import strip_secrets
 
 
@@ -27,6 +27,7 @@ def build_simulation_public_dict(sim: Simulation, tasks: list[SimulationTask]) -
             "accent_color": sim.accent_color, "difficulty": sim.difficulty,
             "estimated_hours": sim.estimated_hours, "skills": sim.skills,
             "rating": sim.rating, "rating_count": sim.rating_count, "manager": sim.manager,
+            "section_labels": sim.section_labels,
         },
         "tasks": [build_task_public_dict(t) for t in tasks],
     }

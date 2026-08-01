@@ -12,7 +12,7 @@ call site through `traced_observation()` / `traced_context()` below keeps
 that guard in one place instead of repeated at each call site.
 """
 from contextlib import contextmanager
-from app.config import settings
+from app.core.config import settings
 
 langfuse_enabled = bool(settings.langfuse_public_key and settings.langfuse_secret_key)
 

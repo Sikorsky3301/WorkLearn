@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Phone, Mail, Users2, StickyNote, Plus } from 'lucide-react'
-import { useCrmSimStore } from '../../store/useCrmSimStore'
+import { useCrmSimStore } from '../../../../../stores/useCrmSimStore'
 import { Card, CardContent } from '../../../../../shared/ui/shadcn/card'
 import { Button } from '../../../../../shared/ui/shadcn/button'
 import { Input } from '../../../../../shared/ui/shadcn/input'

@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import Editor from '@monaco-editor/react'
-import { useSubmitSandbox, useSandboxFiles, useSandboxFileRows } from '../../../shared/api/hooks'
-import { downloadFile } from '../../../shared/api/client'
+import { useSubmitSandbox, useSandboxFiles, useSandboxFileRows } from '../../../hooks'
+import { downloadFile } from '../../../lib/client'
 
 const FILE_ROWS_PAGE_SIZE = 50
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024 // 20MB — matches the backend's cap

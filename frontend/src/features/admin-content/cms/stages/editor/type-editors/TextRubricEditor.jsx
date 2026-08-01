@@ -1,7 +1,7 @@
 import { Input } from '../../../../../../shared/ui/shadcn/input'
 import { Textarea } from '../../../../../../shared/ui/shadcn/textarea'
 import { Label } from '../../../../../../shared/ui/shadcn/label'
-import { cn } from '../../../../../../shared/utils/cn'
+import { cn } from '../../../../../../lib/cn'
 import FieldListEditor from '../fields/FieldListEditor'
 
 export default function TextRubricEditor({ config, setConfig }) {

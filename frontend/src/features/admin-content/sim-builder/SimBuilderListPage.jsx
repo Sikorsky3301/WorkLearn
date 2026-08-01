@@ -4,7 +4,7 @@ import { ArrowLeft, Wand2, Plus, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   useSimBuilderProjects, useCreateSimBuilderProject, useDeleteSimBuilderProject,
-} from '../../../shared/api/hooks'
+} from '../../../hooks'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../../shared/ui/shadcn/dialog'
 import SimBuilderLogo from './SimBuilderLogo'
 

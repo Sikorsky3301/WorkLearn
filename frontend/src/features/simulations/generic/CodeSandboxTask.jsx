@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Loader2, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
-import { useSubmitSandbox } from '../../../shared/api/hooks'
+import { useSubmitSandbox } from '../../../hooks'
 import { Textarea } from '../../../shared/ui/shadcn/textarea'
 import { Button } from '../../../shared/ui/shadcn/button'
 import JupyterPlayground from '../da-job-sim/JupyterPlayground'

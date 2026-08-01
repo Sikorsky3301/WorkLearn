@@ -5,8 +5,8 @@ import {
   BadgeCheck, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { useAuth, ROLES } from '../auth/AuthContext'
-import { useUserSkills, useUserBadges, useDeleteEducation, useSimulations, useMyAssignments } from '../../shared/api/hooks'
-import { downloadFile, resolveMediaUrl } from '../../shared/api/client'
+import { useUserSkills, useUserBadges, useDeleteEducation, useSimulations, useMyAssignments } from '../../hooks'
+import { downloadFile, resolveMediaUrl } from '../../lib/client'
 import EditProfileModal from './components/EditProfileModal'
 import EducationModal from './components/EducationModal'
 import BadgeTile from './components/BadgeTile'

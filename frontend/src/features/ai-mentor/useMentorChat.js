@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { streamChat, api } from '../../shared/api/client'
+import { streamChat, api } from '../../lib/client'
 
 /** Owns all AI Mentor chat state/logic — message list, streaming, stop,
  * retry, clear, and per-message feedback — so CareerTwin.jsx stays a thin

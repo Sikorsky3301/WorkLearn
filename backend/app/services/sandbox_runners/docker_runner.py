@@ -12,7 +12,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from app.config import settings
+from app.core.config import settings
 from app.services.sandbox_runners.base import SandboxResult
 
 logger = logging.getLogger(__name__)

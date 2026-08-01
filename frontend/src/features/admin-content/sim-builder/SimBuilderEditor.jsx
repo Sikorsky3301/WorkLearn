@@ -6,7 +6,7 @@ import {
   useSimBuilderProject, useCreateSimBuilderPage, useDeleteSimBuilderPage, useReorderSimBuilderPages,
   useCreateSimBuilderBlock, useDeleteSimBuilderBlock, useReorderSimBuilderBlocks, useUpdateSimBuilderBlock,
   usePublishSimBuilderProject,
-} from '../../../shared/api/hooks'
+} from '../../../hooks'
 import { DEFAULT_BLOCK_CONFIG } from './blockTypeRegistry'
 import Toolbar from './Toolbar'
 import LeftSidebar from './LeftSidebar'

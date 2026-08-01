@@ -3,7 +3,7 @@ Domain-aware personas for the AI Mentor. Previously the Mentor had one
 hardcoded system prompt scoped to "data analyst" regardless of what
 simulation a student was actually enrolled in — a student in the IT Support
 sim asking about a ticket got refused as "off-topic." This maps each known
-`Simulation.domain` string (see app/models_cms.py — genuinely free text, no
+`Simulation.domain` string (see app/models/cms.py — genuinely free text, no
 enum/registry, confirmed against every domain currently seeded: the 3 legacy
 sims in migrate_legacy_sims.py plus the 7 app/cms_templates/*.py starter
 templates) to its own purpose/scope/refusal text, built from one shared

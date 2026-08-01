@@ -1,4 +1,4 @@
-import { cn } from '../../../../shared/utils/cn'
+import { cn } from '../../../../lib/cn'
 
 /** Thin draggable divider between two resizable columns — pair with
  * useResizableWidth's `startResize` as the onMouseDown handler. */

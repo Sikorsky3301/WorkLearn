@@ -6,7 +6,7 @@ import { taskTypeRegistry } from '../../../simulations/generic/taskTypeRegistry'
 import { taskTypeMeta, DEFAULT_TASK_TYPE_META } from '../shared/taskTypeMeta'
 import { Button } from '../../../../shared/ui/shadcn/button'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '../../../../shared/ui/shadcn/dropdown-menu'
-import { cn } from '../../../../shared/utils/cn'
+import { cn } from '../../../../lib/cn'
 
 /** One task row in the List view — drag handle (sortable reorder), an
  * `insert-before-<id>` droppable for palette-drag-to-insert, a type accent

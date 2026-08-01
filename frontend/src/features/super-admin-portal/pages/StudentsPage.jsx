@@ -1,4 +1,4 @@
-import { useAdminStats } from '../../../shared/api/hooks'
+import { useAdminStats } from '../../../hooks'
 
 export default function StudentsPage() {
   const { data: stats, isLoading } = useAdminStats()

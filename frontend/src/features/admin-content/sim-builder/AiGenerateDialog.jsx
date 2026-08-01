@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Sparkles, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useAiGenerateSimBuilder } from '../../../shared/api/hooks'
+import { useAiGenerateSimBuilder } from '../../../hooks'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../../shared/ui/shadcn/dialog'
 
 /** Toolbar "AI Generate" — scoped to structural skeleton generation (Weeks

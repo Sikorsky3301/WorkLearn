@@ -3,9 +3,9 @@ Seed demo users — matches the old mock AuthContext credentials exactly.
 Run: python seed.py
 """
 import asyncio
-from app.database import engine, Base, AsyncSessionLocal
+from app.db.database import engine, Base, AsyncSessionLocal
 from app.models import User, UnlockedFeature, Role, SuperAdminCredential
-from app.auth import hash_password
+from app.core.auth import hash_password
 
 USERS = [
     # Direct users

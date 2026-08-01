@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import Editor from '@monaco-editor/react'
-import { useSubmitSandbox } from '../../../shared/api/hooks'
+import { useSubmitSandbox } from '../../../hooks'
 
 const MIN_HEIGHT = 280
 const MAX_HEIGHT = 900
@@ -76,138 +76,6 @@ function defineWorkLearnTheme(monaco) {
       'scrollbarSlider.hoverBackground': '#c8c5d380',
     },
   })
-}
-
-// ── Preview + Result panel — same shape as JupyterPlayground's checklist, but
-// self-contained here since the frontend workspace doesn't reuse the CSV/JSON
-// preview logic DASimulationWorkspace's SandboxResultPanel has.
-const VERIFY_STEP_MS = 300
-
-function VerifyIcon() {
-  return <span className="w-[14px] h-[14px] border-2 border-primary/30 border-t-primary rounded-full animate-spin shrink-0" />
-}
-function CheckIcon(props) {
-  return <svg width={props.width || 14} height={props.height || 14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M20 6 9 17l-5-5" /></svg>
-}
-
-function CheckRow({ check, status }) {
-  if (status === 'pending') {
-    return (
-      <div className="flex items-start gap-2.5 text-[13px] px-2.5 py-2 rounded-lg opacity-40">
-        <span className="w-[18px] h-[18px] rounded-full border-2 border-border shrink-0 mt-0.5" />
-        <span className="text-on-surface-variant">{check.label}</span>
-      </div>
-    )
-  }
-  if (status === 'current') {
-    return (
-      <div className="flex items-start gap-2.5 text-[13px] px-2.5 py-2 rounded-lg bg-primary/5">
-        <span className="mt-0.5"><VerifyIcon /></span>
-        <span className="text-on-surface">{check.label}<span className="text-on-surface-variant"> — verifying…</span></span>
-      </div>
-    )
-  }
-  return (
-    <div className={`flex items-start gap-2.5 text-[13px] px-2.5 py-2 rounded-lg transition-colors ${check.pass ? '' : 'bg-red-50'}`}>
-      <span className={`w-[18px] h-[18px] rounded-full flex items-center justify-center shrink-0 mt-0.5 ${check.pass ? 'bg-green-500 text-white' : 'bg-red-200 text-red-700'}`}>
-        {check.pass ? <CheckIcon width={10} height={10} /> : <span className="text-[10px] font-bold">✕</span>}
-      </span>
-      <span className={check.pass ? 'text-on-surface' : 'text-red-700'}>{check.label}</span>
-    </div>
-  )
-}
-
-export function SandboxResultPanel({ gradeResult, accentBorderClass, onNext, hasNext }) {
-  const [logTab, setLogTab] = useState('result')
-  const [revealedCount, setRevealedCount] = useState(0)
-  const checks = gradeResult?.checks || []
-  const total = checks.length
-
-  useEffect(() => {
-    if (!gradeResult || total === 0) { setRevealedCount(total); return }
-    setRevealedCount(0)
-    let i = 0
-    const id = setInterval(() => {
-      i += 1
-      setRevealedCount(i)
-      if (i >= total) clearInterval(id)
-    }, VERIFY_STEP_MS)
-    return () => clearInterval(id)
-  }, [gradeResult, total])
-
-  if (!gradeResult) return null
-
-  const verifying = revealedCount < total
-  const passed = checks.filter(c => c.pass).length
-  const success = gradeResult.score >= 70
-  const isDryRun = gradeResult.dry_run === true
-
-  const statusFor = (i) => (i < revealedCount ? 'done' : i === revealedCount ? 'current' : 'pending')
-
-  return (
-    <div className={`card overflow-hidden p-0 border-l-[3px] ${accentBorderClass}`}>
-      <div className="flex items-center justify-between px-5 py-3 border-b border-border">
-        <span className="text-sm font-bold text-on-surface">Result</span>
-        {verifying ? (
-          <span className="chip text-xs bg-surface-low text-on-surface-variant flex items-center gap-1.5">
-            <VerifyIcon /> Verifying {revealedCount}/{total}…
-          </span>
-        ) : isDryRun ? (
-          <span className="chip text-xs bg-blue-100 text-blue-700 animate-[fadeIn_0.25s_ease]">Preview run — not submitted</span>
-        ) : (
-          <span className={`chip text-xs animate-[fadeIn_0.25s_ease] ${success ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-            {success ? 'Success' : 'Needs Work'}
-          </span>
-        )}
-      </div>
-      <div className="flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-border">
-        <div className="sm:w-1/2 p-5">
-          <p className="text-sm font-bold text-on-surface mb-1">Test Cases {verifying ? '' : <span className="font-normal text-on-surface-variant">· {gradeResult.score}/100</span>}</p>
-          <p className="text-xs text-on-surface-variant mb-3">
-            {verifying ? `Verifying ${revealedCount} of ${total}…` : `Passed ${passed} of ${total} · Failed ${total - passed}`}
-          </p>
-          <div className="space-y-2 max-h-60 overflow-y-auto">
-            {checks.map((c, i) => <CheckRow key={c.id} check={c} status={statusFor(i)} />)}
-          </div>
-        </div>
-        <div className="sm:w-1/2 p-5">
-          <div className="flex items-center gap-4 mb-3 border-b border-border">
-            <button onClick={() => setLogTab('result')} className={`text-sm font-semibold pb-2 -mb-px border-b-2 transition-colors cursor-pointer ${logTab === 'result' ? 'border-primary text-on-surface' : 'border-transparent text-on-surface-variant hover:text-on-surface'}`}>
-              Test output
-            </button>
-            <button onClick={() => setLogTab('logs')} className={`text-sm font-semibold pb-2 -mb-px border-b-2 transition-colors cursor-pointer ${logTab === 'logs' ? 'border-primary text-on-surface' : 'border-transparent text-on-surface-variant hover:text-on-surface'}`}>
-              Jest logs
-            </button>
-          </div>
-          {logTab === 'result' ? (
-            <div className="space-y-2.5 max-h-52 overflow-y-auto">
-              {gradeResult.details?.error && (
-                <p className="text-xs text-red-600">{gradeResult.details.error}</p>
-              )}
-              {checks.map((c, i) => {
-                const status = statusFor(i)
-                if (status === 'pending') return <div key={c.id} className="flex items-start gap-2 text-[13px] opacity-40"><span className="text-on-surface-variant">·</span><span className="text-on-surface-variant">Waiting to verify — {c.label}</span></div>
-                if (status === 'current') return <div key={c.id} className="flex items-start gap-2 text-[13px]"><span className="mt-0.5"><VerifyIcon /></span><span className="text-on-surface-variant">Verifying — {c.label}…</span></div>
-                return <div key={c.id} className="flex items-start gap-2 text-[13px]"><span className={c.pass ? 'text-green-600' : 'text-red-600'}>{c.pass ? '✓' : '✗'}</span><span className="text-on-surface-variant">Jest {c.pass ? 'passed' : 'failed'} this check — {c.label}</span></div>
-              })}
-            </div>
-          ) : (
-            <pre className="text-xs font-mono whitespace-pre-wrap text-on-surface-variant max-h-52 overflow-y-auto">
-              {gradeResult.details?.stdout || '(no output)'}
-              {gradeResult.details?.stderr && <span className="text-red-600">{'\n' + gradeResult.details.stderr}</span>}
-            </pre>
-          )}
-        </div>
-      </div>
-      {hasNext && !verifying && (
-        <div className="px-5 py-3.5 border-t border-border animate-[fadeIn_0.25s_ease]">
-          <button onClick={onNext} className="btn-primary w-full text-sm py-2.5 cursor-pointer">
-            Continue →
-          </button>
-        </div>
-      )}
-    </div>
-  )
 }
 
 export default function FrontendPlayground({

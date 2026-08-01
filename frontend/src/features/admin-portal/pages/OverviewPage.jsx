@@ -1,6 +1,6 @@
 import { Users, ShieldCheck } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
-import { useAdminStats } from '../../../shared/api/hooks'
+import { useAdminStats } from '../../../hooks'
 import StatCard from '../../../shared/design-system/StatCard'
 import EmptyState from '../../../shared/design-system/EmptyState'
 

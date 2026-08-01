@@ -1,8 +1,8 @@
 import { CheckCircle2, Circle } from 'lucide-react'
-import { useCrmSimStore } from '../sales-crm-sim/store/useCrmSimStore'
+import { useCrmSimStore } from '../../../stores/useCrmSimStore'
 import CrmShellLayout from '../sales-crm-sim/stages/Stage5Crm/CrmShellLayout'
 import { Button } from '../../../shared/ui/shadcn/button'
-import { cn } from '../../../shared/utils/cn'
+import { cn } from '../../../lib/cn'
 
 /** Thin wrapper reusing Stage5Crm's 10-module CRM mini-app wholesale.
  * `required_entities` (from task.config) drives the completion gate instead

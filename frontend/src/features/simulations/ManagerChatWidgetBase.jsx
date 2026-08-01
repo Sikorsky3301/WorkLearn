@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { MessageCircle, X, Send } from 'lucide-react'
-import { cn } from '../../shared/utils/cn'
+import { cn } from '../../lib/cn'
 import { Button } from '../../shared/ui/shadcn/button'
 import { Textarea } from '../../shared/ui/shadcn/textarea'
 

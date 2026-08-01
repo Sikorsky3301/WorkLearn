@@ -1,4 +1,4 @@
-import { cn } from '../../../../shared/utils/cn'
+import { cn } from '../../../../lib/cn'
 
 /** Week/task navigator above the Stages canvas — "All" plus one pill per
  * distinct `week` value found in the task list (in first-seen order, plus a

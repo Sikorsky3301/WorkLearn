@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useLayoutEffect } from 'react'
 import { MoreVertical, Trash2 } from 'lucide-react'
 import { useAuth, ROLES } from '../auth/AuthContext'
-import { useMentorTopics } from '../../shared/api/hooks'
+import { useMentorTopics } from '../../hooks'
 import { useMentorChat } from './useMentorChat'
 import ChatSidebar from './ChatSidebar'
 import MentorWelcome from './MentorWelcome'

@@ -3,7 +3,7 @@ Sandbox runner selection: SANDBOX_RUNNER=docker (default, local dev) runs
 submissions via `docker run` on the host daemon; SANDBOX_RUNNER=kubernetes
 launches each submission as a Kubernetes Job (in-cluster deployment).
 """
-from app.config import settings
+from app.core.config import settings
 from app.services.sandbox_runners.base import SandboxResult
 
 __all__ = ["SandboxResult", "get_runner"]

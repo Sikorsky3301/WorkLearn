@@ -1,5 +1,5 @@
 import { ClipboardList } from 'lucide-react'
-import { useAdminActivity } from '../../shared/api/hooks'
+import { useAdminActivity } from '../../hooks'
 import EmptyState from '../../shared/design-system/EmptyState'
 
 const DOT_COLOR = { success: 'bg-emerald-500', cert: 'bg-purple-500', request: 'bg-orange-500', warn: 'bg-amber-500' }

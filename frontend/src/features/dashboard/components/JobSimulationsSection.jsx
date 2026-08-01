@@ -1,4 +1,4 @@
-import { resolveDomainIcon } from '../../../shared/utils/domainIcons'
+import { resolveDomainIcon } from '../../../lib/domainIcons'
 import SimulationCard from './SimulationCard'
 
 /** Job simulations grouped by domain (Simulation.domain — the same filter

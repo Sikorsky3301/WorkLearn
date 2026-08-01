@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react'
 import { Camera, Loader2, FileText, Upload, Phone, MapPin, Briefcase, FolderGit2, Globe } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
-import { useUpdateProfile, useUploadPhoto, useDeletePhoto, useUploadResume, useDeleteResume } from '../../../shared/api/hooks'
-import { resolveMediaUrl } from '../../../shared/api/client'
+import { useUpdateProfile, useUploadPhoto, useDeletePhoto, useUploadResume, useDeleteResume } from '../../../hooks'
+import { resolveMediaUrl } from '../../../lib/client'
 import IconField from '../../../shared/ui/IconField'
 import Modal from './Modal'
 

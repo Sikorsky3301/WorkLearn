@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { api, setToken, clearToken } from '../../shared/api/client'
+import { api, setToken, clearToken } from '../../lib/client'
 
 // Values match the backend Role enum (uppercase)
 export const ROLES = {

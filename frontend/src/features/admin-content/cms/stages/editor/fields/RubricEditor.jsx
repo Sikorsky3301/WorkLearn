@@ -1,7 +1,7 @@
 import { Plus, Trash2, ListChecks } from 'lucide-react'
 import { Input } from '../../../../../../shared/ui/shadcn/input'
 import { Label } from '../../../../../../shared/ui/shadcn/label'
-import { cn } from '../../../../../../shared/utils/cn'
+import { cn } from '../../../../../../lib/cn'
 
 // ── Rubric (shared by any type) ──────────────────────────────────────────────
 export default function RubricEditor({ rubric, onChange }) {

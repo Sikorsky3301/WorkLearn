@@ -1,5 +1,5 @@
 import { Users, Building2, Activity as ActivityIcon, Award, DollarSign } from 'lucide-react'
-import { useAdminStats, useAdminUniversities } from '../../../shared/api/hooks'
+import { useAdminStats, useAdminUniversities } from '../../../hooks'
 import StatCard from '../../../shared/design-system/StatCard'
 import ActivityFeed from '../../admin-shared/ActivityFeed'
 

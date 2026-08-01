@@ -11,8 +11,9 @@ import asyncio
 import importlib
 from pathlib import Path
 from sqlalchemy import text
-from app.database import engine, Base
-from app import models, models_cms, models_sim_builder, models_rbac, models_feature_flags, models_platform_config, models_profile  # noqa: F401 — register all tables before create_all
+from app.db.database import engine, Base
+from app import models  # noqa: F401 — register all tables before create_all
+from app.models import cms, sim_builder, rbac, feature_flags, platform_config, profile  # noqa: F401
 
 MIGRATIONS_DIR = Path(__file__).resolve().parent
 

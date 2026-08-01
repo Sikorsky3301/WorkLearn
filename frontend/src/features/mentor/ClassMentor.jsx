@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { useNavigate } from 'react-router-dom'
-import { useMentorStudents, useUnlockFeature, useRevokeFeature } from '../../shared/api/hooks'
+import { useMentorStudents, useUnlockFeature, useRevokeFeature } from '../../hooks'
 
 const COURSES = [
   { id: 'da-job-sim',          type: 'simulation', title: 'Junior DA Job Simulation',   duration: '3–4 hrs', level: 'Beginner'     },

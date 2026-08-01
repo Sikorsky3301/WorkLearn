@@ -1,0 +1,53 @@
+# LiteLLM Proxy config — the standalone AI gateway, distinct from the
+# in-process litellm SDK usage in backend/app/ai/services/llm.py. See
+# README.md in this folder for how to run this and point the backend at it.
+#
+# Every model below is exposed under a stable `model_name` the backend
+# references via LITELLM_PROXY_MODEL (see backend/.env.example) — so
+# swapping which real provider/model backs e.g. "claude-sonnet" only ever
+# means editing this file, never the backend's own code or its `.env`.
+model_list:
+  - model_name: claude-sonnet
+    litellm_params:
+      model: anthropic/claude-sonnet-4-6
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: llama-groq
+    litellm_params:
+      model: groq/llama-3.3-70b-versatile
+      api_key: os.environ/GROQ_API_KEY
+
+  - model_name: gemini-flash
+    litellm_params:
+      model: gemini/gemini-2.5-flash-lite
+      api_key: os.environ/GEMINI_API_KEY
+
+  # Self-hosted local model (OpenAI-Chat-Completions-compatible), tunneled
+  # via ngrok — same "openai" slot the backend's own AI_PROVIDER=openai
+  # already means. The model name itself (unlike api_base/api_key) has to be
+  # a literal here, not an os.environ/ reference — update it if you retrain/
+  # swap the local model. The URL/key stay env-driven since the ngrok tunnel
+  # rotates independently of this file.
+  - model_name: local-qwen
+    litellm_params:
+      model: openai/Qwen/Qwen2.5-14B-Instruct-AWQ
+      api_base: os.environ/OPENAI_BASE_URL
+      api_key: os.environ/OPENAI_API_KEY
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/LITELLM_PROXY_DATABASE_URL
+  # Lets virtual keys/model routing be managed from the proxy's own /ui
+  # instead of only ever being redeployed via this file.
+  store_model_in_db: true
+
+litellm_settings:
+  # Deliberately no `success_callback: ["langfuse"]` here. The backend
+  # already wraps every call in its own Langfuse tracing (traced_observation()
+  # in app/ai/services/llm.py) — enabling the proxy's own Langfuse callback
+  # too would write a second, independent trace per call into the same
+  # Langfuse project, which is harder to debug (two competing views of the
+  # same request), not easier. If you ever move tracing to live at the
+  # proxy layer instead, remove the app-side wrapping first rather than
+  # running both at once.
+  drop_params: true

@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { X, Clock, Trophy } from 'lucide-react'
-import { useEnrollment, useEnroll, useOnboarding, useCompleteTask, useSimulationFull } from '../../../shared/api/hooks'
-import { resolveMediaUrl } from '../../../shared/api/client'
-import { cn } from '../../../shared/utils/cn'
+import { useEnrollment, useEnroll, useOnboarding, useCompleteTask, useSimulationFull } from '../../../hooks'
+import { resolveMediaUrl } from '../../../lib/client'
+import { cn } from '../../../lib/cn'
 import { Badge } from '../../../shared/ui/shadcn/badge'
 import SimOnboarding from '../SimOnboarding'
 import SimManagerChat from '../SimManagerChat'
 import GenericStageRenderer from './GenericStageRenderer'
-import { useGenericSimStore } from './useGenericSimStore'
+import { useGenericSimStore } from '../../../stores/useGenericSimStore'
 
 // SimManagerChat/genericManagerChatKnowledge.js operate on task.message/
 // whatToDo/whatToSubmit/hints/skills/subject/title — this maps the backend's
@@ -91,7 +91,7 @@ export default function GenericSimShell() {
 
   const { data: full, isLoading: fullLoading } = useSimulationFull(slug)
   const { data: enrollment, isError: enrollError } = useEnrollment(slug)
-  const { mutate: enroll, isPending: enrolling } = useEnroll(slug)
+  const { mutate: enroll, isPending: enrolling, isError: enrollFailed, reset: resetEnroll } = useEnroll(slug)
   const { data: onboarding, isLoading: onboardingLoading } = useOnboarding(slug)
   const { mutate: completeTaskRemote } = useCompleteTask(enrollmentId)
   const triedEnroll = useRef(false)
@@ -103,6 +103,15 @@ export default function GenericSimShell() {
     return () => clearInterval(id)
   }, [status, tick])
 
+  // Step 1 — make sure the student is actually enrolled. This has to fully
+  // resolve (existing enrollment found, or a new one created) before the
+  // offer letter below is ever shown: accepting it hits a backend endpoint
+  // that 400s with "Enroll in the simulation before accepting the offer"
+  // if no Enrollment row exists yet. useOnboarding() is a single fast GET
+  // with no enrollment dependency, while enrolling here takes two
+  // sequential round trips (the 404 check, then the enroll POST) — so
+  // without this gate, the offer letter's Accept button could render (and
+  // be clicked) well before enrollment actually finished.
   useEffect(() => {
     if (enrollmentId) return
     if (enrollment?.id) {
@@ -115,13 +124,34 @@ export default function GenericSimShell() {
     }
   }, [enrollment, enrollError, enrolling, enrollmentId, enroll, startSimulation])
 
+  // Step 2 — only once enrolled, decide whether the offer letter still
+  // needs accepting.
   useEffect(() => {
+    if (!enrollmentId) return
     if (onboarding && onboardingGate === null) {
       setOnboardingGate(!onboarding.accepted)
     }
-  }, [onboarding, onboardingGate])
+  }, [enrollmentId, onboarding, onboardingGate])
 
-  if (fullLoading || onboardingLoading || onboardingGate === null) {
+  if (enrollFailed) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-surface-low">
+        <div className="text-center max-w-sm px-6">
+          <p className="text-sm text-on-surface-variant mb-4">
+            Couldn't enroll you in this simulation — check your connection and try again.
+          </p>
+          <button
+            onClick={() => { triedEnroll.current = false; resetEnroll() }}
+            className="btn-primary px-5 py-2.5 text-sm"
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (fullLoading || onboardingLoading || !enrollmentId || onboardingGate === null) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface-low">
         <span className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />

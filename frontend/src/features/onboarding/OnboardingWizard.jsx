@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import { useSimulations, useUpdateProfile, useUploadPhoto, useAddEducation, useCompleteOnboarding } from '../../shared/api/hooks'
+import { useSimulations, useUpdateProfile, useUploadPhoto, useAddEducation, useCompleteOnboarding } from '../../hooks'
 import OnboardingLayout from './components/OnboardingLayout'
 import WelcomeStep from './steps/WelcomeStep'
 import ProfileStep from './steps/ProfileStep'

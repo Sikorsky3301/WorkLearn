@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { Plus, Trash2, CheckSquare } from 'lucide-react'
-import { useCrmSimStore } from '../../store/useCrmSimStore'
+import { useCrmSimStore } from '../../../../../stores/useCrmSimStore'
 import { Card, CardContent } from '../../../../../shared/ui/shadcn/card'
 import { Button } from '../../../../../shared/ui/shadcn/button'
 import { Input } from '../../../../../shared/ui/shadcn/input'
 import { Label } from '../../../../../shared/ui/shadcn/label'
 import { Badge } from '../../../../../shared/ui/shadcn/badge'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../../../../../shared/ui/shadcn/select'
-import { cn } from '../../../../../shared/utils/cn'
+import { cn } from '../../../../../lib/cn'
 import { formatDate } from './crmConstants'
 
 const PRIORITIES = { high: 'danger', medium: 'warning', low: 'secondary' }

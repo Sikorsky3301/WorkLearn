@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Loader2, PlayCircle } from 'lucide-react'
-import { useAdminSimulation } from '../../../../shared/api/hooks'
+import { useAdminSimulation } from '../../../../hooks'
 import { Card, CardContent } from '../../../../shared/ui/shadcn/card'
 import { Badge } from '../../../../shared/ui/shadcn/badge'
 import RatingStars from '../../../../shared/ui/RatingStars'

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useSkillGPS } from '../../shared/api/hooks'
+import { useSkillGPS } from '../../hooks'
 
 const ROLE_KEYS   = ['junior_da', 'mid_da', 'senior_da', 'lead_da']
 const ROLE_LABELS = { junior_da: 'Junior DA', mid_da: 'Mid-level DA', senior_da: 'Senior DA', lead_da: 'Lead DA' }

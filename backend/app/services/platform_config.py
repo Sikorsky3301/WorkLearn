@@ -2,14 +2,14 @@
 Catalog + seed + read/write helpers for the Platform Configuration Center.
 Seeded defaults mirror this app's actual current `.env`/hardcoded values
 where one exists, so the form isn't blank on first load — but note these
-are display defaults only; they are not read back into `app.config.settings`
-or `app.database.engine` (see models_platform_config.py's docstring).
+are display defaults only; they are not read back into `app.core.config.settings`
+or `app.db.database.engine` (see models/platform_config.py's docstring).
 """
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from app.config import settings
-from app.models_platform_config import PlatformConfig
+from app.core.config import settings
+from app.models.platform_config import PlatformConfig
 
 # (category, key, label, description, is_secret, seed_value)
 CONFIG_CATALOG: list[dict] = [

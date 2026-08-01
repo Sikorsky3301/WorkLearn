@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worklearn-litellm
+  namespace: worklearn
+spec:
+  # Unlike worklearn-backend (hard-pinned to 1 — its APScheduler runs
+  # in-process and would fire once per pod), the proxy has no in-process
+  # scheduler or other per-pod state, so it can actually run >1 replica for
+  # real HA. 2 here as a starting point, not a hard requirement.
+  replicas: 2
+  selector:
+    matchLabels:
+      app: worklearn-litellm
+  template:
+    metadata:
+      labels:
+        app: worklearn-litellm
+    spec:
+      containers:
+        - name: litellm-proxy
+          image: ghcr.io/berriai/litellm-database:latest
+          # NOT `Never` like worklearn-backend/the sandbox images — those are
+          # built locally into Docker Desktop's daemon; this one is a public
+          # image that actually needs to be pulled from ghcr.io.
+          imagePullPolicy: IfNotPresent
+          args: ["--config", "/app/config.yaml"]
+          ports:
+            - containerPort: 4000
+          envFrom:
+            - secretRef:
+                name: worklearn-litellm-env
+          volumeMounts:
+            - name: config
+              mountPath: /app/config.yaml
+              subPath: config.yaml
+          # Starting point, not load-tested — see the same note on
+          # worklearn-backend's deployment.yaml. Lower than the backend's
+          # since this pod mostly proxies HTTP calls to upstream providers
+          # rather than doing CPU-heavy work itself.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /health/liveliness
+              port: 4000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/liveliness
+              port: 4000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      volumes:
+        - name: config
+          configMap:
+            name: worklearn-litellm-config

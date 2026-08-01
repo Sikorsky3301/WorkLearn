@@ -2,7 +2,7 @@ import { Plus, Trash2, AlertTriangle } from 'lucide-react'
 import { Input } from '../../../../../../shared/ui/shadcn/input'
 import { Textarea } from '../../../../../../shared/ui/shadcn/textarea'
 import { Label } from '../../../../../../shared/ui/shadcn/label'
-import { cn } from '../../../../../../shared/utils/cn'
+import { cn } from '../../../../../../lib/cn'
 
 // ── code_sandbox ─────────────────────────────────────────────────────────
 export default function CodeSandboxEditor({ config, setConfig }) {

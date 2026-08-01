@@ -1,70 +1,52 @@
-import { lazy, Suspense } from 'react'
+import { Suspense } from 'react'
 import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from './features/auth/AuthContext'
 
-// ── Shared ────────────────────────────────────────────────────────────────────
+// ── Shared layout ────────────────────────────────────────────────────────────
 import Navbar from './shared/Navbar'
 import Footer from './shared/Footer'
-import NotFound from './shared/NotFound'
 
-// ── Auth: global (direct/individual users + super admin + admin) ───────────────
-import Login            from './features/auth/global/Login'
-import SuperAdminLogin  from './features/auth/global/SuperAdminLogin'
-import AdminPortalLogin from './features/auth/global/AdminPortalLogin'
+// ── (public) — reachable without being logged in, not part of the auth flow ──
+import NotFoundPage from './app/(public)/NotFoundPage'
 
-// ── Auth: university (institution-scoped students + class mentors) ─────────────
-import UniversityLogin  from './features/auth/university/UniversityLogin'
-import MentorLogin      from './features/auth/university/MentorLogin'
+// ── (auth) — the login flow itself, one page per portal's entry point ───────
+import LoginPage            from './app/(auth)/LoginPage'
+import UniversityLoginPage  from './app/(auth)/UniversityLoginPage'
+import MentorLoginPage      from './app/(auth)/MentorLoginPage'
+import SuperAdminLoginPage  from './app/(auth)/SuperAdminLoginPage'
+import AdminPortalLoginPage from './app/(auth)/AdminPortalLoginPage'
 
-// ── Admin — the two RBAC portals are lazy-loaded: a regular student never
-// downloads either bundle (shell + every page + shared admin components).
-// The job-sim CMS editor and Sim Builder stay as regular imports — they're
-// standalone full-screen tools re-hosted under /admin/*, not part of
+// ── (dashboard) — everything behind authentication. SuperAdminPortalPage/
+// AdminPortalPage stay lazy internally (see those files) — a regular student
+// never downloads either portal's bundle (shell + every page + shared admin
+// components). The job-sim CMS editor and Sim Builder are regular imports —
+// they're standalone full-screen tools re-hosted under /admin/*, not part of
 // either portal's own code-split chunk. ──────────────────────────────────────
-const SuperAdminPortal = lazy(() => import('./features/super-admin-portal/SuperAdminPortal'))
-const AdminPortal      = lazy(() => import('./features/admin-portal/AdminPortal'))
-import SimulationBuilder from './features/admin-content/cms/SimulationBuilder'
-import SimBuilderListPage from './features/admin-content/sim-builder/SimBuilderListPage'
-import SimBuilderEditor from './features/admin-content/sim-builder/SimBuilderEditor'
+import SuperAdminPortalPage    from './app/(dashboard)/SuperAdminPortalPage'
+import AdminPortalPage         from './app/(dashboard)/AdminPortalPage'
+import SimulationBuilderPage   from './app/(dashboard)/SimulationBuilderPage'
+import SimBuilderListPage      from './app/(dashboard)/SimBuilderListPage'
+import SimBuilderEditorPage    from './app/(dashboard)/SimBuilderEditorPage'
+import MentorPage              from './app/(dashboard)/MentorPage'
+import OnboardingPage          from './app/(dashboard)/OnboardingPage'
+import DashboardPage           from './app/(dashboard)/DashboardPage'
+import SimulationsPage         from './app/(dashboard)/SimulationsPage'
+import SimulationOverviewPage  from './app/(dashboard)/SimulationOverviewPage'
+import SimulationShellPage     from './app/(dashboard)/SimulationShellPage'
+import PortfolioPage           from './app/(dashboard)/PortfolioPage'
+import AiMentorPage            from './app/(dashboard)/AiMentorPage'
+import SkillGpsPage            from './app/(dashboard)/SkillGpsPage'
+import AnalyticsPage           from './app/(dashboard)/AnalyticsPage'
+import SettingsPage            from './app/(dashboard)/SettingsPage'
+import EvaluationResultPage    from './app/(dashboard)/EvaluationResultPage'
+import CommunityPage           from './app/(dashboard)/CommunityPage'
 
-// ── Mentor ────────────────────────────────────────────────────────────────────
-import ClassMentor from './features/mentor/ClassMentor'
-
-// ── Dashboard ─────────────────────────────────────────────────────────────────
-import Dashboard from './features/dashboard/Dashboard'
-
-// ── Simulations ───────────────────────────────────────────────────────────────
-// Shared across every simulation (browse/enroll, offer-letter onboarding,
-// evaluation results) live at features/simulations/ root. All 3 simulations
-// (da-job-sim, frontend-dev-sim, sales-crm-sim) are now DB-backed and render
-// through the generic engine below — their old hardcoded workspace/overview
-// components (features/simulations/{da-job-sim,frontend-dev-sim,sales-crm-sim}/)
-// are no longer routed but left on disk for reference; several of their
-// sub-components (Stage5Crm, AiCustomerChat, StageQuiz, JupyterPlayground,
-// FrontendPlayground) are still imported directly by the generic task-type
-// renderers in features/simulations/generic/.
-import SimulationWorkspace from './features/simulations/SimulationWorkspace'
-import EvaluationResult    from './features/simulations/EvaluationResult'
-import GenericSimOverview  from './features/simulations/generic/GenericSimOverview'
-import GenericSimShell     from './features/simulations/generic/GenericSimShell'
-
-// ── Onboarding ────────────────────────────────────────────────────────────────
-import OnboardingWizard from './features/onboarding/OnboardingWizard'
-
-// ── Other platform features ───────────────────────────────────────────────────
-import Portfolio    from './features/portfolio/Portfolio'
-import AIMentor     from './features/ai-mentor/CareerTwin'
-import SkillGPS     from './features/skill-gps/SkillGPS'
-import Analytics    from './features/analytics/Analytics'
-import Community    from './features/community/Community'
-import Settings     from './features/settings/Settings'
-
-// ── MIRA (AI mock interviews) ─────────────────────────────────────────────────
+// MIRA (AI mock interviews) — own layout (MiraProvider), see MiraLayout below.
 import { MiraProvider } from './features/mira/MiraContext'
-import MiraHero    from './features/mira/MiraHero'
-import MiraSetup   from './features/mira/MiraSetup'
-import MiraSession from './features/mira/MiraSession'
-import MiraResults from './features/mira/MiraResults'
+import MiraHeroPage    from './app/(dashboard)/MiraHeroPage'
+import MiraSetupPage   from './app/(dashboard)/MiraSetupPage'
+import MiraSessionPage from './app/(dashboard)/MiraSessionPage'
+import MiraResultsPage from './app/(dashboard)/MiraResultsPage'
 
 // Routes that are an active, focused work session — an immersive
 // simulation workspace or a live MIRA interview — skip the global footer so
@@ -124,14 +106,22 @@ function ProtectedRoute() {
 
 // Gates every /super-admin* route — SuperAdmin-exclusive surface (Admin
 // Management, Roles & Permissions, Config Center, Audit Log, etc.). Shows a
-// spinner while auth resolves, SuperAdminLogin if not a signed-in
-// SUPER_ADMIN, or the requested page otherwise. An authenticated ADMIN is
-// bounced to their own portal root — there's nothing here they're allowed to see.
+// spinner while auth resolves, SuperAdminLoginPage if not a signed-in
+// SUPER_ADMIN, or the requested page otherwise.
+//
+// An Admin session does NOT bounce back to /admin here — it shows the
+// SuperAdmin login form instead, same as anyone else without a SUPER_ADMIN
+// session. That used to auto-redirect, which meant typing /super-admin into
+// the address bar while signed in as Admin just landed back on /admin with
+// no way to actually sign in as a super admin from there. The real
+// authorization boundary is server-side anyway (an Admin's token can't call
+// any SuperAdmin-only endpoint regardless of what page the SPA shows), so
+// there's nothing this redirect was protecting — successfully logging in
+// here just replaces the session token/user for this tab, same as any login.
 function RequireSuperAdmin({ children }) {
   const { user, loading } = useAuth()
   if (loading) return <PortalSpinner />
-  if (user?.role === 'ADMIN') return <Navigate to="/admin" replace />
-  if (!user || user.role !== 'SUPER_ADMIN') return <SuperAdminLogin />
+  if (!user || user.role !== 'SUPER_ADMIN') return <SuperAdminLoginPage />
   return children
 }
 
@@ -142,83 +132,83 @@ function RequireSuperAdmin({ children }) {
 function RequireAdmin({ children }) {
   const { user, loading } = useAuth()
   if (loading) return <PortalSpinner />
-  if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) return <AdminPortalLogin />
+  if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) return <AdminPortalLoginPage />
   return children
 }
 
 export default function App() {
   return (
     <Routes>
-      {/* Public — no auth required */}
-      <Route path="/login"            element={<Login />} />
-      <Route path="/university/login" element={<UniversityLogin />} />
-      <Route path="/mentor/login"     element={<MentorLogin />} />
+      {/* (auth) — no login required */}
+      <Route path="/login"            element={<LoginPage />} />
+      <Route path="/university/login" element={<UniversityLoginPage />} />
+      <Route path="/mentor/login"     element={<MentorLoginPage />} />
 
-      {/* SuperAdmin — everything SuperAdmin-exclusive lives in its own
-          portal shell. */}
+      {/* (dashboard) — SuperAdmin: everything SuperAdmin-exclusive lives in
+          its own portal shell. */}
       <Route
         path="/super-admin/*"
         element={
           <RequireSuperAdmin>
             <Suspense fallback={<PortalSpinner />}>
-              <SuperAdminPortal />
+              <SuperAdminPortalPage />
             </Suspense>
           </RequireSuperAdmin>
         }
       />
 
-      {/* Admin — the lower RBAC tier (SUPER_ADMIN can reach this too, see
-          RequireAdmin). The job-sim CMS editor and Sim Builder are standalone
-          full-screen tools (own header, no sidebar chrome), siblings of the
-          portal shell rather than nested in it. React Router ranks routes
-          by specificity regardless of declaration order, so these always
-          win over the portal's own `/*` wildcard for their exact paths —
-          see AdminPortal.jsx's docblock. */}
-      <Route path="/admin/simulations/:id" element={<RequireAdmin><SimulationBuilder /></RequireAdmin>} />
+      {/* (dashboard) — Admin: the lower RBAC tier (SUPER_ADMIN can reach this
+          too, see RequireAdmin). The job-sim CMS editor and Sim Builder are
+          standalone full-screen tools (own header, no sidebar chrome),
+          siblings of the portal shell rather than nested in it. React Router
+          ranks routes by specificity regardless of declaration order, so
+          these always win over the portal's own `/*` wildcard for their
+          exact paths — see AdminPortal.jsx's docblock. */}
+      <Route path="/admin/simulations/:id" element={<RequireAdmin><SimulationBuilderPage /></RequireAdmin>} />
       <Route path="/admin/sim-builder" element={<RequireAdmin><SimBuilderListPage /></RequireAdmin>} />
-      <Route path="/admin/sim-builder/:id" element={<RequireAdmin><SimBuilderEditor /></RequireAdmin>} />
+      <Route path="/admin/sim-builder/:id" element={<RequireAdmin><SimBuilderEditorPage /></RequireAdmin>} />
       <Route
         path="/admin/*"
         element={
           <RequireAdmin>
             <Suspense fallback={<PortalSpinner />}>
-              <AdminPortal />
+              <AdminPortalPage />
             </Suspense>
           </RequireAdmin>
         }
       />
 
-      {/* Protected — require login */}
+      {/* (dashboard) — require login */}
       <Route element={<ProtectedRoute />}>
-        <Route path="/mentor"     element={<ClassMentor />} />
+        <Route path="/mentor"     element={<MentorPage />} />
         {/* Full-screen — no Navbar/Footer, see OnboardingLayout */}
-        <Route path="/onboarding" element={<OnboardingWizard />} />
+        <Route path="/onboarding" element={<OnboardingPage />} />
 
         <Route element={<MainLayout />}>
           <Route path="/"                        element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard"               element={<Dashboard />} />
-          <Route path="/simulations"                element={<SimulationWorkspace />} />
-          <Route path="/simulations/:slug/overview" element={<GenericSimOverview />} />
-          <Route path="/simulations/:slug"          element={<GenericSimShell />} />
-          <Route path="/portfolio"               element={<Portfolio />} />
-          <Route path="/ai-mentor"               element={<AIMentor />} />
+          <Route path="/dashboard"               element={<DashboardPage />} />
+          <Route path="/simulations"                element={<SimulationsPage />} />
+          <Route path="/simulations/:slug/overview" element={<SimulationOverviewPage />} />
+          <Route path="/simulations/:slug"          element={<SimulationShellPage />} />
+          <Route path="/portfolio"               element={<PortfolioPage />} />
+          <Route path="/ai-mentor"               element={<AiMentorPage />} />
           <Route path="/ai-mentor/chat"          element={<Navigate to="/ai-mentor" replace />} />
-          <Route path="/skill-gps"               element={<SkillGPS />} />
-          <Route path="/analytics"               element={<Analytics />} />
+          <Route path="/skill-gps"               element={<SkillGpsPage />} />
+          <Route path="/analytics"               element={<AnalyticsPage />} />
           <Route element={<MiraLayout />}>
-            <Route path="/mira"                  element={<MiraHero />} />
-            <Route path="/mira/setup"            element={<MiraSetup />} />
-            <Route path="/mira/session"          element={<MiraSession />} />
-            <Route path="/mira/results"          element={<MiraResults />} />
+            <Route path="/mira"                  element={<MiraHeroPage />} />
+            <Route path="/mira/setup"            element={<MiraSetupPage />} />
+            <Route path="/mira/session"          element={<MiraSessionPage />} />
+            <Route path="/mira/results"          element={<MiraResultsPage />} />
           </Route>
-          <Route path="/settings"                element={<Settings />} />
-          <Route path="/evaluations/:id"         element={<EvaluationResult />} />
-          <Route path="/community"               element={<Community />} />
+          <Route path="/settings"                element={<SettingsPage />} />
+          <Route path="/evaluations/:id"         element={<EvaluationResultPage />} />
+          <Route path="/community"               element={<CommunityPage />} />
         </Route>
       </Route>
 
-      {/* Catch-all — any unmatched URL, logged in or not */}
-      <Route path="*" element={<NotFound />} />
+      {/* (public) — catch-all, any unmatched URL, logged in or not */}
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   )
 }

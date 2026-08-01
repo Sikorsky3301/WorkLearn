@@ -8,10 +8,10 @@ Starts automatically when the FastAPI app starts.
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import select
 from datetime import datetime, timedelta, timezone
-from app.database import AsyncSessionLocal
+from app.db.database import AsyncSessionLocal
 from app.models import User, Enrollment, TaskCompletion, AgentMessage, EnrollmentStatus, MessageType
-from app.models_cms import SimulationTask
-from app.config import INACTIVITY_DAYS
+from app.models.cms import SimulationTask
+from app.core.config import INACTIVITY_DAYS
 
 scheduler = AsyncIOScheduler(timezone="UTC")
 
@@ -47,7 +47,7 @@ async def _active_enrollments():
 
 async def _next_task_name(sim_id: str, task_index: int, fallback: str) -> str:
     """Task title now comes from the SimulationTask row instead of a
-    hardcoded per-sim_id dict — see app/models_cms.py."""
+    hardcoded per-sim_id dict — see app/models/cms.py."""
     async with AsyncSessionLocal() as db:
         result = await db.execute(
             select(SimulationTask.title).where(

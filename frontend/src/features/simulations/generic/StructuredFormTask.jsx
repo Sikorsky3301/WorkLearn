@@ -4,7 +4,7 @@ import { Input } from '../../../shared/ui/shadcn/input'
 import { Textarea } from '../../../shared/ui/shadcn/textarea'
 import { Label } from '../../../shared/ui/shadcn/label'
 import { Button } from '../../../shared/ui/shadcn/button'
-import { cn } from '../../../shared/utils/cn'
+import { cn } from '../../../lib/cn'
 
 /** Admin-defined field list (text/textarea/number/select/slider/checkbox) —
  * a generic version of sales-crm-sim's Stage1/2/7/8 pattern. Manual/rubric

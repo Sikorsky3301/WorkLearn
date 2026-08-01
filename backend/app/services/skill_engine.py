@@ -1,8 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from app.models import TaskCompletion, UserSkill, XpLedger, User, Enrollment, AgentMessage, EnrollmentStatus, MessageType
-from app.models_cms import SimulationTask
-from app.config import (
+from app.models.cms import SimulationTask
+from app.core.config import (
     TARGET_ROLE_REQUIREMENTS, SKILL_LABELS, QUIZ_BONUS_THRESHOLD, QUIZ_BONUS_XP
 )
 from datetime import datetime, timezone
@@ -39,7 +39,7 @@ async def award_task_completion(
         db.add(tc)
 
     # XP/skill awards now come from the task's own SimulationTask row instead
-    # of a hardcoded per-(simulation_id, task_id) dict — see app/models_cms.py.
+    # of a hardcoded per-(simulation_id, task_id) dict — see app/models/cms.py.
     sim_task_res = await db.execute(
         select(SimulationTask).where(
             SimulationTask.simulation_id == simulation_id, SimulationTask.task_index == task_id,

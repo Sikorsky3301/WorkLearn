@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FilePlus, Sparkles, ArrowLeft, Loader2 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../../shared/ui/shadcn/dialog'
-import { useSimulationTemplates, useCreateSimulationFromTemplate } from '../../../shared/api/hooks'
+import { useSimulationTemplates, useCreateSimulationFromTemplate } from '../../../hooks'
 
 /** "New Simulation" entry point — a template gallery instead of dropping the
  * admin straight into a blank builder. Two steps: pick blank/template, then

@@ -1,6 +1,6 @@
 import { Check } from 'lucide-react'
-import { resolveDomainIcon } from '../../../shared/utils/domainIcons'
-import { domainDescription } from '../../../shared/utils/domainMeta'
+import { resolveDomainIcon } from '../../../lib/domainIcons'
+import { domainDescription } from '../../../lib/domainMeta'
 
 /** Domains come from whatever's actually published (see useSimulations —
  * same source SimulationWorkspace's DomainFilterBar uses), never a

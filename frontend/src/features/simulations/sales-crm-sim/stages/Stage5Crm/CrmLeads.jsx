@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, flexRender, createColumnHelper } from '@tanstack/react-table'
 import { ArrowUpDown, Search } from 'lucide-react'
-import { useCrmSimStore } from '../../store/useCrmSimStore'
+import { useCrmSimStore } from '../../../../../stores/useCrmSimStore'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../../../../shared/ui/shadcn/table'
 import { Input } from '../../../../../shared/ui/shadcn/input'
 import { Badge } from '../../../../../shared/ui/shadcn/badge'

@@ -1,7 +1,7 @@
 """
 Sandbox facade — dispatches to whichever runner is configured
 (SANDBOX_RUNNER=docker|kubernetes, see app/services/sandbox_runners/).
-Callers (app/routes/sandbox.py) only depend on this module's interface, not
+Callers (app/routes/v1/sandbox.py) only depend on this module's interface, not
 on how a submission is actually executed.
 """
 import shutil

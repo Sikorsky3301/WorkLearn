@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { Send, Loader2, CheckCircle2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useRoleplayMessage } from '../../../shared/api/hooks'
+import { useRoleplayMessage } from '../../../hooks'
 import { Textarea } from '../../../shared/ui/shadcn/textarea'
 import { Button } from '../../../shared/ui/shadcn/button'
 import { Badge } from '../../../shared/ui/shadcn/badge'
 import { Label } from '../../../shared/ui/shadcn/label'
-import { cn } from '../../../shared/utils/cn'
+import { cn } from '../../../lib/cn'
 
 /** Generic AI-roleplay chat task (discovery calls, objection handling, etc.)
  * — same UX pattern as sales-crm-sim's AiCustomerChat.jsx, but persona/

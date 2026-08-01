@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Loader2, Sparkles, CheckCircle2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useGradeText } from '../../../shared/api/hooks'
+import { useGradeText } from '../../../hooks'
 import { Textarea } from '../../../shared/ui/shadcn/textarea'
 import { Input } from '../../../shared/ui/shadcn/input'
 import { Label } from '../../../shared/ui/shadcn/label'

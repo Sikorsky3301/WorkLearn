@@ -5,7 +5,7 @@
 // issue. Same mouse-tilt "wobble" effect as the original.
 // Source: https://ui.aceternity.com/components/wobble-card
 import React, { useState } from 'react'
-import { cn } from '../utils/cn'
+import { cn } from '../../lib/cn'
 
 export const WobbleCard = ({ children, containerClassName, className }) => {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })

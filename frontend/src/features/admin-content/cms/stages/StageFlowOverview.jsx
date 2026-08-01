@@ -2,7 +2,7 @@ import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, useSortable, horizontalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { taskTypeMeta, DEFAULT_TASK_TYPE_META } from '../shared/taskTypeMeta'
-import { cn } from '../../../../shared/utils/cn'
+import { cn } from '../../../../lib/cn'
 
 /** Alternate, toggleable view of the whole simulation as a connected
  * horizontal roadmap — Onboarding/Completion end-caps, one background-tinted

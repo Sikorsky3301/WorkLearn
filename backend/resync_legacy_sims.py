@@ -16,8 +16,8 @@ import asyncio
 
 from sqlalchemy import select
 
-from app.database import AsyncSessionLocal
-from app.models_cms import Simulation, SimulationTask
+from app.db.database import AsyncSessionLocal
+from app.models.cms import Simulation, SimulationTask
 from migrate_legacy_sims import da_job_sim, frontend_dev_sim, sales_crm_sim
 
 

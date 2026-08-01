@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Search, UserCircle2 } from 'lucide-react'
-import { useAdminUsers } from '../../shared/api/hooks'
+import { useAdminUsers } from '../../hooks'
 import DataTable from '../../shared/design-system/DataTable'
 import ManageUserModal from './ManageUserModal'
 

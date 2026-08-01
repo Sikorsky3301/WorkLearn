@@ -5,7 +5,7 @@
 // Source: https://ui.aceternity.com/components/file-upload
 import React, { useRef, useState } from 'react'
 import { motion } from 'motion/react'
-import { cn } from '../utils/cn'
+import { cn } from '../../lib/cn'
 
 const mainVariant = {
   initial: { x: 0, y: 0 },

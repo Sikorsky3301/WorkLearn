@@ -1,4 +1,4 @@
-import { cn } from '../../shared/utils/cn'
+import { cn } from '../../lib/cn'
 
 /** Domain filter chips for the simulation picker — computed from whatever
  * distinct `domain` values are actually in use across published simulations

@@ -1,19 +1,6 @@
-// The reusable "stage / task / rubric" schema for job simulations.
-// A future non-sales simulation (SWE, PM, DA, ...) reuses useSimEngine /
-// CrmSimShell's layout patterns by shipping its own file shaped like this
-// one — nothing else in engine/ is sales-specific by name.
-
-import derekHoltPhoto from '../../../../assets/derek-holt.jpg'
-
-export const SIM_META = {
-  id: 'sales-crm-sim',
-  title: 'Enterprise SaaS Sales Representative',
-  company: 'Nimbus CRM',
-  industry: 'CRM SaaS',
-  product: 'Nimbus AI Sales Platform',
-  targetCustomer: 'Atlas Forge Manufacturing',
-  manager: { name: 'Derek Holt', role: 'VP of Sales', avatar: 'DH', photo: derekHoltPhoto },
-}
+// The "stage / task / rubric" schema for the CRM sim's crm_workspace task
+// type — STAGES is read by store/useCrmSimStore.js, stageByIndex by
+// data/managerChatKnowledge.js's rule-based manager replies.
 
 export const STAGES = [
   {
@@ -154,18 +141,6 @@ export const STAGES = [
     successCriteria: ['Demo scheduled', 'Signature requested', 'Follow-up booked', 'Onboarding task created', 'Opportunity stage updated to Closed Won or Closed Lost'],
   },
 ]
-
-export const SCORING_WEIGHTS = {
-  communication: 0.20,
-  discovery: 0.15,
-  research: 0.10,
-  crmAccuracy: 0.15,
-  email: 0.10,
-  negotiation: 0.10,
-  objectionHandling: 0.10,
-  professionalism: 0.05,
-  closing: 0.05,
-}
 
 export function stageByIndex(index) {
   return STAGES.find((s) => s.index === index) ?? STAGES[0]

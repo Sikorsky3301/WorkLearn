@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: worklearn-litellm
+  namespace: worklearn
+spec:
+  # ClusterIP, not LoadBalancer like worklearn-backend — only the backend
+  # (in-cluster) talks to this, never the frontend/browser directly.
+  type: ClusterIP
+  selector:
+    app: worklearn-litellm
+  ports:
+    - port: 4000
+      targetPort: 4000

@@ -4,7 +4,7 @@ import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } 
 import { CSS } from '@dnd-kit/utilities'
 import { Plus, GripVertical, Trash2 } from 'lucide-react'
 import { blockTypeRegistry, BLOCK_GROUPS } from './blockTypeRegistry'
-import { cn } from '../../../shared/utils/cn'
+import { cn } from '../../../lib/cn'
 
 /** The structured block-stack editing surface for the active page — a
  * vertical, drag-to-reorder list (not a true freeform x/y canvas; see the

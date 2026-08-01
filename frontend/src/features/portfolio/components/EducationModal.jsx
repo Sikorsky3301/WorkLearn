@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../../auth/AuthContext'
-import { useAddEducation, useUpdateEducation } from '../../../shared/api/hooks'
+import { useAddEducation, useUpdateEducation } from '../../../hooks'
 import Modal from './Modal'
 
 export default function EducationModal({ entry, onClose }) {

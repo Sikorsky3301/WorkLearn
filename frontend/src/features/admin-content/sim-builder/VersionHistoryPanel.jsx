@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { History, RotateCcw, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useSimBuilderVersions, useRestoreSimBuilderVersion } from '../../../shared/api/hooks'
+import { useSimBuilderVersions, useRestoreSimBuilderVersion } from '../../../hooks'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../../shared/ui/shadcn/sheet'
 
 /** Toolbar "Version History" — lists snapshots created by Publish, with a

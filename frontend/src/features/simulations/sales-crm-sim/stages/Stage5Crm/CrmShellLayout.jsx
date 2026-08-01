@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, Building2, Contact, Activity, CheckSquare,
   Calendar, Target, Kanban, BarChart3, Search,
 } from 'lucide-react'
-import { cn } from '../../../../../shared/utils/cn'
+import { cn } from '../../../../../lib/cn'
 import { CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '../../../../../shared/ui/shadcn/command'
 
 import CrmDashboard from './CrmDashboard'
