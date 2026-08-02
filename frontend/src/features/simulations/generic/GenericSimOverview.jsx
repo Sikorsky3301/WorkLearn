@@ -69,7 +69,9 @@ export default function GenericSimOverview() {
   const sectionLabels = simulation.section_labels || {}
   const weekGroups = groupByWeek(tasks)
 
-  const ctaLabel = enrollment?.status === 'completed' ? 'Review' : enrollment?.status ? 'Continue' : 'Start Simulation'
+  // Enrollment.status is the backend's uppercase EnrollmentStatus enum
+  // value ("COMPLETED", not "completed") — see app/models/__init__.py.
+  const ctaLabel = enrollment?.status === 'COMPLETED' ? 'Review' : enrollment?.status ? 'Continue' : 'Start Simulation'
 
   return (
     <div className="bg-white min-h-screen">

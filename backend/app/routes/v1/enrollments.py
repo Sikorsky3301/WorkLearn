@@ -65,6 +65,7 @@ async def list_simulations(db: AsyncSession = Depends(get_db)):
             "tag": sim.category or sim.domain, "level": sim.difficulty, "difficulty": sim.difficulty,
             "tasks": count_res.scalar() or 0, "estimated_hours": sim.estimated_hours,
             "skills": sim.skills, "rating": sim.rating, "rating_count": sim.rating_count,
+            "manager": sim.manager,
         })
     return {"simulations": out}
 

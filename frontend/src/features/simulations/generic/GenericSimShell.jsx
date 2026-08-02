@@ -96,6 +96,16 @@ export default function GenericSimShell() {
   const { mutate: completeTaskRemote } = useCompleteTask(enrollmentId)
   const triedEnroll = useRef(false)
   const [onboardingGate, setOnboardingGate] = useState(null)
+  // `enrollmentId` above comes from the persisted (localStorage) zustand
+  // store, so it's available instantly on mount even before any network
+  // request — including when it's stale (the Enrollment row it points to
+  // was removed server-side, e.g. an admin's bulk de-enroll, or a reset
+  // dev database). Everything below has to gate on this CONFIRMED id, not
+  // the persisted one, or a stale id lets the offer-letter Accept button
+  // render even though the backend has no matching enrollment, producing
+  // exactly the 400 ("Enroll in the simulation before accepting the
+  // offer") this whole gate exists to prevent.
+  const [confirmedEnrollmentId, setConfirmedEnrollmentId] = useState(null)
 
   useEffect(() => {
     if (status !== 'in_progress') return
@@ -103,35 +113,43 @@ export default function GenericSimShell() {
     return () => clearInterval(id)
   }, [status, tick])
 
-  // Step 1 — make sure the student is actually enrolled. This has to fully
-  // resolve (existing enrollment found, or a new one created) before the
-  // offer letter below is ever shown: accepting it hits a backend endpoint
-  // that 400s with "Enroll in the simulation before accepting the offer"
-  // if no Enrollment row exists yet. useOnboarding() is a single fast GET
-  // with no enrollment dependency, while enrolling here takes two
-  // sequential round trips (the 404 check, then the enroll POST) — so
-  // without this gate, the offer letter's Accept button could render (and
-  // be clicked) well before enrollment actually finished.
+  // Step 1 — make sure the student is actually enrolled, and that the
+  // enrollment really exists server-side right now. useOnboarding() is a
+  // single fast GET with no enrollment dependency, while confirming/creating
+  // an enrollment here can take two sequential round trips (the 404 check,
+  // then the enroll POST) — so without this gate, the offer letter's Accept
+  // button could render (and be clicked) well before enrollment actually
+  // finished.
   useEffect(() => {
-    if (enrollmentId) return
     if (enrollment?.id) {
-      startSimulation(enrollment.id)
+      // Found a real enrollment server-side. If it doesn't match what the
+      // persisted store remembers (stale id, or a first-time enroll),
+      // (re)start the store's progress from this — the real one.
+      if (enrollment.id !== enrollmentId) startSimulation(enrollment.id)
+      setConfirmedEnrollmentId(enrollment.id)
       return
     }
+    // 404 — no enrollment exists server-side (a new user, or the persisted
+    // id was stale and got cleaned up/never existed). Enroll fresh.
     if (enrollError && !triedEnroll.current && !enrolling) {
       triedEnroll.current = true
-      enroll(undefined, { onSuccess: (res) => startSimulation(res.enrollment.id) })
+      enroll(undefined, {
+        onSuccess: (res) => {
+          startSimulation(res.enrollment.id)
+          setConfirmedEnrollmentId(res.enrollment.id)
+        },
+      })
     }
   }, [enrollment, enrollError, enrolling, enrollmentId, enroll, startSimulation])
 
-  // Step 2 — only once enrolled, decide whether the offer letter still
-  // needs accepting.
+  // Step 2 — only once enrollment is confirmed, decide whether the offer
+  // letter still needs accepting.
   useEffect(() => {
-    if (!enrollmentId) return
+    if (!confirmedEnrollmentId) return
     if (onboarding && onboardingGate === null) {
       setOnboardingGate(!onboarding.accepted)
     }
-  }, [enrollmentId, onboarding, onboardingGate])
+  }, [confirmedEnrollmentId, onboarding, onboardingGate])
 
   if (enrollFailed) {
     return (
@@ -151,7 +169,7 @@ export default function GenericSimShell() {
     )
   }
 
-  if (fullLoading || onboardingLoading || !enrollmentId || onboardingGate === null) {
+  if (fullLoading || onboardingLoading || !confirmedEnrollmentId || onboardingGate === null) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface-low">
         <span className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />

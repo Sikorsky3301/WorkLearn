@@ -26,8 +26,16 @@ export default function WelcomeVideoCard() {
 
   return (
     <>
-      <div className="relative card card-shadow p-0 overflow-hidden mb-6 group">
-        <button onClick={() => setPlaying(true)} className="w-full flex items-center gap-4 p-3 text-left cursor-pointer">
+      <div className="relative rounded-xl border border-primary/15 shadow-sm p-0 overflow-hidden mb-6 group bg-gradient-to-r from-primary/10 via-primary/5 to-transparent">
+        {/* Faint dot-grid texture, same decorative language used elsewhere
+            (Portfolio's profile card, the simulation overview hero) — gives
+            this "featured" row a bit of depth instead of a flat tint. */}
+        <div
+          className="absolute inset-0 opacity-[0.06] pointer-events-none"
+          style={{ backgroundImage: 'radial-gradient(circle, #312E81 1.5px, transparent 1.5px)', backgroundSize: '18px 18px' }}
+          aria-hidden="true"
+        />
+        <button onClick={() => setPlaying(true)} className="relative w-full flex items-center gap-4 p-3 text-left cursor-pointer">
           {/* Thumbnail — a real frame from the video, kept small so this reads
               as a quick prompt rather than a full banner. */}
           <div className="relative w-32 sm:w-40 aspect-video shrink-0 rounded-lg overflow-hidden bg-black">
@@ -59,7 +67,7 @@ export default function WelcomeVideoCard() {
 
       {playing && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-primary-dark/90 via-black/80 to-black/85 backdrop-blur-sm p-4"
           onMouseDown={(e) => { if (e.target === e.currentTarget) setPlaying(false) }}
         >
           <div className="w-full max-w-3xl">
