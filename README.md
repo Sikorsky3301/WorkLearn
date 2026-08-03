@@ -24,22 +24,35 @@ docs/             Supporting docs that don't belong in the above — see docs/RE
 
 ```
 app/
-  core/            Config, auth (JWT/password hashing), permission dependencies,
-                   request-ID middleware, logging setup — cross-cutting, not domain logic
+  core/            Config, auth (JWT/password hashing), permissions.py (require_permission +
+                   the Role enum re-export — RBAC's one canonical import), request-ID
+                   middleware, logging setup, canonical filesystem paths — cross-cutting,
+                   not domain logic
   db/              SQLAlchemy engine/session setup (database.py)
   models/          SQLAlchemy models as a package — __init__.py holds the core
                    User/Enrollment/etc. tables, cms.py/rbac.py/sim_builder.py/
-                   feature_flags.py/platform_config.py/profile.py split by feature area
+                   feature_flags.py/platform_config.py/profile.py/certificate.py
+                   split by feature area
   schemas/         Pydantic request/response shapes, same per-feature split as models/
   utils/           Generic, domain-agnostic helpers (empty until something earns its way in)
+  api/
+    v1/            Every resource route, versioned and grouped by RBAC domain —
+                   auth/, users/ (profile, certificates), simulations/ (enrollments,
+                   sandbox, agent_messages), builder/ (the CMS's sim-builder API),
+                   admin/, superadmin/, analytics/, mentor/
   routes/
-    v1/            Every resource route, versioned — auth, admin, enrollments, sandbox, ...
-    health.py      Deliberately unversioned — orchestrators/monitoring shouldn't need
-                   to know about API versioning just to check the process is up
-  services/        Business logic (skill_engine, permissions_seed, audit, ...)
+    health.py      Deliberately unversioned, sits alongside api/v1/ — orchestrators/
+                   monitoring shouldn't need to know about API versioning just to
+                   check the process is up
+  services/        Business logic (skill_engine, permissions_seed, certificates,
+                   simulation_completion, audit, ...)
   services/graders/  Per-task-type grading logic, including the declarative-rules DSL
+  services/sandbox_runners/  Docker/Kubernetes execution backends for code-sandbox tasks
   ai/              Everything that exists *because* of AI — routes/ + services/,
                    including llm.py (the unified litellm-based provider client)
+  agents/          Deterministic scheduler (reminders/deadline checks) — not an
+                   LLM agent framework, despite the name
+  cms_templates/   Starter templates for the Simulation CMS builder (one per domain)
 migrations/        Numbered one-off SQL migrations (schema changes create_all can't express)
 sandboxes/         Docker images for the code-execution sandbox (Python + frontend/JS)
 litellm-proxy/     Optional standalone AI gateway config — see its own README
@@ -50,30 +63,42 @@ tests/             pytest suite — see "Testing" below
 
 ```
 src/
-  app/               Route-level page components only, grouped by access tier —
-                      each file is a thin re-export of the real component in
-                      features/ (App.jsx's <Routes> imports from here, not
-                      straight from features/, so a route's access tier is
-                      visible from its import path alone). Organizational only:
-                      this is Vite + React Router, not Next.js App Router — no
-                      file-based routing, no URL changes.
-    (public)/          Reachable without being logged in, not part of the auth flow
-    (auth)/            The login flow itself — one page per portal's entry point
-    (dashboard)/       Everything behind authentication (including the Admin/
-                       SuperAdmin portals — see the lazy() wrappers in this folder)
-  features/          One folder per feature area's real implementation (dashboard,
-                      portfolio, onboarding, admin-portal, super-admin-portal,
-                      simulations, ai-mentor, mira, ...) — app/ imports from here
-  hooks/             React Query hooks, one file per domain (barrel re-export
+  app/
+    providers/       App-wide provider nesting — QueryClient, AuthProvider, the
+                      top-level error boundary, the toast host (see AppProviders.jsx,
+                      mounted once from main.jsx)
+    router/           The route table (AppRouter.jsx — plain Vite + React Router,
+                      not Next.js App Router, no file-based routing) plus guards/
+                      (ProtectedRoute, RequireAdmin, RequireSuperAdmin, PortalSpinner)
+    store/            Zustand stores (useGenericSimStore, useCrmSimStore)
+  rbac/               Role/permission constants mirroring the backend's Role enum and
+                      permission catalog (roles.js, permissions.js) plus a
+                      usePermission.js hook — one canonical source instead of raw
+                      string literals scattered across guards/components
+  features/           One folder per feature area's real implementation. Most are
+                      flat (dashboard, simulations, auth, ai-mentor, mira, onboarding,
+                      skill-gps, analytics, community, mentor, portfolio's sibling
+                      settings, ...); four are grouped by RBAC domain to mirror the
+                      backend's api/v1/ split:
+                        admin/       portal/ (Admin portal UI) + shared/ (components
+                                     also reused by the SuperAdmin portal)
+                        superadmin/  SuperAdmin portal UI
+                        users/       portfolio/ + settings/ — the logged-in user's
+                                     own account/profile surface
+                        builder/     Simulation CMS + drag-drop Sim Builder
+                                     (admin-authoring tools)
+                      AppRouter imports each feature's top-level component directly.
+  components/         Design-system + shared UI primitives (design-system/ — PortalShell,
+                      Sidebar, DataTable, PermissionGate, ...; ui/ — shadcn-style
+                      primitives; plus Footer/Navbar/NotFound)
+  hooks/              React Query hooks, one file per domain (barrel re-export
                       via index.js, so existing `from '.../hooks'` imports never
                       needed to change as the split grew)
-  lib/               fetch client (client.js) + small pure helpers (domainIcons,
-                      domainMeta, cn, ...)
-  stores/            Zustand stores (useGenericSimStore, useCrmSimStore)
-  types/             Placeholder for shared JSDoc typedefs (plain JS, not TS)
-  shared/
-    design-system/  Admin/SuperAdmin-portal-only components (their own dark mode scope)
-    ui/             Shared primitives (shadcn-style components, etc.)
+  lib/                fetch client (client.js), small pure helpers (domainIcons,
+                      domainMeta, cn, simBranding), pdf/ (lazy-loaded credential
+                      PDF generation — kept out of the main bundle)
+  styles/             index.css — Tailwind directives + base/component layers
+  types/              Placeholder for shared JSDoc typedefs (plain JS, not TS)
 ```
 
 ## Tech stack
