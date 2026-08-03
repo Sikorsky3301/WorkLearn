@@ -6,9 +6,9 @@ import { useSimulations, useEnrollment } from '../../hooks'
 import { api, resolveMediaUrl } from '../../lib/client'
 import { resolveDomainIcon } from '../../lib/domainIcons'
 import { cn } from '../../lib/cn'
-import { SIM_BRANDING } from '../../shared/simBranding'
+import { SIM_BRANDING } from '../../lib/simBranding'
 import DomainFilterBar from './DomainFilterBar'
-import RatingStars from '../../shared/ui/RatingStars'
+import RatingStars from '../../components/ui/RatingStars'
 
 // Additional simulation types from the spec's landing page that aren't
 // built yet — shown as non-interactive cards so the landing page reflects

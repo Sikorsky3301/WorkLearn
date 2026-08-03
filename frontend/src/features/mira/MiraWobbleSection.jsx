@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { WobbleCard } from '../../shared/ui/wobble-card'
+import { WobbleCard } from '../../components/ui/wobble-card'
 
 export default function MiraWobbleSection() {
   const navigate = useNavigate()

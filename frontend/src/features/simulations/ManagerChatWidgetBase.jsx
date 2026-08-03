@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { MessageCircle, X, Send } from 'lucide-react'
 import { cn } from '../../lib/cn'
-import { Button } from '../../shared/ui/shadcn/button'
-import { Textarea } from '../../shared/ui/shadcn/textarea'
+import { Button } from '../../components/ui/shadcn/button'
+import { Textarea } from '../../components/ui/shadcn/textarea'
 
 /** Shared floating bottom-right manager-chat shell — collapsed FAB + expanded
  * panel, unread badge/pulse, aria-live announcements, Escape-to-close with

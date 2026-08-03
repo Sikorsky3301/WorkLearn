@@ -4,12 +4,12 @@ import { X, Clock } from 'lucide-react'
 import { useEnrollment, useEnroll, useOnboarding, useCompleteTask, useSimulationFull } from '../../../hooks'
 import { resolveMediaUrl } from '../../../lib/client'
 import { cn } from '../../../lib/cn'
-import { Badge } from '../../../shared/ui/shadcn/badge'
+import { Badge } from '../../../components/ui/shadcn/badge'
 import SimOnboarding from '../SimOnboarding'
 import SimManagerChat from '../SimManagerChat'
 import GenericStageRenderer from './GenericStageRenderer'
 import SimulationCompleteScreen from './SimulationCompleteScreen'
-import { useGenericSimStore } from '../../../stores/useGenericSimStore'
+import { useGenericSimStore } from '../../../app/store/useGenericSimStore'
 
 // SimManagerChat/genericManagerChatKnowledge.js operate on task.message/
 // whatToDo/whatToSubmit/hints/skills/subject/title — this maps the backend's

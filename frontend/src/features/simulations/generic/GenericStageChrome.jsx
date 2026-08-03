@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { CheckCircle2, Circle, ArrowRight, Brain, Lightbulb } from 'lucide-react'
-import { Button } from '../../../shared/ui/shadcn/button'
+import { Button } from '../../../components/ui/shadcn/button'
 import { cn } from '../../../lib/cn'
 import StageQuiz from '../sales-crm-sim/stages/StageQuiz'
 

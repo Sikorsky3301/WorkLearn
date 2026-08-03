@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts'
-import { useCrmSimStore } from '../../../../../stores/useCrmSimStore'
-import { Card, CardContent, CardHeader, CardTitle } from '../../../../../shared/ui/shadcn/card'
+import { useCrmSimStore } from '../../../../../app/store/useCrmSimStore'
+import { Card, CardContent, CardHeader, CardTitle } from '../../../../../components/ui/shadcn/card'
 import { PIPELINE_STAGES, formatCurrency } from './crmConstants'
 
 const PIE_COLORS = ['#94a3b8', '#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444']

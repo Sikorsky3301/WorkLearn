@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { Lock, Check, ClipboardList } from 'lucide-react'
-import { useAuth, ROLES } from '../auth/AuthContext'
+import { useAuth } from '../auth/AuthContext'
+import { ROLES } from '../../rbac/roles'
 import { useMyAssignments, useSimulations } from '../../hooks'
 import AssignmentCard from './components/AssignmentCard'
 import JobSimulationsSection from './components/JobSimulationsSection'

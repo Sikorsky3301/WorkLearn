@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMira } from './MiraContext'
 import { INTERVIEW_TYPES, ROLES, DIFFICULTIES, DURATIONS } from './questionBank'
-import { FileUpload } from '../../shared/ui/file-upload'
+import { FileUpload } from '../../components/ui/file-upload'
 
 function OptionGroup({ label, options, value, onChange }) {
   return (

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { useAuth, ROLES } from '../AuthContext'
+import { useAuth } from '../AuthContext'
+import { ROLES } from '../../../rbac/roles'
 
 const DEPARTMENTS = [
   'Computer Science & Engineering (CSE)',

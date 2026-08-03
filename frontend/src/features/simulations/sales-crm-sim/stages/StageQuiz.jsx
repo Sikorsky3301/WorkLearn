@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Brain, CheckCircle2, XCircle, ArrowRight, PartyPopper } from 'lucide-react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../../../shared/ui/shadcn/dialog'
-import { Button } from '../../../../shared/ui/shadcn/button'
-import { Progress } from '../../../../shared/ui/shadcn/progress'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../../../components/ui/shadcn/dialog'
+import { Button } from '../../../../components/ui/shadcn/button'
+import { Progress } from '../../../../components/ui/shadcn/progress'
 import { cn } from '../../../../lib/cn'
 
 const OPTION_LETTERS = ['A', 'B', 'C', 'D']

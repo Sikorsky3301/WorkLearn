@@ -2,11 +2,11 @@ import { useState } from 'react'
 import { Loader2, Sparkles, CheckCircle2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useGradeText } from '../../../hooks'
-import { Textarea } from '../../../shared/ui/shadcn/textarea'
-import { Input } from '../../../shared/ui/shadcn/input'
-import { Label } from '../../../shared/ui/shadcn/label'
-import { Button } from '../../../shared/ui/shadcn/button'
-import { Card, CardContent } from '../../../shared/ui/shadcn/card'
+import { Textarea } from '../../../components/ui/shadcn/textarea'
+import { Input } from '../../../components/ui/shadcn/input'
+import { Label } from '../../../components/ui/shadcn/label'
+import { Button } from '../../../components/ui/shadcn/button'
+import { Card, CardContent } from '../../../components/ui/shadcn/card'
 
 function extractScore(result) {
   if (typeof result.overall === 'number') return result.overall

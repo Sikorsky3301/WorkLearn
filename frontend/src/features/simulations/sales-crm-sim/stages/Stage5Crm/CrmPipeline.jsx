@@ -2,7 +2,7 @@ import { DndContext, useDraggable, useDroppable, PointerSensor, useSensor, useSe
 import { useState } from 'react'
 import { GripVertical } from 'lucide-react'
 import { toast } from 'sonner'
-import { useCrmSimStore } from '../../../../../stores/useCrmSimStore'
+import { useCrmSimStore } from '../../../../../app/store/useCrmSimStore'
 import { cn } from '../../../../../lib/cn'
 import { PIPELINE_STAGES, STAGE_DEFAULT_PROBABILITY, formatCurrency, formatDate } from './crmConstants'
 

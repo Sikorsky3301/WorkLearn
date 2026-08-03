@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
-import { useAuth, ROLES } from '../AuthContext'
+import { useAuth } from '../AuthContext'
+import { ROLES } from '../../../rbac/roles'
 import logo from '../../../assets/logo.png'
 
 function GoogleIcon() {

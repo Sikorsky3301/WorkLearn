@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { CheckCircle2 } from 'lucide-react'
-import { Input } from '../../../shared/ui/shadcn/input'
-import { Textarea } from '../../../shared/ui/shadcn/textarea'
-import { Label } from '../../../shared/ui/shadcn/label'
-import { Button } from '../../../shared/ui/shadcn/button'
+import { Input } from '../../../components/ui/shadcn/input'
+import { Textarea } from '../../../components/ui/shadcn/textarea'
+import { Label } from '../../../components/ui/shadcn/label'
+import { Button } from '../../../components/ui/shadcn/button'
 import { cn } from '../../../lib/cn'
 
 /** Admin-defined field list (text/textarea/number/select/slider/checkbox) —

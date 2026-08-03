@@ -1,5 +1,5 @@
 import { Phone, MapPin, Briefcase, FolderGit2, Globe } from 'lucide-react'
-import IconField from '../../../shared/ui/IconField'
+import IconField from '../../../components/ui/IconField'
 
 export default function ContactStep({ value, onChange }) {
   return (

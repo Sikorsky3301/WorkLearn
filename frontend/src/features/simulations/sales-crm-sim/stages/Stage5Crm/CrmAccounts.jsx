@@ -4,12 +4,12 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Plus, Building2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useCrmSimStore } from '../../../../../stores/useCrmSimStore'
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../../../../shared/ui/shadcn/table'
-import { Button } from '../../../../../shared/ui/shadcn/button'
-import { Input } from '../../../../../shared/ui/shadcn/input'
-import { Label } from '../../../../../shared/ui/shadcn/label'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../../../../shared/ui/shadcn/dialog'
+import { useCrmSimStore } from '../../../../../app/store/useCrmSimStore'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../../../../components/ui/shadcn/table'
+import { Button } from '../../../../../components/ui/shadcn/button'
+import { Input } from '../../../../../components/ui/shadcn/input'
+import { Label } from '../../../../../components/ui/shadcn/label'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../../../../components/ui/shadcn/dialog'
 
 const schema = z.object({
   name: z.string().min(2, 'Account name is required'),

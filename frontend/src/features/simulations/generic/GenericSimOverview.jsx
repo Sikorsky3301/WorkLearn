@@ -3,9 +3,9 @@ import { ArrowLeft, ArrowRight, Clock, ListChecks, BarChart3 } from 'lucide-reac
 import { useSimulationFull, useEnrollment } from '../../../hooks'
 import { resolveMediaUrl } from '../../../lib/client'
 import { resolveDomainIcon } from '../../../lib/domainIcons'
-import { Badge } from '../../../shared/ui/shadcn/badge'
-import { Button } from '../../../shared/ui/shadcn/button'
-import RatingStars from '../../../shared/ui/RatingStars'
+import { Badge } from '../../../components/ui/shadcn/badge'
+import { Button } from '../../../components/ui/shadcn/button'
+import RatingStars from '../../../components/ui/RatingStars'
 
 function SectionHeading({ children }) {
   return (

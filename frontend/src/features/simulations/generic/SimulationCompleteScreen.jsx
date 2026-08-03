@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useUserCertificates } from '../../../hooks'
 import { useAuth } from '../../auth/AuthContext'
 import { downloadCertificatePdf } from '../../../lib/pdf'
-import CredentialShield, { variantFor } from '../../portfolio/components/credentials/CredentialShield'
+import CredentialShield, { variantFor } from '../../users/portfolio/components/credentials/CredentialShield'
 
 /**
  * Terminal screen for a finished simulation.

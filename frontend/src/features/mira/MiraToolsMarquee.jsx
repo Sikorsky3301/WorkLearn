@@ -1,4 +1,4 @@
-import { InfiniteMovingCards } from '../../shared/ui/infinite-moving-cards'
+import { InfiniteMovingCards } from '../../components/ui/infinite-moving-cards'
 import opencvLogo from '../../assets/mira/opencv.png'
 import pythonLogo from '../../assets/mira/python.png'
 import awsLogo from '../../assets/mira/aws.png'

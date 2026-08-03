@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useMira } from './MiraContext'
-import { CardContainer, CardBody, CardItem } from '../../shared/ui/three-d-card'
+import { CardContainer, CardBody, CardItem } from '../../components/ui/three-d-card'
 import MiraGeminiSection from './MiraGeminiSection'
 import MiraToolsMarquee from './MiraToolsMarquee'
 import MiraWobbleSection from './MiraWobbleSection'

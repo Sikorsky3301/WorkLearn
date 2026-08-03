@@ -1,17 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { api, setToken, clearToken } from '../../lib/client'
-
-// Values match the backend Role enum (uppercase)
-export const ROLES = {
-  DIRECT_USER:        'DIRECT_USER',
-  UNIVERSITY_STUDENT: 'UNIVERSITY_STUDENT',
-  CLASS_MENTOR:       'CLASS_MENTOR',
-  SUPER_ADMIN:        'SUPER_ADMIN',
-  // Fine-grained-permission admin tier, distinct from SUPER_ADMIN — see
-  // backend's app/models_rbac.py. Real enforcement is always server-side
-  // (require_permission); `hasPermission` below is a UI-nav convenience only.
-  ADMIN:              'ADMIN',
-}
+import { ROLES } from '../../rbac/roles'
 
 const AuthContext = createContext(null)
 

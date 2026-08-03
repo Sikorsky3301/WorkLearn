@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, flexRender, createColumnHelper } from '@tanstack/react-table'
 import { ArrowUpDown, Search } from 'lucide-react'
-import { useCrmSimStore } from '../../../../../stores/useCrmSimStore'
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../../../../shared/ui/shadcn/table'
-import { Input } from '../../../../../shared/ui/shadcn/input'
-import { Badge } from '../../../../../shared/ui/shadcn/badge'
+import { useCrmSimStore } from '../../../../../app/store/useCrmSimStore'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../../../../components/ui/shadcn/table'
+import { Input } from '../../../../../components/ui/shadcn/input'
+import { Badge } from '../../../../../components/ui/shadcn/badge'
 
 const columnHelper = createColumnHelper()
 

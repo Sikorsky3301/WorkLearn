@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react'
 import { isSameDay, format } from 'date-fns'
 import { Plus, CalendarDays } from 'lucide-react'
-import { useCrmSimStore } from '../../../../../stores/useCrmSimStore'
-import { Calendar } from '../../../../../shared/ui/shadcn/calendar'
-import { Card, CardContent } from '../../../../../shared/ui/shadcn/card'
-import { Input } from '../../../../../shared/ui/shadcn/input'
-import { Button } from '../../../../../shared/ui/shadcn/button'
-import { Label } from '../../../../../shared/ui/shadcn/label'
+import { useCrmSimStore } from '../../../../../app/store/useCrmSimStore'
+import { Calendar } from '../../../../../components/ui/shadcn/calendar'
+import { Card, CardContent } from '../../../../../components/ui/shadcn/card'
+import { Input } from '../../../../../components/ui/shadcn/input'
+import { Button } from '../../../../../components/ui/shadcn/button'
+import { Label } from '../../../../../components/ui/shadcn/label'
 
 export default function CrmCalendar() {
   const events = useCrmSimStore((s) => s.crm.events)

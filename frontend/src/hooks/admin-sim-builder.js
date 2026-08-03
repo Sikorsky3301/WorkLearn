@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/client'
 
 // Sim Builder (separate from the job-sim CMS in admin-simulations.js — see
-// src/features/admin-content/sim-builder/)
+// src/features/builder/sim-builder/)
 
 export function useSimBuilderProjects() {
   return useQuery({

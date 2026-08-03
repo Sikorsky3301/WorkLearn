@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { ArrowRight, ListChecks } from 'lucide-react'
-import { SIM_BRANDING } from '../../../shared/simBranding'
+import { SIM_BRANDING } from '../../../lib/simBranding'
 
 /** One job-simulation row in JobSimulationsSection's domain groups.
  * `highlighted` gets a subtle ring — used for the student's preferred

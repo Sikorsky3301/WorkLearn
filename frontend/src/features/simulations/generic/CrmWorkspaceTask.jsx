@@ -1,7 +1,7 @@
 import { CheckCircle2, Circle } from 'lucide-react'
-import { useCrmSimStore } from '../../../stores/useCrmSimStore'
+import { useCrmSimStore } from '../../../app/store/useCrmSimStore'
 import CrmShellLayout from '../sales-crm-sim/stages/Stage5Crm/CrmShellLayout'
-import { Button } from '../../../shared/ui/shadcn/button'
+import { Button } from '../../../components/ui/shadcn/button'
 import { cn } from '../../../lib/cn'
 
 /** Thin wrapper reusing Stage5Crm's 10-module CRM mini-app wholesale.

@@ -17,9 +17,9 @@ in a separate mirror tree — so a rename or delete can't leave an orphaned
 test behind unnoticed.
 
 - `src/lib/*.test.js` — pure functions, no DOM.
-- `src/stores/*.test.js` — zustand store logic, exercised directly via
+- `src/app/store/*.test.js` — zustand store logic, exercised directly via
   `store.getState()` — no React rendering needed for state-machine behavior.
-- `src/shared/ui/*.test.jsx` — component rendering, via
+- `src/components/ui/*.test.jsx` — component rendering, via
   `@testing-library/react`.
 
 `src/test/setup.js` wires up `@testing-library/jest-dom`'s matchers

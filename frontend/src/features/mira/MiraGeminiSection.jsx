@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useScroll, useTransform } from 'motion/react'
-import { GoogleGeminiEffect } from '../../shared/ui/google-gemini-effect'
+import { GoogleGeminiEffect } from '../../components/ui/google-gemini-effect'
 
 export default function MiraGeminiSection() {
   const navigate = useNavigate()

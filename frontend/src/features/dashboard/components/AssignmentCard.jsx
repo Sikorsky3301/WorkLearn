@@ -1,5 +1,5 @@
 import { Briefcase, Check, Mail } from 'lucide-react'
-import { SIM_BRANDING } from '../../../shared/simBranding'
+import { SIM_BRANDING } from '../../../lib/simBranding'
 
 /** One manager/task summary for a single enrolled simulation — Dashboard
  * renders one of these per entry in useMyAssignments() so a student running
