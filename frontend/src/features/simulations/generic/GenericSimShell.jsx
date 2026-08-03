@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { X, Clock, Trophy } from 'lucide-react'
+import { X, Clock } from 'lucide-react'
 import { useEnrollment, useEnroll, useOnboarding, useCompleteTask, useSimulationFull } from '../../../hooks'
 import { resolveMediaUrl } from '../../../lib/client'
 import { cn } from '../../../lib/cn'
@@ -8,6 +8,7 @@ import { Badge } from '../../../shared/ui/shadcn/badge'
 import SimOnboarding from '../SimOnboarding'
 import SimManagerChat from '../SimManagerChat'
 import GenericStageRenderer from './GenericStageRenderer'
+import SimulationCompleteScreen from './SimulationCompleteScreen'
 import { useGenericSimStore } from '../../../stores/useGenericSimStore'
 
 // SimManagerChat/genericManagerChatKnowledge.js operate on task.message/
@@ -200,20 +201,7 @@ export default function GenericSimShell() {
   }
 
   if (status === 'completed') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-surface-low">
-        <div className="text-center max-w-md px-6">
-          <Trophy className="h-12 w-12 text-primary mx-auto mb-3" />
-          <h1 className="text-2xl font-bold text-on-surface mb-2">Simulation Complete!</h1>
-          <p className="text-sm text-on-surface-variant mb-6">
-            You finished all {tasks.length} tasks of {simulation.title}.
-          </p>
-          <button onClick={() => navigate('/simulations')} className="btn-primary px-6 py-2.5">
-            Back to Simulations
-          </button>
-        </div>
-      </div>
-    )
+    return <SimulationCompleteScreen simulation={simulation} taskCount={tasks.length} slug={slug} />
   }
 
   return (

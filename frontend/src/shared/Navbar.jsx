@@ -8,6 +8,7 @@ import { useAuth } from '../features/auth/AuthContext'
 import { useSimulations, useMyAssignments } from '../hooks'
 import { resolveDomainIcon } from '../lib/domainIcons'
 import { domainDescription } from '../lib/domainMeta'
+import { resolveMediaUrl } from '../lib/client'
 
 // Real, working destinations today. `to` is a route; `href` is used instead
 // for the one item (Help & Support) that isn't a page in this app.
@@ -322,12 +323,19 @@ export default function Navbar() {
           >
             <button
               onClick={() => setProfileOpen((v) => !v)}
-              className={`w-8 h-8 bg-primary rounded-full flex items-center justify-center transition-all ring-offset-2 ${
-                profileOpen ? 'ring-2 ring-primary/40' : 'hover:opacity-90 hover:scale-105'
-              }`}
+              className={`w-8 h-8 rounded-full overflow-hidden flex items-center justify-center transition-all ring-offset-2 ${
+                user?.photo_url ? '' : 'bg-primary'
+              } ${profileOpen ? 'ring-2 ring-primary/40' : 'hover:opacity-90 hover:scale-105'}`}
               title={user?.name || 'Profile'}
             >
-              <span className="text-white text-xs font-bold">{avatarInitials}</span>
+              {/* Initials are the fallback, not the only state — this used to
+                  render them unconditionally, so an uploaded photo never
+                  showed here even though the Portfolio displayed it fine. */}
+              {user?.photo_url ? (
+                <img src={resolveMediaUrl(user.photo_url)} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-white text-xs font-bold">{avatarInitials}</span>
+              )}
             </button>
 
             {/* Invisible bridge: fills the gap so mouse doesn't leave the hover zone */}

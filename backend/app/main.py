@@ -6,10 +6,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
+from app.core.paths import STATIC_DIR
 from app.core.logging_config import configure_logging
 from app.core.request_context import RequestIdMiddleware
 from app.db.database import engine, Base, AsyncSessionLocal
-from app.routes.v1 import auth, enrollments, agent_messages, analytics, admin, mentor, sandbox, admin_simulations, admin_simulation_templates, admin_uploads, admin_sim_builder, admin_management, feature_flags, platform_analytics, platform_config, profile
+from app.routes.v1 import auth, enrollments, agent_messages, analytics, admin, mentor, sandbox, admin_simulations, admin_simulation_templates, admin_uploads, admin_sim_builder, admin_management, feature_flags, platform_analytics, platform_config, profile, certificates
 from app.routes import health
 # AI-specific routes (LLM-backed: AI Mentor, generic sim-runtime AI
 # roleplay/grading) live in their own package — see app/ai/'s docstring.
@@ -20,6 +21,7 @@ from app.models import rbac as models_rbac  # noqa: F401 — registers AdminRole
 from app.models import feature_flags as models_feature_flags  # noqa: F401 — registers FeatureFlag/FeatureFlagOverride on Base.metadata before create_all
 from app.models import platform_config as models_platform_config  # noqa: F401 — registers PlatformConfig on Base.metadata before create_all
 from app.models import profile as models_profile  # noqa: F401 — registers EducationEntry on Base.metadata before create_all
+from app.models import certificate as models_certificate  # noqa: F401 — registers Certificate on Base.metadata before create_all
 from app.agents.manager import start_scheduler
 from app.ai.services.langfuse_client import init_langfuse, shutdown_langfuse, langfuse_enabled
 from app.services.permissions_seed import seed_permissions
@@ -29,7 +31,6 @@ from app.services.platform_config import seed_platform_config
 configure_logging(settings.log_level)
 logger = logging.getLogger(__name__)
 
-STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 STATIC_DIR.mkdir(exist_ok=True)
 
 @asynccontextmanager
@@ -137,5 +138,6 @@ app.include_router(feature_flags.router)
 app.include_router(platform_analytics.router)
 app.include_router(platform_config.router)
 app.include_router(profile.router)
+app.include_router(certificates.router)
 app.include_router(health.router)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")

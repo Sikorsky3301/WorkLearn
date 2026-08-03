@@ -11,10 +11,10 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 
 from app.core.dependencies import require_permission
+from app.core.paths import UPLOAD_DIR
 
 router = APIRouter(prefix="/api/admin/uploads", tags=["admin-uploads"])
 
-UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "static" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}

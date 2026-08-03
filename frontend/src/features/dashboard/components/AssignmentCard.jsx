@@ -1,3 +1,4 @@
+import { Briefcase, Check, Mail } from 'lucide-react'
 import { SIM_BRANDING } from '../../../shared/simBranding'
 
 /** One manager/task summary for a single enrolled simulation — Dashboard
@@ -7,21 +8,27 @@ export default function AssignmentCard({ assignment, onGo }) {
   const branding = SIM_BRANDING[assignment.simulation_id]
 
   const simChip = (
-    <div className="inline-flex items-center gap-1.5 mb-3 px-2 py-1 rounded-md bg-primary/5 border border-primary/15">
+    <div className="inline-flex items-center gap-1.5 mb-3 px-2 py-1 rounded-md bg-primary/[0.06] border border-primary/10">
       {branding?.logo ? (
         <img src={branding.logo} alt={assignment.simulation_title} className="h-3.5 w-auto object-contain" />
       ) : (
-        <span className="text-[10px]">💼</span>
+        <Briefcase className="h-3 w-3 text-primary" />
       )}
       <span className="text-[11px] font-semibold text-primary truncate">{assignment.simulation_title}</span>
     </div>
   )
 
+  const shell = 'rounded-xl border border-border bg-white shadow-sm p-5'
+
   if (assignment.has_assignment) {
+    const pct = assignment.total_tasks
+      ? Math.round((assignment.completed_count / assignment.total_tasks) * 100)
+      : 0
+
     return (
-      <div className="card card-shadow">
+      <div className={shell}>
         {simChip}
-        <div className="flex items-center gap-2.5 mb-3">
+        <div className="flex items-center gap-2.5 mb-4">
           {branding?.managerPhoto ? (
             <img src={branding.managerPhoto} alt={assignment.manager.name} className="w-9 h-9 rounded-full object-cover shrink-0" />
           ) : (
@@ -37,18 +44,28 @@ export default function AssignmentCard({ assignment, onGo }) {
           </div>
         </div>
 
-        <div className="border border-border rounded-xl p-3.5 bg-surface-low">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${assignment.in_progress ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
-              {assignment.in_progress ? 'In progress' : 'New assignment'}
-            </span>
-            <span className="text-[11px] text-on-surface-variant">
-              {assignment.completed_count}/{assignment.total_tasks} done
-            </span>
+        {/* Progress rail — replaces the old bare "0/5 done" text so the
+            card carries a sense of momentum at a glance. */}
+        <div className="flex items-center gap-2.5 mb-4">
+          <div className="flex-1 h-1.5 bg-surface-high rounded-full overflow-hidden">
+            <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${pct}%` }} />
           </div>
+          <span className="text-[11px] text-on-surface-variant shrink-0 tabular-nums">
+            {assignment.completed_count}/{assignment.total_tasks}
+          </span>
+        </div>
+
+        <div className="border-t border-border pt-4">
+          <span
+            className={`inline-block text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full mb-2 ${
+              assignment.in_progress ? 'bg-primary/10 text-primary' : 'bg-surface-container text-on-surface-variant'
+            }`}
+          >
+            {assignment.in_progress ? 'In progress' : 'New assignment'}
+          </span>
           <p className="font-bold text-on-surface text-sm mb-1">{assignment.task_name}</p>
           {assignment.brief && (
-            <p className="text-xs text-on-surface-variant leading-relaxed mb-3">"{assignment.brief}"</p>
+            <p className="text-xs text-on-surface-variant leading-relaxed mb-4">{assignment.brief}</p>
           )}
           <button className="btn-primary w-full text-xs py-2" onClick={onGo}>
             Complete this task →
@@ -60,10 +77,12 @@ export default function AssignmentCard({ assignment, onGo }) {
 
   if (assignment.reason === 'completed') {
     return (
-      <div className="card card-shadow flex flex-col items-center justify-center py-8 text-center">
+      <div className={`${shell} flex flex-col items-center justify-center py-8 text-center`}>
         {simChip}
-        <div className="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center mb-3 text-lg">✓</div>
-        <p className="text-sm font-medium text-on-surface mb-1">All tasks completed!</p>
+        <span className="w-11 h-11 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3">
+          <Check className="h-5 w-5" />
+        </span>
+        <p className="text-sm font-semibold text-on-surface mb-1">All tasks completed</p>
         <p className="text-xs text-on-surface-variant leading-relaxed">
           You've finished every task {assignment.manager?.name} assigned. Your Skill GPS is updated.
         </p>
@@ -73,11 +92,13 @@ export default function AssignmentCard({ assignment, onGo }) {
 
   if (assignment.reason === 'onboarding_pending') {
     return (
-      <div className="card card-shadow flex flex-col items-center justify-center py-8 text-center">
+      <div className={`${shell} flex flex-col items-center justify-center py-8 text-center`}>
         {simChip}
-        <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mb-3 text-lg">📩</div>
-        <p className="text-sm font-medium text-on-surface mb-1">You have an offer to accept</p>
-        <p className="text-xs text-on-surface-variant leading-relaxed mb-3">
+        <span className="w-11 h-11 rounded-full bg-primary/[0.07] text-primary flex items-center justify-center mb-3">
+          <Mail className="h-5 w-5" />
+        </span>
+        <p className="text-sm font-semibold text-on-surface mb-1">You have an offer to accept</p>
+        <p className="text-xs text-on-surface-variant leading-relaxed mb-4">
           {assignment.manager?.name} is waiting — accept your offer to begin and earn your Journey badge.
         </p>
         <button className="btn-primary text-xs px-4 py-2" onClick={onGo}>

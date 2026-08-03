@@ -70,7 +70,7 @@ export default function SimOnboarding({ sim = 'da-job-sim', onAccept }) {
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <span className="font-bold text-on-surface text-lg leading-tight">{company?.name}</span>
-            <span className="chip bg-orange-100 text-orange-700 text-[10px]">{company?.industry}</span>
+            <span className="chip bg-primary/10 text-primary text-[10px] normal-case tracking-normal">{company?.industry}</span>
           </div>
           <p className="text-xs text-on-surface-variant">{offer?.team} · {offer?.title}</p>
         </div>
@@ -91,14 +91,14 @@ export default function SimOnboarding({ sim = 'da-job-sim', onAccept }) {
               {manager?.photo_url ? (
                 <img src={resolveMediaUrl(manager.photo_url)} alt={manager?.name} className="w-11 h-11 rounded-full object-cover shrink-0" />
               ) : (
-                <div className="w-11 h-11 bg-orange-500 rounded-full flex items-center justify-center shrink-0">
+                <div className="w-11 h-11 bg-primary rounded-full flex items-center justify-center shrink-0">
                   <span className="text-white text-sm font-bold">{manager?.avatar}</span>
                 </div>
               )}
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-bold text-on-surface">{manager?.name}</p>
-                  <span className="chip bg-orange-100 text-orange-700 text-[10px] shrink-0">{manager?.role}</span>
+                  <span className="chip bg-primary/10 text-primary text-[10px] normal-case tracking-normal shrink-0">{manager?.role}</span>
                 </div>
                 <p className="text-xs text-on-surface-variant">Your manager for this simulation</p>
               </div>

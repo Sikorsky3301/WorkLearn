@@ -26,13 +26,15 @@ export default function WelcomeVideoCard() {
 
   return (
     <>
-      <div className="relative rounded-xl border border-primary/15 shadow-sm p-0 overflow-hidden mb-6 group bg-gradient-to-r from-primary/10 via-primary/5 to-transparent">
+      {/* Deep indigo band — dark enough to sit as the one "featured" strip on
+          an otherwise white dashboard, so text inside is inverted to white. */}
+      <div className="relative rounded-xl shadow-md p-0 overflow-hidden mb-6 group bg-gradient-to-r from-[#151046] via-primary-dark to-primary">
         {/* Faint dot-grid texture, same decorative language used elsewhere
             (Portfolio's profile card, the simulation overview hero) — gives
-            this "featured" row a bit of depth instead of a flat tint. */}
+            the band a bit of depth instead of a flat fill. */}
         <div
-          className="absolute inset-0 opacity-[0.06] pointer-events-none"
-          style={{ backgroundImage: 'radial-gradient(circle, #312E81 1.5px, transparent 1.5px)', backgroundSize: '18px 18px' }}
+          className="absolute inset-0 opacity-[0.10] pointer-events-none"
+          style={{ backgroundImage: 'radial-gradient(circle, #ffffff 1.5px, transparent 1.5px)', backgroundSize: '18px 18px' }}
           aria-hidden="true"
         />
         <button onClick={() => setPlaying(true)} className="relative w-full flex items-center gap-4 p-3 text-left cursor-pointer">
@@ -46,19 +48,19 @@ export default function WelcomeVideoCard() {
             />
             <div className="absolute inset-0 bg-black/15 group-hover:bg-black/25 transition-colors" />
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-9 h-9 rounded-full bg-primary/90 flex items-center justify-center shadow-lg ring-2 ring-white/40 group-hover:scale-110 group-hover:bg-primary transition-transform">
-                <Play className="h-3.5 w-3.5 text-white ml-0.5" fill="currentColor" />
+              <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                <Play className="h-3.5 w-3.5 text-primary ml-0.5" fill="currentColor" />
               </div>
             </div>
           </div>
 
           <div className="min-w-0 flex-1 pr-4">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary/10 text-primary">New</span>
-              <span className="text-[11px] text-on-surface-variant">2 min watch</span>
+              <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-white/15 text-white">New</span>
+              <span className="text-[11px] text-white/60">2 min watch</span>
             </div>
-            <p className="font-bold text-on-surface text-sm">Welcome to WorkLearn</p>
-            <p className="text-xs text-on-surface-variant mt-0.5 leading-snug line-clamp-2">
+            <p className="font-bold text-white text-sm">Welcome to WorkLearn</p>
+            <p className="text-xs text-white/70 mt-0.5 leading-snug line-clamp-2">
               A quick overview of how job simulations, your AI Mentor, and your Portfolio all fit together.
             </p>
           </div>

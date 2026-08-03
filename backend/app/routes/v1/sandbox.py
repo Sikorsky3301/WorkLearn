@@ -37,6 +37,7 @@ from app.services.dataset import seed_from_enrollment
 from app.services.graders import declarative_rules
 from app.services.graders.registry import GRADER_REGISTRY, DATASET_REGISTRY
 from app.services.skill_engine import award_task_completion
+from app.services.simulation_completion import finalize_if_complete
 
 router = APIRouter(prefix="/api/sandbox", tags=["sandbox"])
 logger = logging.getLogger(__name__)
@@ -393,4 +394,14 @@ async def submit(
         score=grade_result["score"], quiz_score=None, rubric_rating=grade_result,
     )
 
-    return {**awards, **grade_result, "dry_run": False}
+    # Sandbox-graded tasks are real task completions, so finishing the last
+    # one has to finalize the simulation exactly as the generic completion
+    # endpoint does — otherwise a simulation made entirely of code_sandbox
+    # tasks (da-job-sim, frontend-dev-sim) never gets marked COMPLETED and
+    # never issues its certificate.
+    finalized = await finalize_if_complete(
+        db, user_id=user_id, enrollment_id=enrollment_id,
+        simulation_id=sim_id, xp_awarded=awards.get("xp_awarded"),
+    )
+
+    return {**awards, **grade_result, **finalized, "dry_run": False}

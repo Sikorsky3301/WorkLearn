@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, func
@@ -8,6 +10,9 @@ from app.core.auth import get_current_user
 from app.models import Enrollment, EnrollmentStatus, TaskCompletion, AgentMessage, MessageType, UserBadge
 from app.models.cms import Simulation, SimulationTask, SimulationStatus
 from app.services.skill_engine import award_task_completion
+from app.services.simulation_completion import finalize_if_complete
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["enrollments"])
 
@@ -283,26 +288,13 @@ async def complete_task(
         score=body.score, quiz_score=body.quiz_score, rubric_rating=body.rubric_rating,
     )
 
-    # Check if every task in this simulation is done → complete the simulation
-    work_task_ids = [t.task_index for t in await _get_sim_tasks(db, sim_id)]
-    count = await db.execute(
-        select(TaskCompletion).where(TaskCompletion.enrollment_id == enrollment_id, TaskCompletion.task_id >= 1)
+    # Shared with the sandbox submission path — see
+    # app/services/simulation_completion.py for why this can't live inline here.
+    finalized = await finalize_if_complete(
+        db, user_id=user_id, enrollment_id=enrollment_id,
+        simulation_id=sim_id, xp_awarded=awards.get("xp_awarded"),
     )
-    if work_task_ids and len(count.scalars().all()) >= len(work_task_ids):
-        await db.execute(
-            update(Enrollment).where(Enrollment.id == enrollment_id).values(
-                status=EnrollmentStatus.COMPLETED, completed_at=datetime.now(timezone.utc)
-            )
-        )
-        sim = await _get_published_sim(db, sim_id)
-        sim_title = sim.title if sim else sim_id
-        db.add(AgentMessage(
-            user_id=user_id, enrollment_id=enrollment_id, type=MessageType.REVIEW,
-            content=f"Congratulations! You completed the {sim_title} and earned {awards['xp_awarded']} XP on your final task. Your Skill GPS has been updated."
-        ))
-        await db.commit()
-
-    return awards
+    return {**awards, **finalized}
 
 
 def _enroll_dict(e: Enrollment) -> dict:

@@ -13,7 +13,7 @@ from pathlib import Path
 from sqlalchemy import text
 from app.db.database import engine, Base
 from app import models  # noqa: F401 — register all tables before create_all
-from app.models import cms, sim_builder, rbac, feature_flags, platform_config, profile  # noqa: F401
+from app.models import cms, sim_builder, rbac, feature_flags, platform_config, profile, certificate  # noqa: F401
 
 MIGRATIONS_DIR = Path(__file__).resolve().parent
 

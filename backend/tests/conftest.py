@@ -68,7 +68,7 @@ async def _test_database():
     # Import order matches migrations/run.py and app/main.py — every models.*
     # submodule has to be imported before create_all sees the full metadata.
     from app.db.database import engine, Base
-    from app.models import cms, sim_builder, rbac, feature_flags, platform_config, profile  # noqa: F401
+    from app.models import cms, sim_builder, rbac, feature_flags, platform_config, profile, certificate  # noqa: F401
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

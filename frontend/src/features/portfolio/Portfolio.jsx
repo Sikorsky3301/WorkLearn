@@ -1,16 +1,17 @@
 import { useState } from 'react'
 import {
   Pencil, Share2, Mail, Phone, MapPin, Briefcase, FolderGit2, Globe,
-  Download, FileText, Plus, GraduationCap, Trash2, Trophy, Award,
-  BadgeCheck, ChevronDown, ChevronUp,
+  Download, FileText, Plus, Trash2,
+  BadgeCheck, ChevronDown, ChevronUp, Camera, Check,
 } from 'lucide-react'
 import { useAuth, ROLES } from '../auth/AuthContext'
-import { useUserSkills, useUserBadges, useDeleteEducation, useSimulations, useMyAssignments } from '../../hooks'
+import { useUserSkills, useUserBadges, useDeleteEducation, useSimulations, useMyAssignments, useUserCertificates } from '../../hooks'
 import { downloadFile, resolveMediaUrl } from '../../lib/client'
 import EditProfileModal from './components/EditProfileModal'
 import EducationModal from './components/EducationModal'
 import BadgeTile from './components/BadgeTile'
 import CaseStudyCard from './components/CaseStudyCard'
+import CertificateCard from './components/CertificateCard'
 
 const SKILL_LABELS = {
   sql:                'SQL Queries',
@@ -40,13 +41,6 @@ const SKILL_CATEGORIES = {
   data_storytelling:  'Leadership',
 }
 
-const categoryColors = {
-  Technical:  'bg-blue-100 text-blue-700',
-  Cognitive:  'bg-violet-100 text-violet-700',
-  Leadership: 'bg-purple-100 text-purple-700',
-  Domain:     'bg-teal-100 text-teal-700',
-}
-
 const categoryDot = {
   Technical:  'bg-blue-500',
   Cognitive:  'bg-violet-500',
@@ -54,17 +48,24 @@ const categoryDot = {
   Domain:     'bg-teal-500',
 }
 
-const CATEGORY_ORDER = ['Technical', 'Domain', 'Cognitive', 'Leadership']
+const categoryBorder = {
+  Technical:  'border-l-blue-500',
+  Cognitive:  'border-l-violet-500',
+  Leadership: 'border-l-purple-500',
+  Domain:     'border-l-teal-500',
+}
 
-const TABS = ['Overview', 'Competencies', 'Education', 'Projects']
+const CATEGORY_ORDER = ['Technical', 'Domain', 'Cognitive', 'Leadership']
+const TABS = ['Overview', 'Competencies', 'Certificates', 'Education', 'Projects']
 
 export default function Portfolio() {
-  const { user }                 = useAuth()
-  const { data: rawSkills = [] } = useUserSkills()
-  const { data: badgeData }      = useUserBadges()
-  const { data: simsData }       = useSimulations()
+  const { user }                  = useAuth()
+  const { data: rawSkills = [] }  = useUserSkills()
+  const { data: badgeData }       = useUserBadges()
+  const { data: simsData }        = useSimulations()
   const { data: assignmentsData } = useMyAssignments()
-  const [tab, setTab]            = useState('Overview')
+  const { data: certificateData } = useUserCertificates()
+  const [tab, setTab]             = useState('Overview')
   const [showEditProfile, setShowEditProfile] = useState(false)
   const [showAddEducation, setShowAddEducation] = useState(false)
   const [editingEducation, setEditingEducation] = useState(null)
@@ -74,11 +75,8 @@ export default function Portfolio() {
   const deleteEducation = useDeleteEducation()
 
   const badges = badgeData?.badges ?? user?.badges ?? []
+  const certificates = certificateData?.certificates ?? []
   const education = user?.education ?? []
-  // Each published simulation grants exactly one Journey badge on offer
-  // acceptance, so "possible" here is real and derivable — not a fabricated
-  // gamification number. Only shown once there's something to compare against.
-  const possibleBadges = simsData?.simulations?.length ?? 0
 
   // "Case studies" — real completed job simulations, not fabricated project
   // write-ups. reason === 'completed' means every task is done (see
@@ -90,7 +88,6 @@ export default function Portfolio() {
     .filter(Boolean)
 
   const xp       = user?.xp ?? 0
-  const level    = Math.floor(xp / 500) + 1
   const initials = user?.name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || '?'
 
   // Normalise: API may return array or object map
@@ -99,6 +96,8 @@ export default function Portfolio() {
     : Object.entries(rawSkills).map(([skill_key, current_score]) => ({ skill_key, current_score }))
 
   const topSkills = [...skills].sort((a, b) => b.current_score - a.current_score).slice(0, 6)
+
+  const hasContact = user?.location || user?.phone || user?.email || user?.website_url || user?.linkedin_url || user?.github_url
 
   function handleShare() {
     navigator.clipboard?.writeText(window.location.href)
@@ -119,491 +118,361 @@ export default function Portfolio() {
   return (
     <div className="max-w-container mx-auto px-6 py-8">
 
-      {/* ── Profile card ── */}
-      <div className="relative rounded-2xl border border-border overflow-hidden mb-6 bg-white">
-        {/* Faint dot-grid texture, top-right corner only — purely decorative */}
-        <div
-          className="absolute top-0 right-0 w-72 h-48 opacity-[0.06] pointer-events-none"
-          style={{ backgroundImage: 'radial-gradient(circle, #312E81 1.5px, transparent 1.5px)', backgroundSize: '16px 16px' }}
-        />
-
-        {/* Identity bar */}
-        <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 pb-5">
-          <div className="flex items-center gap-4 min-w-0">
-            <div className="relative shrink-0">
-              {user?.photo_url ? (
-                <img
-                  src={resolveMediaUrl(user.photo_url)}
-                  alt=""
-                  className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-md"
-                />
-              ) : (
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-indigo-500 border-4 border-white shadow-md flex items-center justify-center text-white text-xl font-bold">
-                  {initials}
-                </div>
-              )}
-              <div
-                className="absolute -bottom-0.5 -right-0.5 w-6 h-6 rounded-full bg-blue-500 border-2 border-white flex items-center justify-center"
-                title="Verified WorkLearn portfolio — skills and badges are earned through graded simulations, not self-reported"
-              >
-                <BadgeCheck className="h-3.5 w-3.5 text-white" />
-              </div>
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg font-bold text-on-surface truncate">{user?.name || 'Your Portfolio'}</h1>
-                {xp > 0 && <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" title="Active learner" />}
-              </div>
-              <p className="text-sm text-on-surface-variant mt-0.5 truncate">
-                {user?.headline || (user?.role === ROLES.UNIVERSITY_STUDENT ? `${user.institution} · ${user.department}` : 'Building my career on WorkLearn')}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <button onClick={handleShare} className="btn-secondary text-xs px-4 py-2 flex items-center gap-1.5 cursor-pointer">
-              <Share2 className="h-3.5 w-3.5" /> {copied ? 'Copied!' : 'Share'}
-            </button>
-            <button onClick={() => setShowEditProfile(true)} className="btn-primary text-xs px-4 py-2 flex items-center gap-1.5 cursor-pointer">
-              <Pencil className="h-3.5 w-3.5" /> Edit Profile
-            </button>
-          </div>
+      {/* ══ Profile header ══ */}
+      <div className="rounded-2xl border border-border bg-white overflow-hidden mb-6 shadow-sm">
+        {/* Cover band — the one dark surface on the page, so the identity
+            block below reads as the anchor rather than one card among many. */}
+        <div className="relative h-28 bg-gradient-to-r from-[#151046] via-primary-dark to-primary">
+          <div
+            className="absolute inset-0 opacity-[0.10]"
+            style={{ backgroundImage: 'radial-gradient(circle, #ffffff 1.5px, transparent 1.5px)', backgroundSize: '18px 18px' }}
+            aria-hidden="true"
+          />
         </div>
 
-        {/* Two-column info panel */}
-        <div className="grid sm:grid-cols-3 gap-6 px-6 pb-6">
-          <div className="sm:col-span-2 space-y-4">
-            <div>
-              <p className="text-xs font-bold text-on-surface uppercase tracking-wide mb-1.5">Experience</p>
-              <p className="text-sm text-on-surface-variant leading-relaxed">
-                {user?.headline || `${skills.length > 0 ? `${skills.length} verified skill${skills.length !== 1 ? 's' : ''}` : 'Getting started'} through hands-on job simulations on WorkLearn.`}
-              </p>
-            </div>
-            <div className="pt-4 border-t border-border">
-              <p className="text-xs font-bold text-on-surface uppercase tracking-wide mb-1.5">About me</p>
-              {user?.bio ? (
-                <>
-                  <p className={`text-sm text-on-surface-variant leading-relaxed ${!bioExpanded && user.bio.length > 220 ? 'line-clamp-3' : ''}`}>
-                    {user.bio}
-                  </p>
-                  {user.bio.length > 220 && (
-                    <button
-                      onClick={() => setBioExpanded((v) => !v)}
-                      className="text-xs font-semibold text-primary hover:underline flex items-center gap-1 mt-1.5 cursor-pointer"
-                    >
-                      {bioExpanded ? <>Show less <ChevronUp className="h-3 w-3" /></> : <>Read more <ChevronDown className="h-3 w-3" /></>}
-                    </button>
-                  )}
-                </>
-              ) : (
-                <button onClick={() => setShowEditProfile(true)} className="text-sm text-primary font-semibold hover:underline cursor-pointer">
-                  Add a bio to tell recruiters about yourself →
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="sm:col-span-1 space-y-4">
-            {topSkills.length > 0 && (
-              <div>
-                <p className="text-xs font-bold text-on-surface uppercase tracking-wide mb-2">Skills</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {topSkills.slice(0, 5).map((s) => (
-                    <span key={s.skill_key} className="chip bg-surface-low text-on-surface normal-case tracking-normal font-semibold">
-                      {SKILL_LABELS[s.skill_key] || s.skill_key}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-2.5">
-              {user?.location && (
-                <div className="flex items-center gap-2 text-sm text-on-surface-variant">
-                  <MapPin className="h-3.5 w-3.5 shrink-0" /> {user.location}
-                </div>
-              )}
-              {user?.phone && (
-                <div className="flex items-center gap-2 text-sm text-on-surface-variant">
-                  <Phone className="h-3.5 w-3.5 shrink-0" /> {user.phone}
-                </div>
-              )}
-              {user?.website_url && (
-                <a href={user.website_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-primary hover:underline">
-                  <Globe className="h-3.5 w-3.5 shrink-0" /> {user.website_url.replace(/^https?:\/\//, '')}
-                </a>
-              )}
-              {user?.email && (
-                <a href={`mailto:${user.email}`} className="flex items-center gap-2 text-sm text-primary hover:underline truncate">
-                  <Mail className="h-3.5 w-3.5 shrink-0" /> {user.email}
-                </a>
-              )}
-              {user?.linkedin_url && (
-                <a href={user.linkedin_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-primary hover:underline">
-                  <Briefcase className="h-3.5 w-3.5 shrink-0" /> LinkedIn
-                </a>
-              )}
-              {user?.github_url && (
-                <a href={user.github_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-primary hover:underline">
-                  <FolderGit2 className="h-3.5 w-3.5 shrink-0" /> GitHub
-                </a>
-              )}
-            </div>
-
-            {user?.resume_url ? (
-              <button
-                onClick={handleDownloadResume}
-                className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg bg-primary text-white hover:bg-primary-dark transition-colors cursor-pointer"
-              >
-                <Download className="h-3.5 w-3.5" /> Download Resume
-              </button>
-            ) : (
+        <div className="px-6 pb-5">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 -mt-12">
+            <div className="flex items-end gap-4 min-w-0">
+              {/* Avatar doubles as an upload affordance — the camera badge
+                  opens the same Edit Profile modal that owns the real file
+                  input, so there's one upload path, not two. */}
               <button
                 onClick={() => setShowEditProfile(true)}
-                className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-dashed border-border text-on-surface-variant hover:border-primary hover:text-primary transition-colors cursor-pointer"
+                className="relative shrink-0 group cursor-pointer rounded-2xl"
+                aria-label="Change profile photo"
+                type="button"
               >
-                <FileText className="h-3.5 w-3.5" /> Add resume
+                {user?.photo_url ? (
+                  <img
+                    src={resolveMediaUrl(user.photo_url)}
+                    alt=""
+                    className="w-24 h-24 rounded-2xl object-cover border-4 border-white shadow-md bg-surface-low"
+                  />
+                ) : (
+                  <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-primary to-indigo-500 border-4 border-white shadow-md flex items-center justify-center text-white text-2xl font-bold">
+                    {initials}
+                  </div>
+                )}
+                <span className="absolute inset-0 rounded-2xl bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <Camera className="h-5 w-5 text-white" />
+                </span>
+                <span
+                  className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-blue-500 border-2 border-white flex items-center justify-center"
+                  title="Verified WorkLearn portfolio — skills and badges are earned through graded simulations, not self-reported"
+                >
+                  <BadgeCheck className="h-3.5 w-3.5 text-white" />
+                </span>
               </button>
-            )}
-          </div>
-        </div>
 
-        {/* Stats strip */}
-        <div className="grid grid-cols-4 gap-3 px-6 py-4 border-t border-border bg-surface-low/50">
-          {[
-            { val: xp.toLocaleString(), label: 'XP Earned' },
-            { val: `Lv.${level}`, label: 'Level' },
-            { val: skills.length.toString(), label: 'Skills' },
-            { val: badges.length.toString(), label: 'Badges' },
-          ].map(s => (
-            <div key={s.label} className="text-center">
-              <p className="text-lg font-bold text-primary">{s.val}</p>
-              <p className="text-[11px] text-on-surface-variant">{s.label}</p>
+              <div className="min-w-0 pb-1">
+                <h1 className="text-xl font-bold text-on-surface truncate">{user?.name || 'Your Portfolio'}</h1>
+                <p className="text-sm text-on-surface-variant mt-0.5 truncate">
+                  {user?.headline || (user?.role === ROLES.UNIVERSITY_STUDENT ? `${user.institution} · ${user.department}` : 'Building my career on WorkLearn')}
+                </p>
+                {(user?.location || user?.email) && (
+                  <div className="flex items-center gap-3 mt-1.5 text-xs text-on-surface-variant flex-wrap">
+                    {user?.location && <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" /> {user.location}</span>}
+                    {user?.email && <span className="inline-flex items-center gap-1 truncate"><Mail className="h-3 w-3" /> {user.email}</span>}
+                  </div>
+                )}
+              </div>
             </div>
-          ))}
+
+            <div className="flex items-center gap-2 shrink-0 pb-1">
+              <button onClick={handleShare} className="btn-secondary text-xs px-3.5 py-2">
+                {copied ? <><Check className="h-3.5 w-3.5" /> Copied</> : <><Share2 className="h-3.5 w-3.5" /> Share</>}
+              </button>
+              <button onClick={() => setShowEditProfile(true)} className="btn-primary text-xs px-3.5 py-2">
+                <Pencil className="h-3.5 w-3.5" /> Edit Profile
+              </button>
+            </div>
+          </div>
+
+          {/* One consolidated stat row — these used to appear three separate
+              times on this page (header strip, progress card, and again in
+              its inner grid). */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-border border border-border rounded-xl mt-5 overflow-hidden bg-surface-low/40">
+            {[
+              { val: xp.toLocaleString(), label: 'XP earned' },
+              { val: skills.length, label: skills.length === 1 ? 'Verified skill' : 'Verified skills' },
+              { val: badges.length, label: badges.length === 1 ? 'Badge' : 'Badges' },
+              { val: certificates.length, label: certificates.length === 1 ? 'Certificate' : 'Certificates' },
+            ].map((s) => (
+              <div key={s.label} className="px-4 py-3 text-center">
+                <p className="text-lg font-bold text-on-surface tabular-nums leading-none">{s.val}</p>
+                <p className="text-[11px] text-on-surface-variant mt-1.5 leading-none">{s.label}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* ── Case Studies — completed job simulations, shown as real
-          proof-of-work project cards. Always visible (not tab-gated),
-          same real data the Overview/Projects tabs point back to. ── */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <span className="section-label">Case Studies</span>
-            <p className="text-sm font-bold text-on-surface mt-0.5">Completed job simulations</p>
-          </div>
-          {completedSims.length > 0 && (
-            <button onClick={() => setTab('Projects')} className="btn-ghost text-xs flex items-center gap-1">
-              View more →
-            </button>
-          )}
-        </div>
-        {completedSims.length === 0 ? (
-          <div className="card">
-            <EmptyState icon={FileText} title="No completed simulations yet" desc="Finish every task in a job simulation to add it here as a verified case study." />
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {completedSims.map((sim) => <CaseStudyCard key={sim.id} sim={sim} />)}
-          </div>
-        )}
-      </div>
-
-      {/* ── Tabs ── */}
-      <div className="flex border-b border-border mb-7">
+      {/* ══ Tabs ══ */}
+      <div className="flex border-b border-border mb-6">
         {TABS.map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-5 py-2.5 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${
-              tab === t ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant hover:text-on-surface'
+            className={`relative px-5 py-2.5 text-sm font-semibold transition-colors cursor-pointer ${
+              tab === t ? 'text-primary' : 'text-on-surface-variant hover:text-on-surface'
             }`}
           >
             {t}
+            {tab === t && <span className="absolute left-0 right-0 -bottom-px h-0.5 bg-primary rounded-full" />}
           </button>
         ))}
       </div>
 
-      {/* ── OVERVIEW — bento grid: varied tile spans instead of a plain
-          2-col+1-col split, each tile fading/rising in with a small stagger
-          on mount (see .portfolio-fade-in, index.css). ── */}
-      {tab === 'Overview' && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+      {/* ══ Body: main column + persistent sidebar ══ */}
+      <div className="grid lg:grid-cols-3 gap-6 items-start">
+        <div className="lg:col-span-2 space-y-6">
 
-          {/* Skill Snapshot */}
-          <div className="card md:col-span-2 portfolio-fade-in hover:shadow-md transition-shadow" style={{ animationDelay: '0ms' }}>
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <span className="section-label">Skill Snapshot</span>
-                <p className="text-sm font-bold text-on-surface mt-0.5">Earned through simulations</p>
-              </div>
-              <button className="btn-ghost text-xs" onClick={() => setTab('Competencies')}>View all →</button>
-            </div>
+          {tab === 'Overview' && (
+            <>
+              <Panel title="About">
+                {user?.bio ? (
+                  <>
+                    <p className={`text-sm text-on-surface-variant leading-relaxed ${!bioExpanded && user.bio.length > 320 ? 'line-clamp-4' : ''}`}>
+                      {user.bio}
+                    </p>
+                    {user.bio.length > 320 && (
+                      <button
+                        onClick={() => setBioExpanded((v) => !v)}
+                        className="text-xs font-semibold text-primary hover:underline flex items-center gap-1 mt-2 cursor-pointer"
+                      >
+                        {bioExpanded ? <>Show less <ChevronUp className="h-3 w-3" /></> : <>Read more <ChevronDown className="h-3 w-3" /></>}
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <InlinePrompt
+                    text="No bio yet — a short summary helps recruiters understand what you're working toward."
+                    action="Add a bio"
+                    onClick={() => setShowEditProfile(true)}
+                  />
+                )}
+              </Panel>
 
-            {topSkills.length === 0 ? (
-              <EmptyState icon={Trophy} title="No skills earned yet" desc="Complete simulation tasks to earn verified skill points that appear here." />
-            ) : (
-              <div className="grid grid-cols-2 gap-3">
-                {topSkills.map(s => <SkillBar key={s.skill_key} skillKey={s.skill_key} score={s.current_score} />)}
-              </div>
-            )}
-          </div>
-
-          {/* Progress / level card */}
-          <div className="card md:col-span-2 border-primary/20 bg-gradient-to-r from-primary/5 to-indigo-50 portfolio-fade-in hover:shadow-md transition-shadow" style={{ animationDelay: '60ms' }}>
-            <div className="flex items-center gap-5 h-full">
-              <div className="text-center shrink-0">
-                <div className="relative w-20 h-20">
-                  <svg viewBox="0 0 80 80" className="w-full h-full -rotate-90">
-                    <circle cx="40" cy="40" r="32" fill="none" stroke="#e5e1e9" strokeWidth="8" />
-                    <circle cx="40" cy="40" r="32" fill="none" stroke="#312E81" strokeWidth="8"
-                      strokeDasharray={`${2 * Math.PI * 32 * ((xp % 500) / 500)} ${2 * Math.PI * 32 * (1 - (xp % 500) / 500)}`}
-                      strokeLinecap="round" />
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-lg font-bold text-primary">{level}</span>
-                    <span className="text-xs text-on-surface-variant">Lv</span>
+              <Panel
+                title="Top Skills"
+                subtitle="Earned through graded simulation tasks"
+                action={skills.length > 0 && <button className="btn-ghost text-xs" onClick={() => setTab('Competencies')}>View all →</button>}
+              >
+                {topSkills.length === 0 ? (
+                  <InlinePrompt text="Complete simulation tasks to earn verified skill points — they'll appear here automatically." />
+                ) : (
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    {topSkills.map(s => <SkillBar key={s.skill_key} skillKey={s.skill_key} score={s.current_score} />)}
                   </div>
-                </div>
-                <p className="text-xs text-on-surface-variant mt-1">Current Level</p>
-              </div>
-              <div className="flex-1">
-                <p className="font-bold text-on-surface mb-1">Your Learning Progress</p>
-                <p className="text-sm text-on-surface-variant mb-3">
-                  {xp === 0
-                    ? 'Start your first simulation to begin earning XP and building your profile.'
-                    : `${xp.toLocaleString()} XP earned across ${skills.length} skill${skills.length !== 1 ? 's' : ''}. Keep it up!`}
-                </p>
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { val: xp.toLocaleString(), label: 'XP Earned', color: 'text-primary' },
-                    { val: skills.length.toString(), label: 'Skills', color: 'text-green-600' },
-                    { val: `Lv.${level}`, label: 'Level', color: 'text-indigo-500' },
-                  ].map(s => (
-                    <div key={s.label} className="bg-white rounded-lg border border-border p-2.5 text-center">
-                      <p className={`text-base font-bold ${s.color}`}>{s.val}</p>
-                      <p className="text-xs text-on-surface-variant">{s.label}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
+                )}
+              </Panel>
 
-          {/* Journey Badges — wide tile */}
-          <div className="card md:col-span-3 portfolio-fade-in hover:shadow-md transition-shadow" style={{ animationDelay: '120ms' }}>
-            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-              <div>
-                <span className="section-label">Journey Badges</span>
-                <p className="text-sm font-bold text-on-surface mt-0.5">Milestones earned on the platform</p>
-              </div>
-              {possibleBadges > 0 && (
-                <div className="flex items-center gap-2 shrink-0">
-                  <div className="w-20 h-1.5 bg-surface-high rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-amber-400 to-primary rounded-full transition-all"
-                      style={{ width: `${Math.min((badges.length / possibleBadges) * 100, 100)}%` }}
-                    />
+              <Panel
+                title="Case Studies"
+                subtitle="Completed job simulations"
+                action={completedSims.length > 0 && <button className="btn-ghost text-xs" onClick={() => setTab('Projects')}>View all →</button>}
+              >
+                {completedSims.length === 0 ? (
+                  <InlinePrompt text="Finish every task in a job simulation and it'll show up here as a verified case study you can share with recruiters." />
+                ) : (
+                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                    {completedSims.slice(0, 3).map((sim) => <CaseStudyCard key={sim.id} sim={sim} />)}
                   </div>
-                  <span className="text-xs font-semibold text-on-surface-variant whitespace-nowrap">
-                    {badges.length} of {possibleBadges} collected
-                  </span>
-                </div>
-              )}
-            </div>
-            {badges.length === 0 ? (
-              <EmptyState icon={Award} title="No badges yet" desc="Accept a job simulation offer to earn your first Simulation Journey badge." />
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {badges.map(b => <BadgeTile key={b.id} badge={b} />)}
-              </div>
-            )}
-          </div>
-
-          {/* What's next */}
-          <div className="card md:col-span-1 portfolio-fade-in hover:shadow-md transition-shadow" style={{ animationDelay: '180ms' }}>
-            <span className="section-label mb-3 block">What's next</span>
-            {skills.length === 0 ? (
-              <div className="space-y-2.5">
-                <div className="flex items-start gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
-                  <div className="w-2.5 h-2.5 bg-primary rounded-full mt-1 shrink-0" />
-                  <div>
-                    <p className="text-xs font-semibold text-on-surface">Enroll in the DA Job Simulation</p>
-                    <p className="text-xs text-on-surface-variant mt-0.5">Start your first real-world data analyst task.</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-3 border border-border rounded-lg opacity-50">
-                  <div className="w-2.5 h-2.5 bg-border rounded-full mt-1 shrink-0" />
-                  <div>
-                    <p className="text-xs font-semibold text-on-surface">Complete Task 1 — SQL</p>
-                    <p className="text-xs text-on-surface-variant mt-0.5">Earn your first skill points.</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-3 border border-border rounded-lg opacity-30">
-                  <div className="w-2.5 h-2.5 bg-border rounded-full mt-1 shrink-0" />
-                  <div>
-                    <p className="text-xs font-semibold text-on-surface">Build your portfolio</p>
-                    <p className="text-xs text-on-surface-variant mt-0.5">Submit tasks to generate verified artifacts.</p>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <p className="text-xs text-on-surface-variant leading-relaxed">
-                Keep completing tasks to unlock more skills and project artifacts. Every completed task adds verified proof of work to your portfolio.
-              </p>
-            )}
-          </div>
-
-          {/* Education preview — only while empty, so it doesn't duplicate the full Education tab */}
-          {education.length === 0 && (
-            <div className="card md:col-span-2 border-dashed portfolio-fade-in hover:shadow-md transition-shadow" style={{ animationDelay: '300ms' }}>
-              <span className="section-label mb-2 block">Education</span>
-              <p className="text-xs text-on-surface-variant mb-3">Add your academic background to round out your portfolio.</p>
-              <button onClick={() => setShowAddEducation(true)} className="btn-ghost text-xs flex items-center gap-1 cursor-pointer">
-                <Plus className="h-3.5 w-3.5" /> Add education
-              </button>
-            </div>
+                )}
+              </Panel>
+            </>
           )}
-        </div>
-      )}
 
-      {/* ── COMPETENCIES — grouped by category instead of one flat grid, so
-          a recruiter scanning this can immediately see the technical vs.
-          domain vs. cognitive vs. leadership spread rather than a wall of
-          identical cards. ── */}
-      {tab === 'Competencies' && (
-        skills.length === 0 ? (
-          <div className="py-16">
-            <EmptyState icon={Trophy} large title="No skills earned yet" desc="Complete simulation tasks to earn verified skill points. Each task awards points in specific skills relevant to your target role." />
-          </div>
-        ) : (
-          <div className="space-y-8">
-            {CATEGORY_ORDER.map((category, groupIdx) => {
-              const items = skills.filter(s => (SKILL_CATEGORIES[s.skill_key] || 'Technical') === category)
-              if (items.length === 0) return null
-              return (
-                <div
-                  key={category}
-                  className="portfolio-fade-in"
-                  style={{ animationDelay: `${groupIdx * 70}ms` }}
-                >
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className={`w-2 h-2 rounded-full ${categoryDot[category]}`} />
-                    <h3 className="text-sm font-bold text-on-surface">{category}</h3>
-                    <span className="text-xs text-on-surface-variant">({items.length})</span>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    {items.map(s => {
-                      const label = SKILL_LABELS[s.skill_key] || s.skill_key
-                      return (
-                        <div
-                          key={s.skill_key}
-                          className={`card border-l-4 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-default ${
-                            { Technical: 'border-l-blue-500', Cognitive: 'border-l-violet-500', Leadership: 'border-l-purple-500', Domain: 'border-l-teal-500' }[category]
-                          }`}
-                        >
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="w-10 h-10 bg-surface-low rounded-xl flex items-center justify-center">
-                              <BarIcon size={18} />
+          {tab === 'Competencies' && (
+            skills.length === 0 ? (
+              <Panel title="Competencies">
+                <InlinePrompt text="Complete simulation tasks to earn verified skill points. Each task awards points in specific skills relevant to your target role." />
+              </Panel>
+            ) : (
+              <div className="space-y-6">
+                {CATEGORY_ORDER.map((category) => {
+                  const items = skills.filter(s => (SKILL_CATEGORIES[s.skill_key] || 'Technical') === category)
+                  if (items.length === 0) return null
+                  return (
+                    <Panel key={category} title={category} subtitle={`${items.length} skill${items.length !== 1 ? 's' : ''}`} dot={categoryDot[category]}>
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        {items.map(s => (
+                          <div key={s.skill_key} className={`border border-border border-l-[3px] ${categoryBorder[category]} rounded-lg p-4 hover:shadow-sm transition-shadow`}>
+                            <div className="flex items-center justify-between mb-2.5">
+                              <p className="text-sm font-semibold text-on-surface">{SKILL_LABELS[s.skill_key] || s.skill_key}</p>
+                              <span className="text-sm font-bold text-primary tabular-nums ml-2 shrink-0">{s.current_score}</span>
                             </div>
-                            <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${categoryColors[category]}`}>
-                              {category}
-                            </span>
-                          </div>
-                          <p className="text-sm font-semibold text-on-surface mb-1 leading-tight">{label}</p>
-                          <div className="mt-3">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-xs text-on-surface-variant">Score</span>
-                              <span className="text-sm font-bold text-primary">{s.current_score}</span>
-                            </div>
-                            <div className="h-2 bg-surface-high rounded-full overflow-hidden">
+                            <div className="h-1.5 bg-surface-high rounded-full overflow-hidden">
                               <div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(s.current_score, 100)}%` }} />
                             </div>
                           </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )
-      )}
-
-      {/* ── EDUCATION ── */}
-      {tab === 'Education' && (
-        <div className="max-w-2xl">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <span className="section-label">Academic Background</span>
-              <p className="text-sm font-bold text-on-surface mt-0.5">Schools, degrees, and coursework</p>
-            </div>
-            <button onClick={() => setShowAddEducation(true)} className="btn-primary text-xs px-4 py-2 flex items-center gap-1.5 cursor-pointer">
-              <Plus className="h-3.5 w-3.5" /> Add Education
-            </button>
-          </div>
-
-          {education.length === 0 ? (
-            <div className="card">
-              <EmptyState icon={GraduationCap} title="No education added yet" desc="Add your schools and degrees so recruiters get the full picture." />
-            </div>
-          ) : (
-            <div className="relative pl-8 space-y-6">
-              <div className="absolute left-[11px] top-2 bottom-2 w-px bg-border" />
-              {education.map(e => (
-                <div key={e.id} className="relative">
-                  <div className="absolute -left-8 top-1 w-6 h-6 rounded-full bg-primary/10 border-2 border-primary flex items-center justify-center">
-                    <GraduationCap className="h-3 w-3 text-primary" />
-                  </div>
-                  <div className="card group">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-on-surface">{e.institution}</p>
-                        {(e.degree || e.field_of_study) && (
-                          <p className="text-xs text-on-surface-variant mt-0.5">
-                            {[e.degree, e.field_of_study].filter(Boolean).join(', ')}
-                          </p>
-                        )}
-                        <p className="text-[11px] text-on-surface-variant mt-1 font-medium">
-                          {e.start_year || '—'} – {e.is_current ? 'Present' : (e.end_year || '—')}
-                        </p>
-                        {e.description && <p className="text-xs text-on-surface-variant mt-2 leading-relaxed">{e.description}</p>}
+                        ))}
                       </div>
-                      <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => setEditingEducation(e)} className="p-1.5 rounded-md hover:bg-surface-low text-on-surface-variant hover:text-primary cursor-pointer" aria-label="Edit">
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button onClick={() => handleDeleteEducation(e.id)} className="p-1.5 rounded-md hover:bg-red-50 text-on-surface-variant hover:text-red-600 cursor-pointer" aria-label="Delete">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                    </Panel>
+                  )
+                })}
+              </div>
+            )
+          )}
+
+          {tab === 'Certificates' && (
+            <Panel
+              title="Certificates"
+              subtitle="Issued automatically when you complete every task in a simulation"
+            >
+              {certificates.length === 0 ? (
+                <InlinePrompt text="No certificates yet. Complete every task in a job simulation and its certificate — with a unique verification number — is issued to you automatically." />
+              ) : (
+                <div className="space-y-3">
+                  {certificates.map((c) => <CertificateCard key={c.id} certificate={c} />)}
+                </div>
+              )}
+            </Panel>
+          )}
+
+          {tab === 'Education' && (
+            <Panel
+              title="Education"
+              subtitle="Schools, degrees, and coursework"
+              action={
+                <button onClick={() => setShowAddEducation(true)} className="btn-primary text-xs px-3.5 py-2">
+                  <Plus className="h-3.5 w-3.5" /> Add
+                </button>
+              }
+            >
+              {education.length === 0 ? (
+                <InlinePrompt
+                  text="Add your schools and degrees so recruiters get the full picture."
+                  action="Add education"
+                  onClick={() => setShowAddEducation(true)}
+                />
+              ) : (
+                <div className="relative pl-7 space-y-5">
+                  <div className="absolute left-[9px] top-2 bottom-2 w-px bg-border" />
+                  {education.map(e => (
+                    <div key={e.id} className="relative group">
+                      <span className="absolute -left-7 top-1 w-[18px] h-[18px] rounded-full bg-white border-2 border-primary flex items-center justify-center">
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                      </span>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-on-surface">{e.institution}</p>
+                          {(e.degree || e.field_of_study) && (
+                            <p className="text-xs text-on-surface-variant mt-0.5">
+                              {[e.degree, e.field_of_study].filter(Boolean).join(', ')}
+                            </p>
+                          )}
+                          <p className="text-[11px] text-on-surface-variant mt-1 font-medium">
+                            {e.start_year || '—'} – {e.is_current ? 'Present' : (e.end_year || '—')}
+                          </p>
+                          {e.description && <p className="text-xs text-on-surface-variant mt-2 leading-relaxed">{e.description}</p>}
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => setEditingEducation(e)} className="p-1.5 rounded-md hover:bg-surface-low text-on-surface-variant hover:text-primary cursor-pointer" aria-label="Edit">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button onClick={() => handleDeleteEducation(e.id)} className="p-1.5 rounded-md hover:bg-red-50 text-on-surface-variant hover:text-red-600 cursor-pointer" aria-label="Delete">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              )}
+            </Panel>
+          )}
+
+          {tab === 'Projects' && (
+            <Panel title="Projects" subtitle="Completed job simulations, as verified case studies">
+              {completedSims.length === 0 ? (
+                <InlinePrompt text="Finish every task in a job simulation and it'll show up here as a verified case study — shareable with recruiters." />
+              ) : (
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                  {completedSims.map((sim) => <CaseStudyCard key={sim.id} sim={sim} />)}
+                </div>
+              )}
+            </Panel>
           )}
         </div>
-      )}
 
-      {/* ── PROJECTS — same completed-simulation case studies shown above,
-          just the full grid rather than the top-of-page preview. ── */}
-      {tab === 'Projects' && (
-        completedSims.length === 0 ? (
-          <div className="py-16">
-            <EmptyState
-              icon={FileText} large title="No completed simulations yet"
-              desc="Finish every task in a job simulation and it'll show up here as a verified case study — shareable with recruiters."
-            />
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {completedSims.map((sim) => <CaseStudyCard key={sim.id} sim={sim} />)}
-          </div>
-        )
-      )}
+        {/* ── Sidebar: always present, so the page never reads as half-empty
+            regardless of which tab is open ── */}
+        <div className="space-y-6">
+          <Panel title="Contact" compact>
+            {hasContact ? (
+              <div className="space-y-2.5">
+                {user?.email && (
+                  <a href={`mailto:${user.email}`} className="flex items-center gap-2.5 text-sm text-primary hover:underline truncate">
+                    <Mail className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{user.email}</span>
+                  </a>
+                )}
+                {user?.phone && (
+                  <div className="flex items-center gap-2.5 text-sm text-on-surface-variant">
+                    <Phone className="h-3.5 w-3.5 shrink-0" /> {user.phone}
+                  </div>
+                )}
+                {user?.location && (
+                  <div className="flex items-center gap-2.5 text-sm text-on-surface-variant">
+                    <MapPin className="h-3.5 w-3.5 shrink-0" /> {user.location}
+                  </div>
+                )}
+                {user?.website_url && (
+                  <a href={user.website_url} target="_blank" rel="noreferrer" className="flex items-center gap-2.5 text-sm text-primary hover:underline truncate">
+                    <Globe className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{user.website_url.replace(/^https?:\/\//, '')}</span>
+                  </a>
+                )}
+                {user?.linkedin_url && (
+                  <a href={user.linkedin_url} target="_blank" rel="noreferrer" className="flex items-center gap-2.5 text-sm text-primary hover:underline">
+                    <Briefcase className="h-3.5 w-3.5 shrink-0" /> LinkedIn
+                  </a>
+                )}
+                {user?.github_url && (
+                  <a href={user.github_url} target="_blank" rel="noreferrer" className="flex items-center gap-2.5 text-sm text-primary hover:underline">
+                    <FolderGit2 className="h-3.5 w-3.5 shrink-0" /> GitHub
+                  </a>
+                )}
+              </div>
+            ) : (
+              <InlinePrompt text="No contact details yet." action="Add contact info" onClick={() => setShowEditProfile(true)} />
+            )}
+          </Panel>
+
+          <Panel title="Resume" compact>
+            {user?.resume_url ? (
+              <>
+                <div className="flex items-center gap-2.5 mb-3 min-w-0">
+                  <span className="h-9 w-9 rounded-lg bg-primary/[0.07] text-primary flex items-center justify-center shrink-0">
+                    <FileText className="h-4 w-4" />
+                  </span>
+                  <p className="text-sm text-on-surface truncate">{user.resume_filename || 'Resume.pdf'}</p>
+                </div>
+                <button onClick={handleDownloadResume} className="btn-primary w-full text-xs py-2">
+                  <Download className="h-3.5 w-3.5" /> Download
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => setShowEditProfile(true)}
+                className="w-full flex flex-col items-center gap-1.5 border border-dashed border-border rounded-lg py-5 text-on-surface-variant hover:border-primary hover:text-primary transition-colors cursor-pointer"
+              >
+                <FileText className="h-4 w-4" />
+                <span className="text-xs font-semibold">Add resume</span>
+              </button>
+            )}
+          </Panel>
+
+          <Panel title="Badges" subtitle={badges.length > 0 ? `${badges.length} earned` : undefined} compact>
+            {badges.length === 0 ? (
+              <InlinePrompt text="Accept a job simulation offer to earn your first Journey badge." />
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                {badges.map(b => <BadgeTile key={b.id} badge={b} />)}
+              </div>
+            )}
+          </Panel>
+        </div>
+      </div>
 
       {showEditProfile && <EditProfileModal onClose={() => setShowEditProfile(false)} />}
       {showAddEducation && <EducationModal onClose={() => setShowAddEducation(false)} />}
@@ -612,14 +481,39 @@ export default function Portfolio() {
   )
 }
 
-function EmptyState({ icon: Icon, title, desc, large }) {
+/** Shared section shell — one border/padding/heading treatment instead of
+ * each block inventing its own, which is what made the old page read as a
+ * pile of unrelated cards. */
+function Panel({ title, subtitle, action, dot, compact, children }) {
   return (
-    <div className="flex flex-col items-center justify-center py-10 text-center text-on-surface-variant">
-      <div className={`${large ? 'w-14 h-14' : 'w-12 h-12'} rounded-full bg-gradient-to-br from-surface-high to-surface-low flex items-center justify-center mb-3 text-primary/70`}>
-        <Icon className={large ? 'h-6 w-6' : 'h-[18px] w-[18px]'} strokeWidth={1.5} />
+    <section className="rounded-xl border border-border bg-white shadow-sm">
+      <div className={`flex items-start justify-between gap-3 ${compact ? 'px-5 pt-4 pb-3' : 'px-6 pt-5 pb-4'}`}>
+        <div className="min-w-0">
+          <h2 className="text-sm font-bold text-on-surface flex items-center gap-2">
+            {dot && <span className={`w-2 h-2 rounded-full ${dot}`} />}
+            {title}
+          </h2>
+          {subtitle && <p className="text-xs text-on-surface-variant mt-0.5">{subtitle}</p>}
+        </div>
+        {action && <div className="shrink-0">{action}</div>}
       </div>
-      <p className={`${large ? 'text-base' : 'text-sm'} font-semibold mb-1 text-on-surface`}>{title}</p>
-      <p className={`${large ? 'text-sm max-w-sm' : 'text-xs max-w-xs'}`}>{desc}</p>
+      <div className={`border-t border-border ${compact ? 'px-5 py-4' : 'px-6 py-5'}`}>{children}</div>
+    </section>
+  )
+}
+
+/** Replaces the old full-height EmptyState illustrations — those took a lot
+ * of vertical space to say very little, which is exactly what made an
+ * early-stage portfolio look empty rather than just new. */
+function InlinePrompt({ text, action, onClick }) {
+  return (
+    <div className="text-sm text-on-surface-variant leading-relaxed">
+      {text}
+      {action && (
+        <button onClick={onClick} className="ml-1.5 text-primary font-semibold hover:underline cursor-pointer">
+          {action} →
+        </button>
+      )}
     </div>
   )
 }
@@ -628,32 +522,17 @@ function SkillBar({ skillKey, score }) {
   const label    = SKILL_LABELS[skillKey] || skillKey
   const category = SKILL_CATEGORIES[skillKey] || 'Technical'
   return (
-    <div className="flex items-center gap-3 p-3 border border-border rounded-lg hover:border-primary transition-colors">
-      <div className="w-8 h-8 bg-surface-low rounded-lg flex items-center justify-center shrink-0">
-        <BarIcon />
+    <div className="border border-border rounded-lg p-3.5 hover:border-primary/40 transition-colors">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-semibold text-on-surface truncate flex items-center gap-1.5">
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${categoryDot[category]}`} />
+          {label}
+        </p>
+        <span className="text-xs font-bold text-primary ml-2 shrink-0 tabular-nums">{score}</span>
       </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between mb-1">
-          <p className="text-xs font-semibold text-on-surface truncate flex items-center gap-1.5">
-            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${categoryDot[category]}`} />
-            {label}
-          </p>
-          <span className="text-xs font-bold text-primary ml-2 shrink-0">{score}</span>
-        </div>
-        <div className="h-1.5 bg-surface-high rounded-full overflow-hidden">
-          <div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(score, 100)}%` }} />
-        </div>
+      <div className="h-1.5 bg-surface-high rounded-full overflow-hidden">
+        <div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(score, 100)}%` }} />
       </div>
     </div>
-  )
-}
-
-function BarIcon({ size = 14 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#312E81" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="18" y1="20" x2="18" y2="10" />
-      <line x1="12" y1="20" x2="12" y2="4" />
-      <line x1="6" y1="20" x2="6" y2="14" />
-    </svg>
   )
 }

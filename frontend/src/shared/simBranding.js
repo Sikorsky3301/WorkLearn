@@ -17,8 +17,11 @@ import salesCrmSimBanner from '../assets/sales-crm-sim-banner.jpg'
 // or AI-generated image — picked to match each simulation's actual work
 // (a dashboard/charts screen for the data-analyst sim, a React code editor
 // for the frontend sim, a sales presentation for the CRM sim).
+// Accents stay inside the brand's own cool palette (indigo primary, slate,
+// teal) — deliberately no orange/amber, which read as generic "template"
+// colors here and clash with the indigo primary everything else uses.
 export const SIM_BRANDING = {
-  'da-job-sim':       { logo: lumenLogoImg, accentColor: 'bg-orange-500', banner: daJobSimBanner },
-  'frontend-dev-sim': { logo: enigmaLogoImg, accentColor: 'bg-orange-500', banner: frontendDevSimBanner },
-  'sales-crm-sim':    { logo: nimbusLogoImg, accentColor: 'bg-blue-600', managerPhoto: derekHoltPhoto, banner: salesCrmSimBanner },
+  'da-job-sim':       { logo: lumenLogoImg, accentColor: 'bg-indigo-700', banner: daJobSimBanner },
+  'frontend-dev-sim': { logo: enigmaLogoImg, accentColor: 'bg-slate-800', banner: frontendDevSimBanner },
+  'sales-crm-sim':    { logo: nimbusLogoImg, accentColor: 'bg-teal-700', managerPhoto: derekHoltPhoto, banner: salesCrmSimBanner },
 }

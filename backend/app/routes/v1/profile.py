@@ -16,15 +16,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db
 from app.core.auth import get_current_user
+from app.core.paths import UPLOAD_DIR, PHOTO_DIR, RESUME_DIR
 from app.models import User
 from app.models.profile import EducationEntry
 from app.schemas.profile import ProfileUpdateBody, EducationIn, EducationOut
 
 router = APIRouter(prefix="/api/users/me", tags=["profile"])
 
-UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "static" / "uploads"
-PHOTO_DIR = UPLOAD_DIR / "profile_photos"
-RESUME_DIR = UPLOAD_DIR / "resumes"
 PHOTO_DIR.mkdir(parents=True, exist_ok=True)
 RESUME_DIR.mkdir(parents=True, exist_ok=True)
 

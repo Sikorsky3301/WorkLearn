@@ -1,0 +1,7 @@
+Bottom line: Email is our most efficient channel by AOV, and the free-shipping test shows a real, if modest, lift — recommend a phased rollout, not a full one.
+
+Findings: (1) Paid Search drives the most orders but Email has 22% higher AOV — volume and value are decoupled. (2) The free-shipping variant lifted AOV ~5% with a statistically significant result (p<0.05) on a balanced sample. (3) 8% of orders are guest-checkout and un-segmentable — a measurable blind spot for personalization.
+
+Recommendations: (1) Shift 10% of Paid Search budget toward Email — highest confidence, immediate impact. (2) Roll out free shipping to one region first, watching fulfillment cost per order, not just AOV. (3) Add a lightweight guest-checkout capture (email at minimum) to shrink the unsegmentable share.
+
+Caveat: the shipping lift is real but small — fulfillment cost per order needs one more month of data before a full rollout is safe to call profit-positive, not just revenue-positive.
