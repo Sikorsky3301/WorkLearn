@@ -5,7 +5,7 @@ migration — `seed_permissions` upserts by `key` on every startup, so adding a
 row is safe to run against a database that already has older rows.
 
 Only `users.*`, `admins.*`, and `activity.view_feed` are actually enforced by
-an endpoint in Phase 1 (see app/routes/v1/admin.py, app/routes/v1/admin_management.py).
+an endpoint in Phase 1 (see app/api/v1/admin/admin.py, app/api/v1/superadmin/admin_management.py).
 The rest are seeded now — categorized per the platform's requested capability
 list — so Phase 2 (feature flags, platform analytics) and later simulation-
 management delegation can gate against them without a schema change.

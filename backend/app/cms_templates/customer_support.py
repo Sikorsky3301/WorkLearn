@@ -1,6 +1,6 @@
 """Starter template: Customer Support. Instantiated via
 POST /api/admin/simulations/from-template/customer_support — see
-app/routes/v1/admin_simulations.py."""
+app/api/v1/admin/admin_simulations.py."""
 
 TEMPLATE = {
     "key": "customer_support",

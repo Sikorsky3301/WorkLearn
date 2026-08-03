@@ -1,5 +1,5 @@
 """Pydantic request/response models for the ADMIN-tier RBAC surface
-(app/routes/v1/admin_management.py) — admin lifecycle, roles, and permissions."""
+(app/api/v1/superadmin/admin_management.py) — admin lifecycle, roles, and permissions."""
 from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field
 

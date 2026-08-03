@@ -3,8 +3,8 @@ Repair enrollments that finished every task but were never finalized.
 
 Until app/services/simulation_completion.py existed, the "all tasks done ->
 mark COMPLETED + issue certificate" step ran only in
-routes/v1/enrollments.py::complete_task. Every `code_sandbox` task completes
-through routes/v1/sandbox.py::submit instead, so simulations built entirely
+api/v1/simulations/enrollments.py::complete_task. Every `code_sandbox` task completes
+through api/v1/simulations/sandbox.py::submit instead, so simulations built entirely
 from sandbox tasks (da-job-sim and frontend-dev-sim are both 5/5
 code_sandbox) left students with a fully-completed task list, an
 IN_PROGRESS enrollment, and no certificate.

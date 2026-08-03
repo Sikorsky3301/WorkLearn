@@ -14,7 +14,7 @@ from app.ai.services.llm import stream_chat, generate, chat_with_tools
 from app.ai.services.langfuse_client import traced_observation, traced_context, get_current_trace_id, score_trace
 from app.ai.services.mentor_tools import TOOL_SCHEMAS, execute_tool, MentorToolContext
 from app.ai.services.mentor_personas import build_system_prompt, get_persona
-from app.routes.v1.enrollments import _build_assignment
+from app.api.v1.simulations.enrollments import _build_assignment
 
 logger = logging.getLogger(__name__)
 

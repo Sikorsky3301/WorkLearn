@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Enrollment, TaskCompletion, User, XpLedger
 from app.services.skill_engine import compute_skill_gps
-from app.routes.v1.enrollments import _build_assignment, _get_sim_tasks
+from app.api.v1.simulations.enrollments import _build_assignment, _get_sim_tasks
 
 logger = logging.getLogger(__name__)
 

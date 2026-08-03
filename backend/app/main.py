@@ -10,7 +10,14 @@ from app.core.paths import STATIC_DIR
 from app.core.logging_config import configure_logging
 from app.core.request_context import RequestIdMiddleware
 from app.db.database import engine, Base, AsyncSessionLocal
-from app.routes.v1 import auth, enrollments, agent_messages, analytics, admin, mentor, sandbox, admin_simulations, admin_simulation_templates, admin_uploads, admin_sim_builder, admin_management, feature_flags, platform_analytics, platform_config, profile, certificates
+from app.api.v1.auth import auth
+from app.api.v1.users import profile, certificates
+from app.api.v1.simulations import enrollments, sandbox, agent_messages
+from app.api.v1.builder import admin_sim_builder
+from app.api.v1.admin import admin, admin_simulations, admin_simulation_templates, admin_uploads
+from app.api.v1.superadmin import admin_management, feature_flags, platform_analytics, platform_config
+from app.api.v1.analytics import analytics
+from app.api.v1.mentor import mentor
 from app.routes import health
 # AI-specific routes (LLM-backed: AI Mentor, generic sim-runtime AI
 # roleplay/grading) live in their own package — see app/ai/'s docstring.

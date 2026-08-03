@@ -1,5 +1,5 @@
 """
-Integration tests for the direct-user auth flow (app/routes/v1/auth.py) — real
+Integration tests for the direct-user auth flow (app/api/v1/auth/auth.py) — real
 HTTP requests (in-process, via httpx's ASGI transport) against a real test
 database. See tests/conftest.py for how DB isolation works. pytest.ini sets
 asyncio_mode=auto, so plain `async def test_...` is enough — no markers needed.

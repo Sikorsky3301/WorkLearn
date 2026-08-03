@@ -27,7 +27,7 @@ def create_token(
         payload["sa"] = True
     # Frontend-nav hint only — the backend never trusts this claim, it
     # re-checks permissions against the database on every request (see
-    # app/core/dependencies.py::require_permission).
+    # app/core/permissions.py::require_permission).
     if permissions is not None:
         payload["permissions"] = permissions
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)

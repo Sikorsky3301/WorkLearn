@@ -2,9 +2,9 @@
 "Is this simulation finished?" — the single place that decides, and the
 single place that reacts.
 
-This logic used to live inline in routes/v1/enrollments.py::complete_task
+This logic used to live inline in api/v1/simulations/enrollments.py::complete_task
 only. But that endpoint is not the only way a task gets completed: every
-`code_sandbox` task completes through routes/v1/sandbox.py::submit instead,
+`code_sandbox` task completes through api/v1/simulations/sandbox.py::submit instead,
 which calls award_task_completion directly. Simulations built entirely from
 sandbox tasks (da-job-sim and frontend-dev-sim are both 5/5 code_sandbox)
 therefore never had their enrollment marked COMPLETED and never had a

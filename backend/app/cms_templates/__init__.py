@@ -2,7 +2,7 @@
 each exporting a TEMPLATE dict shaped as {key, label, description, simulation,
 tasks}, where `simulation` matches SimulationCreate (minus `id`) and each
 entry in `tasks` matches SimulationTaskCreate. See
-app/routes/v1/admin_simulations.py's create_from_template for how these are
+app/api/v1/admin/admin_simulations.py's create_from_template for how these are
 instantiated into a real DRAFT simulation."""
 from app.cms_templates import (
     customer_support, marketing_content, finance_accounting,

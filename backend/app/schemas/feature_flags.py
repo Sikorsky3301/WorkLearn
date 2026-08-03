@@ -1,5 +1,5 @@
 """Pydantic request/response models for the real feature-flag system
-(app/routes/v1/feature_flags.py)."""
+(app/api/v1/superadmin/feature_flags.py)."""
 from datetime import datetime
 from pydantic import BaseModel, Field
 

@@ -1,5 +1,5 @@
 """
-Integration tests for permission-based access control (app/core/dependencies.py's
+Integration tests for permission-based access control (app/core/permissions.py's
 require_permission). This is the same grant/deny pattern manually verified
 live (via disposable test roles/curl) throughout this project's RBAC work —
 now automated instead of re-done by hand every time something touches it.

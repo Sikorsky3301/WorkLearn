@@ -33,7 +33,7 @@ def test_superadmin_token_carries_sa_flag():
 def test_token_embeds_permissions_as_nav_hint_only():
     # create_token's own docstring/comment: this claim is a frontend-nav
     # hint the backend never trusts as an authorization decision — see
-    # app/core/dependencies.py::require_permission re-querying the DB instead.
+    # app/core/permissions.py::require_permission re-querying the DB instead.
     token = create_token("admin-1", "ADMIN", permissions=["users.view"])
     payload = decode_token(token)
     assert payload["permissions"] == ["users.view"]

@@ -1,7 +1,7 @@
 """
 RBAC for the ADMIN tier. SUPER_ADMIN is untouched by any of this — it stays a
 separate `SuperAdminCredential` row (see app/models.py) and is always an
-unconditional bypass in `require_permission` (see app/core/dependencies.py).
+unconditional bypass in `require_permission` (see app/core/permissions.py).
 
 `AdminRole` is deliberately not named `Role` — that name is already the
 4-value (soon 5) enum on `User.role`, imported directly as `SAEnum(Role)`.
