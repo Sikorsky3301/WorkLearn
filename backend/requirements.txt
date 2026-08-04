@@ -1,4 +1,6 @@
 fastapi==0.115.5
+# Required by FastAPI for File()/Form() endpoints (e.g. profile photo upload).
+python-multipart==0.0.32
 uvicorn[standard]==0.32.1
 sqlalchemy==2.0.36
 asyncpg==0.30.0

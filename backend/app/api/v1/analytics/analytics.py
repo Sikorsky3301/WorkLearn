@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from datetime import datetime, timedelta, timezone, date
 from app.db.database import get_db
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, token_user_id
 from app.models import User, TaskCompletion, XpLedger, Enrollment, EnrollmentStatus
 from app.services.skill_engine import get_user_skills
 
@@ -11,7 +11,7 @@ router = APIRouter(prefix="/api", tags=["analytics"])
 
 @router.get("/analytics")
 async def analytics(period: str = "week", db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
-    user_id = token["sub"]
+    user_id = token_user_id(token)
     now = datetime.now(timezone.utc)
 
     if period == "week":

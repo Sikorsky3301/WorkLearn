@@ -1,17 +1,13 @@
 """
 Feature-flag catalog, seeding, and resolution.
-
-`ROLE_DEFAULTS` is a byte-for-byte replica of the frontend's previous
-hardcoded ROLE_FEATURES map (src/features/auth/AuthContext.jsx) — seeded once
-so behavior doesn't change the moment this migration lands; admins then
-manage flags for real via the Feature Flags UI. `admin_panel` from that old
-map isn't carried over — RBAC (app/models/rbac.py) now governs admin-surface
-access entirely, so a feature flag for it would be redundant/confusing.
+Role overrides use role slugs (student, teacher, ...).
+University overrides match universities.code via the user's university join.
 """
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from app.models import User
+from app.models.roles import RoleSlug
 from app.models.feature_flags import FeatureFlag, FeatureFlagOverride
 
 FEATURE_FLAG_CATALOG: list[dict] = [
@@ -29,16 +25,14 @@ FEATURE_FLAG_CATALOG: list[dict] = [
      "description": "Assign specific tasks to individual students."},
 ]
 
+# Independent students (default university) get the open catalog; university-
+# provisioned students are tightened via university overrides if needed.
 ROLE_DEFAULTS: dict[str, dict[str, bool]] = {
-    "DIRECT_USER": {
+    RoleSlug.STUDENT: {
         "python_sandbox": True, "download_dataset": True, "model_solution": True,
         "certificate": True, "all_courses": True, "assign_tasks": False,
     },
-    "UNIVERSITY_STUDENT": {
-        "python_sandbox": False, "download_dataset": True, "model_solution": False,
-        "certificate": False, "all_courses": False, "assign_tasks": False,
-    },
-    "CLASS_MENTOR": {
+    RoleSlug.TEACHER: {
         "python_sandbox": True, "download_dataset": True, "model_solution": True,
         "certificate": True, "all_courses": True, "assign_tasks": True,
     },
@@ -46,9 +40,6 @@ ROLE_DEFAULTS: dict[str, dict[str, bool]] = {
 
 
 async def seed_feature_flags(db: AsyncSession) -> None:
-    """Idempotent — upserts the catalog by key, then makes sure every
-    ROLE_DEFAULTS override row exists (does not touch overrides an admin
-    later changes — on_conflict_do_nothing, not do_update, for those)."""
     for flag in FEATURE_FLAG_CATALOG:
         stmt = pg_insert(FeatureFlag).values(**flag, enabled_default=False).on_conflict_do_update(
             index_elements=["key"],
@@ -67,25 +58,22 @@ async def seed_feature_flags(db: AsyncSession) -> None:
 
 
 async def resolve_feature_flags(db: AsyncSession, user: User) -> dict[str, bool]:
-    """Precedence, least to most specific: enabled_default < role override <
-    university override < user override. Called on every /me and login
-    response (see routes/auth.py) — cheap at this data scale (a handful of
-    flags, a few dozen overrides), not worth indexing/caching yet."""
     flags_res = await db.execute(select(FeatureFlag))
     resolved = {f.key: f.enabled_default for f in flags_res.scalars().all()}
 
     overrides_res = await db.execute(select(FeatureFlagOverride))
     overrides = overrides_res.scalars().all()
-    role_val = user.role.value if hasattr(user.role, "value") else str(user.role)
+    role_val = user.role
+    uni_code = user.university.code if user.university else None
 
     for o in overrides:
         if o.scope_type == "role" and o.scope_value == role_val:
             resolved[o.flag_key] = o.enabled
     for o in overrides:
-        if o.scope_type == "university" and user.institution_code and o.scope_value == user.institution_code:
+        if o.scope_type == "university" and uni_code and o.scope_value == uni_code:
             resolved[o.flag_key] = o.enabled
     for o in overrides:
-        if o.scope_type == "user" and o.scope_value == user.id:
+        if o.scope_type == "user" and o.scope_value == str(user.id):
             resolved[o.flag_key] = o.enabled
 
     return resolved

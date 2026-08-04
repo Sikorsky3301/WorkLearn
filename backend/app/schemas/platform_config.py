@@ -13,7 +13,7 @@ class ConfigEntryOut(BaseModel):
     value: str | None
     value_set: bool
     updated_at: datetime | None
-    updated_by: str | None
+    updated_by: int | None
 
 
 class SetConfigBody(BaseModel):

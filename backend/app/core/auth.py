@@ -15,21 +15,14 @@ def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
 def create_token(
-    user_id: str, role: str, sa: bool = False,
-    permissions: list[str] | None = None, expire_hours: int | None = None,
+    user_id: int, role: str, expire_hours: int | None = None,
 ) -> str:
     if expire_hours is not None:
         expire = datetime.now(timezone.utc) + timedelta(hours=expire_hours)
     else:
         expire = datetime.now(timezone.utc) + timedelta(days=settings.jwt_expire_days)
-    payload = {"sub": user_id, "role": role, "exp": expire}
-    if sa:
-        payload["sa"] = True
-    # Frontend-nav hint only — the backend never trusts this claim, it
-    # re-checks permissions against the database on every request (see
-    # app/core/permissions.py::require_permission).
-    if permissions is not None:
-        payload["permissions"] = permissions
+    # sub as string for JWT interop; callers parse with int(token["sub"])
+    payload = {"sub": str(user_id), "role": role, "exp": expire}
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 def decode_token(token: str) -> dict:
@@ -40,3 +33,10 @@ def decode_token(token: str) -> dict:
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer)) -> dict:
     return decode_token(credentials.credentials)
+
+
+def token_user_id(token: dict) -> int:
+    try:
+        return int(token["sub"])
+    except (TypeError, ValueError, KeyError):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")

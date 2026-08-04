@@ -3,38 +3,45 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth import get_current_user
 from app.db.database import get_db
-from app.models import User, Role  # noqa: F401 — Role re-exported so RBAC consumers have one canonical "roles + permission checks" import
-from app.models.rbac import AdminRolePermission
+from app.models import User
+from app.models.roles import RoleSlug
 
 
-def require_permission(key: str):
-    """Returns a dependency that lets SUPER_ADMIN through unconditionally,
-    and otherwise re-checks the ADMIN's current AdminRole permissions
-    against the database on every request. Deliberately never trusts the
-    JWT's embedded `permissions` claim (that's a frontend-nav hint only) —
-    so revoking a permission or suspending an admin takes effect on their
-    very next request, not after their token happens to expire."""
+def require_roles(*allowed_slugs: str):
+    """Allow only users whose role slug is in allowed_slugs.
+    Super Admin always passes when listed; if only checking admin portals,
+    include RoleSlug.SUPER_ADMIN explicitly where needed."""
+
+    allowed = set(allowed_slugs)
 
     async def _check(
         token: dict = Depends(get_current_user),
         db: AsyncSession = Depends(get_db),
     ) -> dict:
-        if token.get("role") == "SUPER_ADMIN":
-            return token
-        if token.get("role") != "ADMIN":
-            raise HTTPException(403, "Admin access required")
+        role = token.get("role")
+        if role not in allowed:
+            raise HTTPException(403, "Insufficient role for this action")
 
-        result = await db.execute(select(User).where(User.id == token["sub"]))
+        # Load user and enforce is_active for everyone
+        try:
+            user_id = int(token["sub"])
+        except (TypeError, ValueError):
+            raise HTTPException(401, "Invalid token")
+
+        result = await db.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
-        if not user or not user.is_active or not user.admin_role_id:
-            raise HTTPException(403, "Admin account is inactive or has no assigned role")
-
-        perm_result = await db.execute(
-            select(AdminRolePermission.permission_key).where(AdminRolePermission.role_id == user.admin_role_id)
-        )
-        granted = {row[0] for row in perm_result.all()}
-        if key not in granted:
-            raise HTTPException(403, f"Missing required permission: {key}")
+        if not user or not user.is_active:
+            raise HTTPException(403, "Account is inactive or not found")
+        if user.role != role:
+            # Token role must still match DB (role changes take effect immediately)
+            raise HTTPException(403, "Role no longer valid — please sign in again")
+        token["_user"] = user
         return token
 
     return _check
+
+
+# Back-compat alias used by many admin routes — platform admin surface
+def require_permission(_key: str = ""):
+    """Former fine-grained permission gate. Now equivalent to platform admin roles."""
+    return require_roles(RoleSlug.SUPER_ADMIN, RoleSlug.ADMIN, RoleSlug.UNIVERSITY_ADMIN)

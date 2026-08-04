@@ -15,7 +15,7 @@ from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, token_user_id
 from app.core.paths import UPLOAD_DIR, PHOTO_DIR, RESUME_DIR
 from app.models import User
 from app.models.profile import EducationEntry
@@ -32,7 +32,7 @@ MAX_PHOTO_BYTES = 5 * 1024 * 1024   # 5MB
 MAX_RESUME_BYTES = 10 * 1024 * 1024  # 10MB
 
 
-async def _get_user(db: AsyncSession, user_id: str) -> User:
+async def _get_user(db: AsyncSession, user_id: int) -> User:
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
@@ -44,7 +44,7 @@ async def _get_user(db: AsyncSession, user_id: str) -> User:
 async def update_profile(
     body: ProfileUpdateBody, db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user),
 ):
-    user = await _get_user(db, token["sub"])
+    user = await _get_user(db, token_user_id(token))
     for field, value in body.model_dump().items():
         setattr(user, field, value.strip() if isinstance(value, str) else value)
     await db.commit()
@@ -54,7 +54,7 @@ async def update_profile(
 
 @router.post("/complete-onboarding")
 async def complete_onboarding(db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
-    user = await _get_user(db, token["sub"])
+    user = await _get_user(db, token_user_id(token))
     user.onboarding_completed = True
     await db.commit()
     return {"ok": True}
@@ -71,7 +71,7 @@ async def upload_photo(
     if len(content) > MAX_PHOTO_BYTES:
         raise HTTPException(400, "Image is too large (max 5MB)")
 
-    user = await _get_user(db, token["sub"])
+    user = await _get_user(db, token_user_id(token))
     filename = f"{uuid.uuid4().hex}{ext}"
     (PHOTO_DIR / filename).write_bytes(content)
     old_url = user.photo_url
@@ -88,7 +88,7 @@ async def upload_photo(
 
 @router.delete("/photo")
 async def delete_photo(db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
-    user = await _get_user(db, token["sub"])
+    user = await _get_user(db, token_user_id(token))
     old_url = user.photo_url
     user.photo_url = None
     await db.commit()
@@ -108,7 +108,7 @@ async def upload_resume(
     if len(content) > MAX_RESUME_BYTES:
         raise HTTPException(400, "File is too large (max 10MB)")
 
-    user = await _get_user(db, token["sub"])
+    user = await _get_user(db, token_user_id(token))
     filename = f"{uuid.uuid4().hex}{ext}"
     (RESUME_DIR / filename).write_bytes(content)
     old_url = user.resume_url
@@ -125,7 +125,7 @@ async def upload_resume(
 
 @router.delete("/resume")
 async def delete_resume(db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
-    user = await _get_user(db, token["sub"])
+    user = await _get_user(db, token_user_id(token))
     old_url = user.resume_url
     user.resume_url = None
     user.resume_filename = None
@@ -138,8 +138,9 @@ async def delete_resume(db: AsyncSession = Depends(get_db), token: dict = Depend
 
 @router.get("/education", response_model=list[EducationOut])
 async def list_education(db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
+    user_id = token_user_id(token)
     result = await db.execute(
-        select(EducationEntry).where(EducationEntry.user_id == token["sub"])
+        select(EducationEntry).where(EducationEntry.user_id == user_id)
         .order_by(EducationEntry.sort_order, EducationEntry.start_year.desc())
     )
     return result.scalars().all()
@@ -149,9 +150,10 @@ async def list_education(db: AsyncSession = Depends(get_db), token: dict = Depen
 async def add_education(
     body: EducationIn, db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user),
 ):
-    count_result = await db.execute(select(EducationEntry).where(EducationEntry.user_id == token["sub"]))
+    user_id = token_user_id(token)
+    count_result = await db.execute(select(EducationEntry).where(EducationEntry.user_id == user_id))
     sort_order = len(count_result.scalars().all())
-    entry = EducationEntry(user_id=token["sub"], sort_order=sort_order, **body.model_dump())
+    entry = EducationEntry(user_id=user_id, sort_order=sort_order, **body.model_dump())
     db.add(entry)
     await db.commit()
     await db.refresh(entry)
@@ -160,10 +162,11 @@ async def add_education(
 
 @router.put("/education/{entry_id}", response_model=EducationOut)
 async def update_education(
-    entry_id: str, body: EducationIn, db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user),
+    entry_id: int, body: EducationIn, db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user),
 ):
+    user_id = token_user_id(token)
     result = await db.execute(
-        select(EducationEntry).where(EducationEntry.id == entry_id, EducationEntry.user_id == token["sub"])
+        select(EducationEntry).where(EducationEntry.id == entry_id, EducationEntry.user_id == user_id)
     )
     entry = result.scalar_one_or_none()
     if not entry:
@@ -177,10 +180,11 @@ async def update_education(
 
 @router.delete("/education/{entry_id}")
 async def delete_education(
-    entry_id: str, db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user),
+    entry_id: int, db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user),
 ):
+    user_id = token_user_id(token)
     result = await db.execute(
-        delete(EducationEntry).where(EducationEntry.id == entry_id, EducationEntry.user_id == token["sub"])
+        delete(EducationEntry).where(EducationEntry.id == entry_id, EducationEntry.user_id == user_id)
     )
     if result.rowcount == 0:
         raise HTTPException(404, "Education entry not found")

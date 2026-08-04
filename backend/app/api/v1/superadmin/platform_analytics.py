@@ -27,7 +27,7 @@ async def platform_analytics(
     wau = (await db.execute(select(func.count()).select_from(User).where(User.last_seen_at >= week_ago))).scalar() or 0
     mau = (await db.execute(select(func.count()).select_from(User).where(User.last_seen_at >= month_ago))).scalar() or 0
     universities = (await db.execute(
-        select(func.count(func.distinct(User.institution_code))).where(User.institution_code.isnot(None))
+        select(func.count(func.distinct(User.university_id))).where(User.university_id.isnot(None))
     )).scalar() or 0
     total_simulations = (await db.execute(select(func.count()).select_from(Simulation))).scalar() or 0
     total_enrollments = (await db.execute(select(func.count()).select_from(Enrollment))).scalar() or 0

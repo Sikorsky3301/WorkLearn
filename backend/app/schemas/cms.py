@@ -189,7 +189,7 @@ SLUG_PATTERN = r"^[a-z0-9]+(-[a-z0-9]+)*$"
 
 
 class SimulationCreate(BaseModel):
-    id: str = Field(pattern=SLUG_PATTERN)
+    slug: str = Field(pattern=SLUG_PATTERN)
     title: str
     description: str
     company: str
@@ -209,9 +209,9 @@ class SimulationCreate(BaseModel):
 
 
 class SimulationUpdate(BaseModel):
-    """Same fields as create, all optional, minus `id` (immutable — see
-    models_cms.py's Simulation.id docstring: renaming would orphan every
-    Enrollment/TaskCompletion/UserBadge row referencing it by string)."""
+    """Same fields as create, all optional. Integer `id` is immutable;
+    `slug` may be changed if unique."""
+    slug: str | None = Field(None, pattern=SLUG_PATTERN)
     title: str | None = None
     description: str | None = None
     company: str | None = None
@@ -293,15 +293,15 @@ class SimulationTaskUpdate(BaseModel):
 
 
 class ReorderTasksBody(BaseModel):
-    task_ids: list[str]
+    task_ids: list[int]
 
 
 class DuplicateSimulationBody(BaseModel):
-    new_id: str = Field(pattern=SLUG_PATTERN)
+    new_slug: str = Field(pattern=SLUG_PATTERN)
 
 
 class CreateFromTemplateBody(BaseModel):
-    id: str = Field(pattern=SLUG_PATTERN)
+    slug: str = Field(pattern=SLUG_PATTERN)
     title: str | None = None
 
 

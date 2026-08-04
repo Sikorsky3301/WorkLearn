@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
-from app.models import TaskCompletion, UserSkill, XpLedger, User, Enrollment, AgentMessage, EnrollmentStatus, MessageType
+from app.models import TaskCompletion, UserSkill, XpLedger, User, Enrollment, EnrollmentStatus
 from app.models.cms import SimulationTask
 from app.core.config import (
     TARGET_ROLE_REQUIREMENTS, SKILL_LABELS, QUIZ_BONUS_THRESHOLD, QUIZ_BONUS_XP
@@ -9,10 +9,10 @@ from datetime import datetime, timezone
 
 async def award_task_completion(
     db: AsyncSession,
-    user_id: str,
-    enrollment_id: str,
+    user_id: int,
+    enrollment_id: int,
     task_id: int,
-    simulation_id: str,
+    simulation_id: int,
     score: int | None = None,
     quiz_score: int | None = None,
     rubric_rating: dict | None = None,
@@ -81,12 +81,12 @@ async def award_task_completion(
     return {"xp_awarded": total_xp, "skills_awarded": skill_awards}
 
 
-async def get_user_skills(db: AsyncSession, user_id: str) -> dict[str, int]:
+async def get_user_skills(db: AsyncSession, user_id: int) -> dict[str, int]:
     result = await db.execute(select(UserSkill).where(UserSkill.user_id == user_id))
     return {s.skill_key: s.current_score for s in result.scalars().all()}
 
 
-async def compute_skill_gps(db: AsyncSession, user_id: str, target_role: str) -> dict:
+async def compute_skill_gps(db: AsyncSession, user_id: int, target_role: str) -> dict:
     requirements = TARGET_ROLE_REQUIREMENTS.get(target_role, TARGET_ROLE_REQUIREMENTS["junior_da"])
     user_skills = await get_user_skills(db, user_id)
 

@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 from pydantic import BaseModel
 from app.db.database import get_db, AsyncSessionLocal
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, token_user_id
 from app.models import User, Enrollment, MentorChatMessage
 from app.services.skill_engine import compute_skill_gps
 from app.ai.services.llm import stream_chat, generate, chat_with_tools
@@ -55,7 +55,7 @@ async def chat(body: ChatBody, db: AsyncSession = Depends(get_db), token: dict =
     if token.get("sa"):
         raise HTTPException(403, "AI Mentor is available for enrolled students only.")
 
-    user_id = token["sub"]
+    user_id = token_user_id(token)
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
@@ -179,7 +179,7 @@ Current task: {_current_task_headline(assignment)}
 async def chat_history(limit: int = 50, db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
     if token.get("sa"):
         return []
-    user_id = token["sub"]
+    user_id = token_user_id(token)
     result = await db.execute(
         select(MentorChatMessage)
         .where(MentorChatMessage.user_id == user_id)
@@ -199,7 +199,7 @@ async def chat_history(limit: int = 50, db: AsyncSession = Depends(get_db), toke
 async def clear_chat_history(db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
     if token.get("sa"):
         return {"ok": True}
-    await db.execute(delete(MentorChatMessage).where(MentorChatMessage.user_id == token["sub"]))
+    await db.execute(delete(MentorChatMessage).where(MentorChatMessage.user_id == token_user_id(token)))
     await db.commit()
     return {"ok": True}
 
@@ -218,7 +218,7 @@ async def set_message_feedback(
     if body.feedback not in (None, "up", "down"):
         raise HTTPException(400, "feedback must be 'up', 'down', or null")
 
-    user_id = token["sub"]
+    user_id = token_user_id(token)
     result = await db.execute(
         select(MentorChatMessage).where(MentorChatMessage.id == message_id, MentorChatMessage.user_id == user_id)
     )
@@ -244,7 +244,7 @@ async def mentor_topics(db: AsyncSession = Depends(get_db), token: dict = Depend
     whatever persona the student is actually talking to."""
     if token.get("sa"):
         return {"domain": None, "topics": []}
-    user_id = token["sub"]
+    user_id = token_user_id(token)
     enroll_res = await db.execute(
         select(Enrollment).where(Enrollment.user_id == user_id).order_by(Enrollment.enrolled_at.desc()).limit(1)
     )
@@ -257,7 +257,7 @@ async def mentor_topics(db: AsyncSession = Depends(get_db), token: dict = Depend
 
 @router.get("/skill-gps")
 async def skill_gps(role: str = "junior_da", db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
-    user_id = token["sub"]
+    user_id = token_user_id(token)
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     target_role = role or (user.target_role if user else "junior_da")

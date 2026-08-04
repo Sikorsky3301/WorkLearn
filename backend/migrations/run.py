@@ -13,15 +13,17 @@ from pathlib import Path
 from sqlalchemy import text
 from app.db.database import engine, Base
 from app import models  # noqa: F401 — register all tables before create_all
-from app.models import cms, sim_builder, rbac, feature_flags, platform_config, profile, certificate  # noqa: F401
+from app.models import (  # noqa: F401
+    cms, sim_builder, rbac, feature_flags, platform_config, profile, certificate,
+    roles, university,
+)
 
 MIGRATIONS_DIR = Path(__file__).resolve().parent
 
 
 async def _ensure_new_tables():
-    # Brand-new tables (admin_roles, permissions, admin_role_permissions,
-    # audit_logs) are handled by create_all, same as every other table in
-    # this project — only altering EXISTING tables needs a numbered script.
+    # Brand-new tables (roles, universities, audit_logs, etc.) are handled by
+    # create_all — only altering EXISTING tables needs a numbered script.
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

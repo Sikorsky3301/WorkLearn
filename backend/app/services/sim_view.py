@@ -22,7 +22,8 @@ def build_task_public_dict(t: SimulationTask) -> dict:
 def build_simulation_public_dict(sim: Simulation, tasks: list[SimulationTask]) -> dict:
     return {
         "simulation": {
-            "id": sim.id, "title": sim.title, "description": sim.description, "company": sim.company,
+            "id": sim.id, "slug": sim.slug, "title": sim.title, "description": sim.description,
+            "company": sim.company,
             "logo_url": sim.logo_url, "domain": sim.domain, "category": sim.category,
             "accent_color": sim.accent_color, "difficulty": sim.difficulty,
             "estimated_hours": sim.estimated_hours, "skills": sim.skills,

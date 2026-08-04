@@ -25,13 +25,15 @@ async def test_register_then_me(client):
     assert resp.status_code == 200
     body = resp.json()
     assert body["user"]["email"] == "test-student@example.com"
-    assert body["user"]["role"] == "DIRECT_USER"
-    assert body["user"]["onboarding_completed"] is False  # new signup, wizard should show
+    assert body["user"]["role"] == "student"
+    assert body["user"]["university"]["is_default"] is True
+    assert body["user"]["onboarding_completed"] is False
 
     token = body["token"]
     me = await client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert me.status_code == 200
     assert me.json()["email"] == "test-student@example.com"
+    assert me.json()["role"] == "student"
 
 
 async def test_register_rejects_duplicate_email(client):

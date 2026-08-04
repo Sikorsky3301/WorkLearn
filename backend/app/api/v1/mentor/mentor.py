@@ -4,37 +4,51 @@ from sqlalchemy import select, func
 from pydantic import BaseModel
 from datetime import datetime, timezone
 from app.db.database import get_db
-from app.core.auth import get_current_user
-from app.models import User, Role, Enrollment, TaskCompletion, UnlockedFeature
+from app.core.auth import get_current_user, token_user_id
+from app.models import User, Enrollment, TaskCompletion, UnlockedFeature
+from app.models.roles import RoleSlug, ROLE_IDS
+from app.services.simulation_lookup import get_simulation
 
 router = APIRouter(prefix="/api/mentor", tags=["mentor"])
 
+
 def require_mentor(token: dict = Depends(get_current_user)):
-    if token.get("role") not in ("CLASS_MENTOR", "SUPER_ADMIN"):
+    if token.get("role") not in (RoleSlug.TEACHER, RoleSlug.SUPER_ADMIN):
         raise HTTPException(403, "Mentor access required")
     return token
 
+
 @router.get("/students")
 async def mentor_students(db: AsyncSession = Depends(get_db), token: dict = Depends(require_mentor)):
-    user_id = token["sub"]
+    user_id = token_user_id(token)
     mentor_res = await db.execute(select(User).where(User.id == user_id))
     mentor = mentor_res.scalar_one_or_none()
-    if not mentor or not mentor.institution_code:
+    if not mentor or not mentor.university_id:
         return []
 
     students_res = await db.execute(
         select(User)
-        .where(User.role == Role.UNIVERSITY_STUDENT, User.institution_code == mentor.institution_code)
+        .where(
+            User.role_id == ROLE_IDS[RoleSlug.STUDENT],
+            User.university_id == mentor.university_id,
+        )
         .order_by(User.name)
     )
     students = students_res.scalars().all()
 
+    da_sim = await get_simulation(db, "da-job-sim", published_only=True)
+
     out = []
     for s in students:
-        enroll_res = await db.execute(
-            select(Enrollment).where(Enrollment.user_id == s.id, Enrollment.simulation_id == "da-job-sim")
-        )
-        enrollment = enroll_res.scalar_one_or_none()
+        enrollment = None
+        if da_sim:
+            enroll_res = await db.execute(
+                select(Enrollment).where(
+                    Enrollment.user_id == s.id,
+                    Enrollment.simulation_id == da_sim.id,
+                )
+            )
+            enrollment = enroll_res.scalar_one_or_none()
         tasks_done = 0
         if enrollment:
             tc_res = await db.execute(
@@ -69,27 +83,31 @@ async def mentor_students(db: AsyncSession = Depends(get_db), token: dict = Depe
         })
     return out
 
+
 class UnlockBody(BaseModel):
     feature: str
 
+
 @router.post("/students/{student_id}/unlock")
 async def unlock_for_student(
-    student_id: str, body: UnlockBody,
+    student_id: int, body: UnlockBody,
     db: AsyncSession = Depends(get_db), token: dict = Depends(require_mentor)
 ):
+    granter_id = token_user_id(token)
     existing = await db.execute(
         select(UnlockedFeature).where(
             UnlockedFeature.user_id == student_id, UnlockedFeature.feature == body.feature
         )
     )
     if not existing.scalar_one_or_none():
-        db.add(UnlockedFeature(user_id=student_id, feature=body.feature, granted_by=token["sub"]))
+        db.add(UnlockedFeature(user_id=student_id, feature=body.feature, granted_by=granter_id))
         await db.commit()
     return {"ok": True}
 
+
 @router.delete("/students/{student_id}/unlock/{feature}")
 async def revoke_unlock(
-    student_id: str, feature: str,
+    student_id: int, feature: str,
     db: AsyncSession = Depends(get_db), token: dict = Depends(require_mentor)
 ):
     result = await db.execute(

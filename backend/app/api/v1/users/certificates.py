@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, token_user_id
 from app.models.certificate import Certificate
 from app.services.certificates import certificate_dict
 
@@ -18,9 +18,10 @@ router = APIRouter(prefix="/api", tags=["certificates"])
 
 @router.get("/users/me/certificates")
 async def my_certificates(db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
+    user_id = token_user_id(token)
     result = await db.execute(
         select(Certificate)
-        .where(Certificate.user_id == token["sub"])
+        .where(Certificate.user_id == user_id)
         .order_by(Certificate.issued_at.desc())
     )
     return {"certificates": [certificate_dict(c) for c in result.scalars().all()]}

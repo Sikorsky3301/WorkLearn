@@ -2,14 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from app.db.database import get_db
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, token_user_id
 from app.models import AgentMessage
 
 router = APIRouter(prefix="/api", tags=["agent-messages"])
 
 @router.get("/agent-messages")
 async def list_messages(db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
-    user_id = token["sub"]
+    user_id = token_user_id(token)
     result = await db.execute(
         select(AgentMessage).where(AgentMessage.user_id == user_id)
         .order_by(AgentMessage.created_at.desc()).limit(20)
@@ -18,9 +18,10 @@ async def list_messages(db: AsyncSession = Depends(get_db), token: dict = Depend
     return {"messages": [_msg_dict(m) for m in msgs]}
 
 @router.post("/agent-messages/{msg_id}/read")
-async def mark_read(msg_id: str, db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
+async def mark_read(msg_id: int, db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
+    user_id = token_user_id(token)
     result = await db.execute(
-        select(AgentMessage).where(AgentMessage.id == msg_id, AgentMessage.user_id == token["sub"])
+        select(AgentMessage).where(AgentMessage.id == msg_id, AgentMessage.user_id == user_id)
     )
     if not result.scalar_one_or_none():
         raise HTTPException(404, "Message not found")
@@ -30,8 +31,9 @@ async def mark_read(msg_id: str, db: AsyncSession = Depends(get_db), token: dict
 
 @router.post("/agent-messages/read-all")
 async def mark_all_read(db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
+    user_id = token_user_id(token)
     await db.execute(
-        update(AgentMessage).where(AgentMessage.user_id == token["sub"], AgentMessage.read == False).values(read=True)
+        update(AgentMessage).where(AgentMessage.user_id == user_id, AgentMessage.read == False).values(read=True)
     )
     await db.commit()
     return {"ok": True}

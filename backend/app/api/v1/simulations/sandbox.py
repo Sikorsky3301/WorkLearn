@@ -29,7 +29,7 @@ from sqlalchemy import select
 
 from app.core.config import settings
 from app.db.database import get_db
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, token_user_id
 from app.models import Enrollment
 from app.models.cms import SimulationTask
 from app.services import sandbox, artifacts
@@ -55,7 +55,7 @@ class SubmitBody(BaseModel):
     dry_run: bool = False           # "Run" preview — grades the code but never persists completion/XP
 
 
-async def _get_owned_enrollment(enrollment_id: str, user_id: str, db: AsyncSession) -> Enrollment:
+async def _get_owned_enrollment(enrollment_id: int, user_id: int, db: AsyncSession) -> Enrollment:
     result = await db.execute(
         select(Enrollment).where(Enrollment.id == enrollment_id, Enrollment.user_id == user_id)
     )
@@ -65,7 +65,7 @@ async def _get_owned_enrollment(enrollment_id: str, user_id: str, db: AsyncSessi
     return enrollment
 
 
-async def _get_sandbox_task(db: AsyncSession, sim_id: str, task_id: int) -> SimulationTask | None:
+async def _get_sandbox_task(db: AsyncSession, sim_id: int, task_id: int) -> SimulationTask | None:
     result = await db.execute(
         select(SimulationTask).where(
             SimulationTask.simulation_id == sim_id, SimulationTask.task_index == task_id,
@@ -82,7 +82,7 @@ def _is_da_job_sim_family(config: dict) -> bool:
     return (config.get("grader_key") or "").startswith("da_job_sim.")
 
 
-def _resolve_input_csv(enrollment_id: str, task_id: int) -> bytes:
+def _resolve_input_csv(enrollment_id: int, task_id: int) -> bytes:
     """The exact dataset.csv bytes this task's sandbox will see — the raw
     seeded dataset for Task 1, or the student's own Task 1 cleaned output for 2-4.
     da_job_sim family only."""
@@ -136,13 +136,13 @@ def _frontend_kind(filename: str) -> str:
 
 @router.get("/{enrollment_id}/tasks/{task_id}/files")
 async def list_files(
-    enrollment_id: str, task_id: int,
+    enrollment_id: int, task_id: int,
     db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user),
 ):
     """Directory listing for the sandbox's Explorer sidebar — real file
     previews, not decoration: dataset.csv reflects the exact bytes the Docker
     container will read, and output.* reflects the last graded artifact."""
-    user_id = token["sub"]
+    user_id = token_user_id(token)
     enrollment = await _get_owned_enrollment(enrollment_id, user_id, db)
     sim_task = await _get_sandbox_task(db, enrollment.simulation_id, task_id)
 
@@ -178,7 +178,7 @@ async def list_files(
     return {"files": files}
 
 
-async def _resolve_csv_by_name(enrollment_id: str, task_id: int, filename: str, db: AsyncSession, sim_id: str) -> bytes:
+async def _resolve_csv_by_name(enrollment_id: int, task_id: int, filename: str, db: AsyncSession, sim_id: int) -> bytes:
     """Resolves either of the two CSV files the Explorer can show to their
     actual bytes — shared by pagination and download, which serve the same
     underlying data two different ways. da_job_sim family only (frontend tasks
@@ -202,14 +202,14 @@ async def _resolve_csv_by_name(enrollment_id: str, task_id: int, filename: str, 
 
 @router.get("/{enrollment_id}/tasks/{task_id}/files/{filename}/rows")
 async def file_rows(
-    enrollment_id: str, task_id: int, filename: str,
+    enrollment_id: int, task_id: int, filename: str,
     page: int = 1, page_size: int = FILE_PAGE_SIZE,
     db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user),
 ):
     """Full, paginated access to a CSV file's rows — the Explorer's inline
     preview only ever shows the first 10 rows; this is how the student pages
     through the entire dataset (dataset.csv can be ~9,600 rows)."""
-    user_id = token["sub"]
+    user_id = token_user_id(token)
     enrollment = await _get_owned_enrollment(enrollment_id, user_id, db)
     csv_bytes = await _resolve_csv_by_name(enrollment_id, task_id, filename, db, enrollment.simulation_id)
     return _paginate_csv(csv_bytes, page, page_size)
@@ -217,13 +217,13 @@ async def file_rows(
 
 @router.get("/{enrollment_id}/tasks/{task_id}/files/{filename}/download")
 async def download_file(
-    enrollment_id: str, task_id: int, filename: str,
+    enrollment_id: int, task_id: int, filename: str,
     db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user),
 ):
     """Raw file download — same source data as /rows, served as an
     attachment so the student can save the dataset (or their graded output)
     to their own machine."""
-    user_id = token["sub"]
+    user_id = token_user_id(token)
     enrollment = await _get_owned_enrollment(enrollment_id, user_id, db)
     csv_bytes = await _resolve_csv_by_name(enrollment_id, task_id, filename, db, enrollment.simulation_id)
     return Response(
@@ -233,7 +233,7 @@ async def download_file(
     )
 
 
-async def _submit_da_job_sim_family(enrollment_id: str, task_id: int, body: SubmitBody, sim_task: SimulationTask):
+async def _submit_da_job_sim_family(enrollment_id: int, task_id: int, body: SubmitBody, sim_task: SimulationTask):
     """The original pandas/CSV pipeline — unchanged behavior, just relocated
     and re-keyed off the task's own config instead of a hardcoded sim_id dict."""
     config = sim_task.config
@@ -293,7 +293,7 @@ async def _submit_da_job_sim_family(enrollment_id: str, task_id: int, body: Subm
     return grade_result, output_name, output_bytes
 
 
-async def _submit_frontend_dev_sim_family(enrollment_id: str, task_id: int, body: SubmitBody, sim_task: SimulationTask):
+async def _submit_frontend_dev_sim_family(enrollment_id: int, task_id: int, body: SubmitBody, sim_task: SimulationTask):
     """Runs the student's HTML/CSS/JS/React file against a hidden Jest test
     spec inside the frontend sandbox image. Same trust model as da_job_sim:
     the sandbox's stdout is shown to the student for debugging, but grading
@@ -328,7 +328,7 @@ async def _submit_frontend_dev_sim_family(enrollment_id: str, task_id: int, body
     return grade_result, output_name, output_bytes
 
 
-async def _submit_declarative_rules(enrollment_id: str, task_id: int, body: SubmitBody, sim_task: SimulationTask):
+async def _submit_declarative_rules(enrollment_id: int, task_id: int, body: SubmitBody, sim_task: SimulationTask):
     """No-code grading path for admin-authored code_sandbox tasks: run the
     student's code (any language the admin configured), then evaluate the
     JSON artifact it wrote against the task's declarative rules — no
@@ -359,10 +359,10 @@ async def _submit_declarative_rules(enrollment_id: str, task_id: int, body: Subm
 
 @router.post("/{enrollment_id}/tasks/{task_id}/submit")
 async def submit(
-    enrollment_id: str, task_id: int, body: SubmitBody,
+    enrollment_id: int, task_id: int, body: SubmitBody,
     db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user),
 ):
-    user_id = token["sub"]
+    user_id = token_user_id(token)
     enrollment = await _get_owned_enrollment(enrollment_id, user_id, db)
     sim_id = enrollment.simulation_id
     sim_task = await _get_sandbox_task(db, sim_id, task_id)
