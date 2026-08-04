@@ -11,10 +11,11 @@ from app.core.logging_config import configure_logging
 from app.core.request_context import RequestIdMiddleware
 from app.db.database import engine, Base, AsyncSessionLocal
 from app.api.v1.auth import auth
+from app.api.v1.tenant import router as tenant_router
 from app.api.v1.users import profile, certificates
 from app.api.v1.simulations import enrollments, sandbox, agent_messages
 from app.api.v1.builder import admin_sim_builder
-from app.api.v1.admin import admin, admin_simulations, admin_simulation_templates, admin_uploads
+from app.api.v1.admin import admin, admin_simulations, admin_simulation_templates, admin_uploads, provisioning
 from app.api.v1.superadmin import admin_management, feature_flags, platform_analytics, platform_config
 from app.api.v1.analytics import analytics
 from app.api.v1.mentor import mentor
@@ -22,16 +23,18 @@ from app.routes import health
 # AI-specific routes (LLM-backed: AI Mentor, generic sim-runtime AI
 # roleplay/grading) live in their own package — see app/ai/'s docstring.
 from app.ai.routes import ai_mentor, sim_runtime
+from app.models import roles as models_roles  # noqa: F401
+from app.models import university as models_university  # noqa: F401
 from app.models import cms as models_cms  # noqa: F401 — registers Simulation/SimulationTask on Base.metadata before create_all
 from app.models import sim_builder as models_sim_builder  # noqa: F401 — registers SimBuilder* tables on Base.metadata before create_all
-from app.models import rbac as models_rbac  # noqa: F401 — registers AdminRole/Permission/AdminRolePermission/AuditLog on Base.metadata before create_all
+from app.models import rbac as models_rbac  # noqa: F401 — registers AuditLog on Base.metadata before create_all
 from app.models import feature_flags as models_feature_flags  # noqa: F401 — registers FeatureFlag/FeatureFlagOverride on Base.metadata before create_all
 from app.models import platform_config as models_platform_config  # noqa: F401 — registers PlatformConfig on Base.metadata before create_all
 from app.models import profile as models_profile  # noqa: F401 — registers EducationEntry on Base.metadata before create_all
 from app.models import certificate as models_certificate  # noqa: F401 — registers Certificate on Base.metadata before create_all
 from app.agents.manager import start_scheduler
 from app.ai.services.langfuse_client import init_langfuse, shutdown_langfuse, langfuse_enabled
-from app.services.permissions_seed import seed_permissions
+from app.services.roles_seed import seed_roles_and_universities
 from app.services.feature_flags import seed_feature_flags
 from app.services.platform_config import seed_platform_config
 
@@ -46,14 +49,9 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    # Idempotent — upserts the permission catalog + built-in "Administrator"
-    # AdminRole. See app/services/permissions_seed.py.
     async with AsyncSessionLocal() as session:
-        await seed_permissions(session)
+        await seed_roles_and_universities(session)
 
-    # Idempotent — upserts the feature-flag catalog + role-default overrides
-    # (byte-for-byte replica of the old hardcoded ROLE_FEATURES map). See
-    # app/services/feature_flags.py.
     async with AsyncSessionLocal() as session:
         await seed_feature_flags(session)
 
@@ -101,9 +99,14 @@ def _cors_origins() -> list[str]:
     return list(origins)
 
 
+# Partner university subdomains in local/dev: http://iitd.localhost:5173 etc.
+_CORS_ORIGIN_REGEX = r"https?://([a-z0-9-]+\.)?localhost:\d+"
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins(),
+    allow_origin_regex=_CORS_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -128,11 +131,13 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     )
 
 app.include_router(auth.router)
+app.include_router(tenant_router)
 app.include_router(enrollments.router)
 app.include_router(ai_mentor.router)
 app.include_router(agent_messages.router)
 app.include_router(analytics.router)
 app.include_router(admin.router)
+app.include_router(provisioning.router)
 app.include_router(mentor.router)
 app.include_router(sandbox.router)
 app.include_router(admin_simulations.router)

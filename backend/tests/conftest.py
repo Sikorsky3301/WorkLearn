@@ -68,15 +68,18 @@ async def _test_database():
     # Import order matches migrations/run.py and app/main.py — every models.*
     # submodule has to be imported before create_all sees the full metadata.
     from app.db.database import engine, Base
-    from app.models import cms, sim_builder, rbac, feature_flags, platform_config, profile, certificate  # noqa: F401
+    from app.models import roles, university, cms, sim_builder, rbac, feature_flags, platform_config, profile, certificate  # noqa: F401
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    from app.services.permissions_seed import seed_permissions
+    from app.services.roles_seed import seed_roles_and_universities
+    from app.services.feature_flags import seed_feature_flags
     from app.db.database import AsyncSessionLocal
     async with AsyncSessionLocal() as session:
-        await seed_permissions(session)
+        await seed_roles_and_universities(session)
+    async with AsyncSessionLocal() as session:
+        await seed_feature_flags(session)
 
     yield
 
@@ -101,7 +104,8 @@ async def _clean_tables():
     yield
     import asyncpg
     from app.db.database import Base
-    from app.services.permissions_seed import seed_permissions
+    from app.services.roles_seed import seed_roles_and_universities
+    from app.services.feature_flags import seed_feature_flags
     from app.db.database import AsyncSessionLocal
 
     conn = await asyncpg.connect(_asyncpg_url(_TEST_DATABASE_URL))
@@ -112,7 +116,9 @@ async def _clean_tables():
         await conn.close()
 
     async with AsyncSessionLocal() as session:
-        await seed_permissions(session)
+        await seed_roles_and_universities(session)
+    async with AsyncSessionLocal() as session:
+        await seed_feature_flags(session)
 
 
 @pytest_asyncio.fixture

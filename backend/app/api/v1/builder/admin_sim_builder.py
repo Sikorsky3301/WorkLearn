@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from app.db.database import get_db
+from app.core.auth import token_user_id
 from app.core.permissions import require_permission
 from app.models.sim_builder import SimBuilderProject, SimBuilderPage, SimBuilderBlock, SimBuilderVersion, SimBuilderStatus
 from app.schemas.sim_builder import (
@@ -114,7 +115,7 @@ async def list_projects(db: AsyncSession = Depends(get_db), _=Depends(require_pe
 
 @router.post("")
 async def create_project(body: SimBuilderProjectCreate, db: AsyncSession = Depends(get_db), token: dict = Depends(require_permission("simulations.create"))):
-    project = SimBuilderProject(title=body.title, status=SimBuilderStatus.DRAFT, created_by=token.get("sub"))
+    project = SimBuilderProject(title=body.title, status=SimBuilderStatus.DRAFT, created_by=token_user_id(token))
     db.add(project)
     await db.commit()
     await db.refresh(project, attribute_names=["pages"])
@@ -284,7 +285,7 @@ async def publish_project(project_id: str, db: AsyncSession = Depends(get_db), t
 
     version = SimBuilderVersion(
         project_id=project_id, version_number=next_version, label=f"Version {next_version}",
-        snapshot=_project_dict(project), created_by=token.get("sub"),
+        snapshot=_project_dict(project), created_by=token_user_id(token),
     )
     db.add(version)
     project.status = SimBuilderStatus.PUBLISHED

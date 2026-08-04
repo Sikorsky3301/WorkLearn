@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 async def finalize_if_complete(
-    db: AsyncSession, *, user_id: str, enrollment_id: str, simulation_id: str, xp_awarded: int | None = None,
+    db: AsyncSession, *, user_id: int, enrollment_id: int, simulation_id: int, xp_awarded: int | None = None,
 ) -> dict:
     """Mark the enrollment COMPLETED, post the manager's wrap-up message, and
     issue the completion certificate — iff every task is now done.

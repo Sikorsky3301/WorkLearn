@@ -1,10 +1,9 @@
-"""Pydantic request/response models for the ADMIN-tier RBAC surface
-(app/api/v1/superadmin/admin_management.py) — admin lifecycle, roles, and permissions."""
+"""Pydantic models for admin lifecycle + platform roles + audit log."""
 from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field
 
 
-# ── Permissions ──────────────────────────────────────────────────────────────
+# ── Permissions (catalog removed — endpoint returns empty) ───────────────────
 
 class PermissionOut(BaseModel):
     key: str
@@ -13,29 +12,17 @@ class PermissionOut(BaseModel):
     description: str
 
 
-# ── Roles ────────────────────────────────────────────────────────────────────
-
-class AdminRoleCreate(BaseModel):
-    name: str
-    description: str | None = None
-    permission_keys: list[str] = Field(default_factory=list)
-
-
-class AdminRoleUpdate(BaseModel):
-    name: str | None = None
-    description: str | None = None
-    permission_keys: list[str] | None = None  # None = leave unchanged, [] = clear all
-
+# ── Platform roles (roles table — list only) ─────────────────────────────────
 
 class AdminRoleOut(BaseModel):
-    id: str
+    id: int
+    slug: str
     name: str
     description: str | None
     is_builtin: bool
-    permission_keys: list[str]
-    admin_count: int
-    created_at: datetime
-    updated_at: datetime
+    permission_keys: list[str] = Field(default_factory=list)
+    admin_count: int = 0
+    created_at: datetime | None = None
 
 
 # ── Admins ───────────────────────────────────────────────────────────────────
@@ -44,12 +31,10 @@ class AdminCreate(BaseModel):
     name: str
     email: EmailStr
     password: str = Field(min_length=6)
-    admin_role_id: str
 
 
 class AdminUpdate(BaseModel):
     name: str | None = None
-    admin_role_id: str | None = None
 
 
 class AdminResetPassword(BaseModel):
@@ -57,13 +42,13 @@ class AdminResetPassword(BaseModel):
 
 
 class AdminOut(BaseModel):
-    id: str
+    id: int
     name: str
     email: str | None
     is_active: bool
     suspended_at: datetime | None
-    admin_role_id: str | None
-    admin_role_name: str | None
+    role: str
+    role_id: int
     created_at: datetime
     last_seen_at: datetime | None
 
@@ -71,8 +56,8 @@ class AdminOut(BaseModel):
 # ── Audit log ────────────────────────────────────────────────────────────────
 
 class AuditLogOut(BaseModel):
-    id: str
-    actor_id: str | None
+    id: int
+    actor_id: int | None
     actor_role: str
     actor_name: str
     action: str

@@ -1,22 +1,16 @@
-"""
-Portfolio education entries — a user can have many, so unlike the flat
-contact/photo/resume fields (which live directly on User, see models.py),
-this is its own table. No relationship is declared on User (no other
-cross-file table does either, e.g. models_cms.py's Simulation); routes/
-profile.py queries it directly by user_id.
-"""
+"""Portfolio education entries."""
 from datetime import datetime
 from sqlalchemy import String, Integer, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import mapped_column, Mapped
 from app.db.database import Base
-from app.models import new_uuid, utcnow
+from app.models.helpers import utcnow
 
 
 class EducationEntry(Base):
     __tablename__ = "education_entries"
 
-    id:             Mapped[str]           = mapped_column(String, primary_key=True, default=new_uuid)
-    user_id:        Mapped[str]           = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    id:             Mapped[int]           = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id:        Mapped[int]           = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     institution:    Mapped[str]           = mapped_column(String, nullable=False)
     degree:         Mapped[str | None]    = mapped_column(String, nullable=True)
     field_of_study: Mapped[str | None]    = mapped_column(String, nullable=True)

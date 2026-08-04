@@ -2,15 +2,16 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, func
+from sqlalchemy import select
 from pydantic import BaseModel
-from datetime import datetime, timezone
 from app.db.database import get_db
-from app.core.auth import get_current_user
-from app.models import Enrollment, EnrollmentStatus, TaskCompletion, AgentMessage, MessageType, UserBadge
+from app.core.auth import get_current_user, token_user_id
+from app.models import Enrollment, TaskCompletion, AgentMessage, MessageType, UserBadge
 from app.models.cms import Simulation, SimulationTask, SimulationStatus
 from app.services.skill_engine import award_task_completion
 from app.services.simulation_completion import finalize_if_complete
+from app.services.simulation_lookup import get_simulation
+from sqlalchemy import func
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ class CompleteTaskBody(BaseModel):
     rubric_rating: dict | None = None
 
 
-async def _has_journey_badge(db: AsyncSession, user_id: str, sim_id: str) -> bool:
+async def _has_journey_badge(db: AsyncSession, user_id: int, sim_id: int) -> bool:
     result = await db.execute(
         select(UserBadge).where(
             UserBadge.user_id == user_id,
@@ -39,14 +40,11 @@ async def _has_journey_badge(db: AsyncSession, user_id: str, sim_id: str) -> boo
     return result.scalar_one_or_none() is not None
 
 
-async def _get_published_sim(db: AsyncSession, sim_id: str) -> Simulation | None:
-    result = await db.execute(
-        select(Simulation).where(Simulation.id == sim_id, Simulation.status == SimulationStatus.PUBLISHED)
-    )
-    return result.scalar_one_or_none()
+async def _get_published_sim(db: AsyncSession, key: str | int) -> Simulation | None:
+    return await get_simulation(db, key, published_only=True)
 
 
-async def _get_sim_tasks(db: AsyncSession, sim_id: str) -> list[SimulationTask]:
+async def _get_sim_tasks(db: AsyncSession, sim_id: int) -> list[SimulationTask]:
     result = await db.execute(
         select(SimulationTask).where(SimulationTask.simulation_id == sim_id).order_by(SimulationTask.task_index)
     )
@@ -63,7 +61,7 @@ async def list_simulations(db: AsyncSession = Depends(get_db)):
             select(func.count()).select_from(SimulationTask).where(SimulationTask.simulation_id == sim.id)
         )
         out.append({
-            "id": sim.id, "title": sim.title, "description": sim.description,
+            "id": sim.id, "slug": sim.slug, "title": sim.title, "description": sim.description,
             "company": sim.company, "logo_url": sim.logo_url,
             "domain": sim.domain, "category": sim.category or sim.domain,
             "accent_color": sim.accent_color,
@@ -77,17 +75,15 @@ async def list_simulations(db: AsyncSession = Depends(get_db)):
 
 @router.get("/users/me/badges")
 async def my_badges(db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
+    user_id = token_user_id(token)
     result = await db.execute(
-        select(UserBadge).where(UserBadge.user_id == token["sub"]).order_by(UserBadge.granted_at.desc())
+        select(UserBadge).where(UserBadge.user_id == user_id).order_by(UserBadge.granted_at.desc())
     )
     return {"badges": [_badge_dict(b) for b in result.scalars().all()]}
 
 
-async def _build_assignment(db: AsyncSession, user_id: str, enrollment: Enrollment) -> dict:
-    """Manager + current-task summary for one enrollment — shared by the
-    single-simulation `/my-assignment` (kept for back-compat) and the
-    multi-simulation `/my-assignments` the Dashboard now uses so every
-    enrolled simulation's manager/task shows up, not just the latest one."""
+async def _build_assignment(db: AsyncSession, user_id: int, enrollment: Enrollment) -> dict:
+    """Manager + current-task summary for one enrollment."""
     sim_id = enrollment.simulation_id
     sim = await _get_published_sim(db, sim_id)
     tasks = await _get_sim_tasks(db, sim_id) if sim else []
@@ -104,8 +100,8 @@ async def _build_assignment(db: AsyncSession, user_id: str, enrollment: Enrollme
 
     base = {
         "simulation_id": sim_id,
-        "simulation_title": sim.title if sim else sim_id,
-        # Powers the AI Mentor's domain-aware persona (app/ai/services/mentor_personas.py)
+        "simulation_slug": sim.slug if sim else None,
+        "simulation_title": sim.title if sim else str(sim_id),
         "domain": sim.domain if sim else None,
         "enrollment_id": enrollment.id,
         "manager": manager,
@@ -113,7 +109,6 @@ async def _build_assignment(db: AsyncSession, user_id: str, enrollment: Enrollme
         "total_tasks": len(work_task_ids),
     }
 
-    # Enrolled but hasn't accepted the offer yet → onboarding is pending
     if not await _has_journey_badge(db, user_id, sim_id):
         return {**base, "has_assignment": False, "reason": "onboarding_pending"}
 
@@ -127,7 +122,6 @@ async def _build_assignment(db: AsyncSession, user_id: str, enrollment: Enrollme
         "task_id": next_task_id,
         "task_name": next_task.title if next_task else f"Task {next_task_id}",
         "brief": (next_task.objective or "") if next_task else "",
-        # True once they've completed at least one earlier task (i.e. actively in progress)
         "in_progress": completed_count > 0,
         "assigned_at": enrollment.enrolled_at.isoformat(),
     }
@@ -135,10 +129,7 @@ async def _build_assignment(db: AsyncSession, user_id: str, enrollment: Enrollme
 
 @router.get("/my-assignment")
 async def my_assignment(db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
-    """Most-recently-enrolled simulation's manager/task. Kept for any caller
-    still using the singular endpoint — the Dashboard itself now uses
-    `/my-assignments` (plural) so it can show every enrolled simulation."""
-    user_id = token["sub"]
+    user_id = token_user_id(token)
     result = await db.execute(
         select(Enrollment).where(Enrollment.user_id == user_id)
         .order_by(Enrollment.enrolled_at.desc()).limit(1)
@@ -151,10 +142,7 @@ async def my_assignment(db: AsyncSession = Depends(get_db), token: dict = Depend
 
 @router.get("/my-assignments")
 async def my_assignments(db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
-    """One manager/task summary per simulation the student is enrolled in —
-    powers the Dashboard's "Your Managers" list so a student running multiple
-    job simulations at once sees every manager and their current task."""
-    user_id = token["sub"]
+    user_id = token_user_id(token)
     result = await db.execute(
         select(Enrollment).where(Enrollment.user_id == user_id)
         .order_by(Enrollment.enrolled_at.asc())
@@ -166,37 +154,36 @@ async def my_assignments(db: AsyncSession = Depends(get_db), token: dict = Depen
 
 @router.post("/simulations/{sim_id}/enroll")
 async def enroll(sim_id: str, background: BackgroundTasks, db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
-    user_id = token["sub"]
+    user_id = token_user_id(token)
+    sim = await _get_published_sim(db, sim_id)
+    if not sim:
+        raise HTTPException(404, "Simulation not found")
+
     result = await db.execute(
-        select(Enrollment).where(Enrollment.user_id == user_id, Enrollment.simulation_id == sim_id)
+        select(Enrollment).where(Enrollment.user_id == user_id, Enrollment.simulation_id == sim.id)
     )
     existing = result.scalar_one_or_none()
     if existing:
-        return {"enrollment": _enroll_dict(existing), "already_enrolled": True}
+        return {"enrollment": _enroll_dict(existing, sim.slug), "already_enrolled": True}
 
-    enrollment = Enrollment(user_id=user_id, simulation_id=sim_id)
+    enrollment = Enrollment(user_id=user_id, simulation_id=sim.id)
     db.add(enrollment)
     await db.commit()
     await db.refresh(enrollment)
-
-    # NOTE: the manager welcome is posted when the student ACCEPTS the offer
-    # (see accept_onboarding), not at enroll — onboarding comes first.
-    return {"enrollment": _enroll_dict(enrollment), "already_enrolled": False}
+    return {"enrollment": _enroll_dict(enrollment, sim.slug), "already_enrolled": False}
 
 
 @router.get("/simulations/{sim_id}/onboarding")
 async def get_onboarding(sim_id: str, db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
-    """Onboarding experience content (company, manager, projects, offer) + whether accepted."""
+    user_id = token_user_id(token)
     sim = await _get_published_sim(db, sim_id)
     if not sim:
         raise HTTPException(404, "No onboarding for this simulation")
-    tasks = await _get_sim_tasks(db, sim_id)
-    # "projects" is derived from the sim's own tasks at read time (not stored
-    # in the onboarding JSON blob) so it can never drift from the real task list.
+    tasks = await _get_sim_tasks(db, sim.id)
     projects = [{"id": t.task_index, "name": t.title, "brief": t.objective or ""} for t in tasks]
-    accepted = await _has_journey_badge(db, token["sub"], sim_id)
+    accepted = await _has_journey_badge(db, user_id, sim.id)
     return {**sim.onboarding, "manager": sim.manager, "logo_url": sim.logo_url, "projects": projects,
-            "simulation_id": sim_id, "accepted": accepted}
+            "simulation_id": sim.id, "simulation_slug": sim.slug, "accepted": accepted}
 
 
 @router.post("/simulations/{sim_id}/onboarding/accept")
@@ -204,46 +191,45 @@ async def accept_onboarding(
     sim_id: str, background: BackgroundTasks,
     db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)
 ):
-    """Accept the offer → grant the Simulation Journey badge and start Week 1."""
-    user_id = token["sub"]
+    user_id = token_user_id(token)
     sim = await _get_published_sim(db, sim_id)
     if not sim:
         raise HTTPException(404, "No onboarding for this simulation")
 
-    # Ensure the student is enrolled
     enroll_res = await db.execute(
-        select(Enrollment).where(Enrollment.user_id == user_id, Enrollment.simulation_id == sim_id)
+        select(Enrollment).where(Enrollment.user_id == user_id, Enrollment.simulation_id == sim.id)
     )
     enrollment = enroll_res.scalar_one_or_none()
     if not enrollment:
         raise HTTPException(400, "Enroll in the simulation before accepting the offer.")
 
-    # Idempotent badge grant
-    if not await _has_journey_badge(db, user_id, sim_id):
+    if not await _has_journey_badge(db, user_id, sim.id):
         badge = UserBadge(
             user_id=user_id, badge_key=JOURNEY_BADGE_KEY,
-            label=f"{sim.title} — Journey", icon="🎖️", simulation_id=sim_id,
+            label=f"{sim.title} — Journey", icon="🎖️", simulation_id=sim.id,
         )
         db.add(badge)
         await db.commit()
-        # Manager posts the Week 1 welcome now that onboarding is done
-        background.add_task(_spawn_manager_welcome, user_id, enrollment.id, sim_id)
+        background.add_task(_spawn_manager_welcome, user_id, enrollment.id, sim.id)
 
     badge_res = await db.execute(
         select(UserBadge).where(
             UserBadge.user_id == user_id, UserBadge.badge_key == JOURNEY_BADGE_KEY,
-            UserBadge.simulation_id == sim_id,
+            UserBadge.simulation_id == sim.id,
         )
     )
     b = badge_res.scalar_one()
-    return {"accepted": True, "badge": _badge_dict(b)}
+    return {"accepted": True, "badge": _badge_dict(b, sim.slug)}
 
 
 @router.get("/enrollments/by-sim/{sim_id}")
 async def get_by_sim(sim_id: str, db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
-    user_id = token["sub"]
+    user_id = token_user_id(token)
+    sim = await _get_published_sim(db, sim_id)
+    if not sim:
+        raise HTTPException(404, "Simulation not found")
     result = await db.execute(
-        select(Enrollment).where(Enrollment.user_id == user_id, Enrollment.simulation_id == sim_id)
+        select(Enrollment).where(Enrollment.user_id == user_id, Enrollment.simulation_id == sim.id)
     )
     enrollment = result.scalar_one_or_none()
     if not enrollment:
@@ -252,29 +238,37 @@ async def get_by_sim(sim_id: str, db: AsyncSession = Depends(get_db), token: dic
         select(TaskCompletion.task_id, TaskCompletion.score, TaskCompletion.quiz_score)
         .where(TaskCompletion.enrollment_id == enrollment.id)
     )
-    return {**_enroll_dict(enrollment), "task_completions": [{"task_id": r[0], "score": r[1], "quiz_score": r[2]} for r in completions]}
+    return {
+        **_enroll_dict(enrollment, sim.slug),
+        "task_completions": [{"task_id": r[0], "score": r[1], "quiz_score": r[2]} for r in completions],
+    }
 
 
 @router.get("/enrollments/{enrollment_id}")
-async def get_enrollment(enrollment_id: str, db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
+async def get_enrollment(enrollment_id: int, db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
+    user_id = token_user_id(token)
     result = await db.execute(
-        select(Enrollment).where(Enrollment.id == enrollment_id, Enrollment.user_id == token["sub"])
+        select(Enrollment).where(Enrollment.id == enrollment_id, Enrollment.user_id == user_id)
     )
     enrollment = result.scalar_one_or_none()
     if not enrollment:
         raise HTTPException(404, "Enrollment not found")
+    sim = await _get_published_sim(db, enrollment.simulation_id)
     completions = await db.execute(
         select(TaskCompletion.task_id).where(TaskCompletion.enrollment_id == enrollment_id)
     )
-    return {**_enroll_dict(enrollment), "completed_task_ids": [r[0] for r in completions]}
+    return {
+        **_enroll_dict(enrollment, sim.slug if sim else None),
+        "completed_task_ids": [r[0] for r in completions],
+    }
 
 
 @router.post("/enrollments/{enrollment_id}/tasks/{task_id}/complete")
 async def complete_task(
-    enrollment_id: str, task_id: int, body: CompleteTaskBody,
+    enrollment_id: int, task_id: int, body: CompleteTaskBody,
     db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)
 ):
-    user_id = token["sub"]
+    user_id = token_user_id(token)
     result = await db.execute(
         select(Enrollment).where(Enrollment.id == enrollment_id, Enrollment.user_id == user_id)
     )
@@ -288,8 +282,6 @@ async def complete_task(
         score=body.score, quiz_score=body.quiz_score, rubric_rating=body.rubric_rating,
     )
 
-    # Shared with the sandbox submission path — see
-    # app/services/simulation_completion.py for why this can't live inline here.
     finalized = await finalize_if_complete(
         db, user_id=user_id, enrollment_id=enrollment_id,
         simulation_id=sim_id, xp_awarded=awards.get("xp_awarded"),
@@ -297,22 +289,29 @@ async def complete_task(
     return {**awards, **finalized}
 
 
-def _enroll_dict(e: Enrollment) -> dict:
-    return {
+def _enroll_dict(e: Enrollment, slug: str | None = None) -> dict:
+    d = {
         "id": e.id, "user_id": e.user_id, "simulation_id": e.simulation_id,
         "status": e.status, "current_task_idx": e.current_task_idx,
-        "enrolled_at": e.enrolled_at.isoformat(), "completed_at": e.completed_at.isoformat() if e.completed_at else None,
+        "enrolled_at": e.enrolled_at.isoformat(),
+        "completed_at": e.completed_at.isoformat() if e.completed_at else None,
     }
+    if slug is not None:
+        d["simulation_slug"] = slug
+    return d
 
 
-def _badge_dict(b: UserBadge) -> dict:
-    return {
+def _badge_dict(b: UserBadge, slug: str | None = None) -> dict:
+    d = {
         "id": b.id, "badge_key": b.badge_key, "label": b.label, "icon": b.icon,
         "simulation_id": b.simulation_id, "granted_at": b.granted_at.isoformat(),
     }
+    if slug is not None:
+        d["simulation_slug"] = slug
+    return d
 
 
-async def _spawn_manager_welcome(user_id: str, enrollment_id: str, sim_id: str):
+async def _spawn_manager_welcome(user_id: int, enrollment_id: int, sim_id: int):
     """Deterministic welcome from the Manager — no LLM."""
     from app.db.database import AsyncSessionLocal
     from app.models import User

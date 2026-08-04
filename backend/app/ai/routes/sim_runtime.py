@@ -20,11 +20,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.db.database import get_db
-from app.core.auth import get_current_user
-from app.models.cms import Simulation, SimulationTask, SimulationStatus
+from app.core.auth import get_current_user, token_user_id
+from app.models.cms import SimulationTask
 from app.ai.services.llm import generate, stream_chat
 from app.ai.services.langfuse_client import traced_context
 from app.services.sim_view import build_simulation_public_dict
+from app.services.simulation_lookup import get_simulation
 
 router = APIRouter(prefix="/api/simulations", tags=["sim-runtime"])
 logger = logging.getLogger(__name__)
@@ -39,26 +40,28 @@ async def get_full_simulation(sim_id: str, db: AsyncSession = Depends(get_db), t
     the admin-only draft-preview endpoint (see
     admin_simulations.preview_full_simulation) rather than growing a bypass
     flag here."""
-    result = await db.execute(select(Simulation).where(Simulation.id == sim_id, Simulation.status == SimulationStatus.PUBLISHED))
-    sim = result.scalar_one_or_none()
+    sim = await get_simulation(db, sim_id, published_only=True)
     if not sim:
         raise HTTPException(404, "Simulation not found")
     tasks_res = await db.execute(
-        select(SimulationTask).where(SimulationTask.simulation_id == sim_id).order_by(SimulationTask.task_index)
+        select(SimulationTask).where(SimulationTask.simulation_id == sim.id).order_by(SimulationTask.task_index)
     )
     tasks = tasks_res.scalars().all()
     return build_simulation_public_dict(sim, tasks)
 
 
-async def _get_task(db: AsyncSession, sim_id: str, task_index: int, task_type: str) -> SimulationTask:
+async def _get_task(db: AsyncSession, sim_key: str, task_index: int, task_type: str) -> SimulationTask:
     """Intentionally status-agnostic (no PUBLISHED filter) — this is what
     lets roleplay_message/grade_text below work against DRAFT simulations
     for any authenticated user, which is exactly what makes the admin
     builder's interactive preview possible without a separate AI endpoint.
     Do not add a status filter here."""
+    sim = await get_simulation(db, sim_key)
+    if not sim:
+        raise HTTPException(404, "Simulation not found")
     result = await db.execute(
         select(SimulationTask).where(
-            SimulationTask.simulation_id == sim_id, SimulationTask.task_index == task_index,
+            SimulationTask.simulation_id == sim.id, SimulationTask.task_index == task_index,
             SimulationTask.type == task_type,
         )
     )
@@ -169,7 +172,7 @@ async def roleplay_message(
         {"role": "user", "content": body.message},
     ]
     try:
-        with traced_context(user_id=token["sub"], tags=["sim-runtime", "ai-roleplay", sim_id]):
+        with traced_context(user_id=token_user_id(token), tags=["sim-runtime", "ai-roleplay", sim_id]):
             raw = await _collect_stream_chat(
                 system, messages, max_tokens=config.get("max_tokens") or 350, trace_name="sim-roleplay",
                 temperature=config.get("temperature"),
@@ -212,7 +215,7 @@ async def grade_text(
         prompt = prompt_template.format(text=body.text)
 
     try:
-        with traced_context(user_id=token["sub"], tags=["sim-runtime", "text-rubric", sim_id]):
+        with traced_context(user_id=token_user_id(token), tags=["sim-runtime", "text-rubric", sim_id]):
             raw = await generate(
                 prompt, max_tokens=config.get("max_tokens") or 500, trace_name="sim-grade-text",
                 temperature=config.get("temperature"),

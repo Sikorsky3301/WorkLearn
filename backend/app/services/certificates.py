@@ -20,7 +20,7 @@ from app.models.cms import Simulation, SimulationTask
 logger = logging.getLogger(__name__)
 
 
-def build_certificate_number(simulation_id: str, issued_year: int) -> str:
+def build_certificate_number(simulation_slug: str, issued_year: int) -> str:
     """`WL-<SIM>-<YEAR>-<RAND>` e.g. WL-DAJOB-2026-4F9A2C.
 
     Readable enough to quote over the phone, and the random tail (not a
@@ -28,12 +28,12 @@ def build_certificate_number(simulation_id: str, issued_year: int) -> str:
     how many certificates the platform has issued, nor guessed from
     someone else's.
     """
-    sim_slug = "".join(c for c in simulation_id.upper() if c.isalnum())[:5] or "SIM"
+    sim_slug = "".join(c for c in simulation_slug.upper() if c.isalnum())[:5] or "SIM"
     tail = uuid.uuid4().hex[:6].upper()
     return f"WL-{sim_slug}-{issued_year}-{tail}"
 
 
-async def _completion_stats(db: AsyncSession, enrollment_id: str) -> tuple[int, int | None]:
+async def _completion_stats(db: AsyncSession, enrollment_id: int) -> tuple[int, int | None]:
     """(#completed tasks, average score or None if nothing was scored)."""
     result = await db.execute(
         select(TaskCompletion.score).where(TaskCompletion.enrollment_id == enrollment_id)
@@ -45,7 +45,7 @@ async def _completion_stats(db: AsyncSession, enrollment_id: str) -> tuple[int, 
 
 
 async def issue_certificate_if_complete(
-    db: AsyncSession, *, user_id: str, enrollment_id: str, simulation_id: str
+    db: AsyncSession, *, user_id: int, enrollment_id: int, simulation_id: int
 ) -> Certificate | None:
     """Issue the completion certificate iff every task is done. Returns the
     certificate (existing or newly created), or None if not yet eligible.
@@ -85,7 +85,7 @@ async def issue_certificate_if_complete(
         simulation_title=sim.title,
         company=sim.company or "",
         recipient_name=user.name,
-        certificate_number=build_certificate_number(simulation_id, _issued_year()),
+        certificate_number=build_certificate_number(sim.slug, _issued_year()),
         tasks_completed=completed_count,
         total_tasks=total_tasks,
         average_score=average,

@@ -1,6 +1,6 @@
 """Starter templates for the Simulation CMS builder — one module per domain,
 each exporting a TEMPLATE dict shaped as {key, label, description, simulation,
-tasks}, where `simulation` matches SimulationCreate (minus `id`) and each
+tasks}, where `simulation` matches SimulationCreate (minus `slug`) and each
 entry in `tasks` matches SimulationTaskCreate. See
 app/api/v1/admin/admin_simulations.py's create_from_template for how these are
 instantiated into a real DRAFT simulation."""
