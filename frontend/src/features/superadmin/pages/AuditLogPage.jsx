@@ -57,8 +57,8 @@ export default function AuditLogPage() {
           className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm outline-none text-slate-900 dark:text-slate-100"
         >
           <option value="">All actors</option>
-          <option value="SUPER_ADMIN">Super Admin</option>
-          <option value="ADMIN">Admin</option>
+          <option value="super_admin">Super Admin</option>
+          <option value="admin">Admin</option>
         </select>
         <input
           value={action} onChange={(e) => setAction(e.target.value)} placeholder="Filter by action (e.g. user.suspend)"

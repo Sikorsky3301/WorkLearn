@@ -21,10 +21,10 @@ const STEP_COPY = {
   review:    { title: 'Review & finish', subtitle: 'Confirm everything looks right, then get started.' },
 }
 
-/** First-login onboarding wizard — gated in App.jsx's ProtectedRoute (a
- * DIRECT_USER/UNIVERSITY_STUDENT with onboarding_completed=false is
- * redirected here on every route until they finish). Data is only
- * persisted once, on the final step — see handleFinish. */
+/** First-login onboarding wizard — gated in app/router/guards/ProtectedRoute
+ * (a STUDENT with onboarding_completed=false is redirected here on every
+ * route until they finish). Data is only persisted once, on the final step
+ * — see handleFinish. */
 export default function OnboardingWizard() {
   const navigate = useNavigate()
   const { user, refreshUser } = useAuth()

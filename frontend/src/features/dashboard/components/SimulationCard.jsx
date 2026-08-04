@@ -7,7 +7,7 @@ import { SIM_BRANDING } from '../../../lib/simBranding'
  * domain, set during onboarding. */
 export default function SimulationCard({ sim, highlighted }) {
   const navigate = useNavigate()
-  const branding = SIM_BRANDING[sim.id]
+  const branding = SIM_BRANDING[sim.slug]
 
   return (
     <div

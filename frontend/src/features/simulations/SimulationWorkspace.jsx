@@ -140,7 +140,7 @@ export default function SimulationWorkspace() {
 function SimBanner({ sim }) {
   const DomainIcon = resolveDomainIcon(sim.domain || sim.category)
   const initials = (sim.company || sim.title).split(' ').map((w) => w[0]).slice(0, 2).join('')
-  const banner = SIM_BRANDING[sim.id]?.banner
+  const banner = SIM_BRANDING[sim.slug]?.banner
 
   return (
     <div className={`relative h-36 overflow-hidden ${sim.accent_color || 'bg-primary'}`}>

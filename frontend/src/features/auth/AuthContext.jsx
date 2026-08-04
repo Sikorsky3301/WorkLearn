@@ -134,13 +134,16 @@ export function AuthProvider({ children }) {
   }
 
   // UI-nav convenience only — never the actual authorization boundary. Every
-  // Admin-tier endpoint re-checks permissions server-side on every request
-  // (see backend's require_permission), so this can only ever hide/show nav,
-  // not actually grant/deny access.
-  const hasPermission = (key) => {
+  // Admin-tier endpoint re-checks this server-side on every request (see
+  // backend's require_permission, app/core/permissions.py) — that function
+  // no longer does per-key checks at all, it's an alias for
+  // require_roles(SUPER_ADMIN, ADMIN, UNIVERSITY_ADMIN), so `key` is accepted
+  // for call-site readability but ignored here too, matching reality. If the
+  // backend ever reintroduces real per-key grants, this needs the /me
+  // response to send a `permissions` array again (it currently doesn't).
+  const hasPermission = (_key) => {
     if (!user) return false
-    if (user.role === ROLES.SUPER_ADMIN) return true
-    return Boolean(user.permissions?.includes(key))
+    return user.role === ROLES.SUPER_ADMIN || user.role === ROLES.ADMIN || user.role === ROLES.UNIVERSITY_ADMIN
   }
 
   return (

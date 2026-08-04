@@ -1,12 +1,16 @@
-// Values match the backend Role enum (uppercase) — see
-// backend/app/models/__init__.py's `Role`.
+// Values match the backend's RoleSlug (lowercase) — see
+// backend/app/models/roles.py. DIRECT_USER and UNIVERSITY_STUDENT from the
+// old taxonomy are merged into one STUDENT slug now (independent vs.
+// university-affiliated is distinguished by user.university.is_default,
+// not by the role itself); CLASS_MENTOR was renamed to TEACHER;
+// UNIVERSITY_ADMIN is new.
 export const ROLES = {
-  DIRECT_USER:        'DIRECT_USER',
-  UNIVERSITY_STUDENT: 'UNIVERSITY_STUDENT',
-  CLASS_MENTOR:       'CLASS_MENTOR',
-  SUPER_ADMIN:        'SUPER_ADMIN',
-  // Fine-grained-permission admin tier, distinct from SUPER_ADMIN — see
-  // backend's app/models/rbac.py. Real enforcement is always server-side
+  STUDENT:          'student',
+  TEACHER:          'teacher',
+  UNIVERSITY_ADMIN: 'university_admin',
+  SUPER_ADMIN:      'super_admin',
+  // Platform admin tier, distinct from SUPER_ADMIN — see backend's
+  // app/models/roles.py. Real enforcement is always server-side
   // (require_permission); permission checks below are a UI-nav convenience only.
-  ADMIN:              'ADMIN',
+  ADMIN:            'admin',
 }

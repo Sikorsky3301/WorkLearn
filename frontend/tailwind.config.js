@@ -6,7 +6,7 @@ export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
   // A custom selector (not Tailwind's default `.dark` on <html>) applied only
   // to the Admin/SuperAdmin PortalShell root (see
-  // src/shared/design-system/theme/ThemeProvider.jsx) — so `dark:` utilities
+  // src/components/design-system/theme/ThemeProvider.jsx) — so `dark:` utilities
   // used by shared portal components can never activate anywhere in the
   // student-facing app, even if a component is reused there later.
   darkMode: ['selector', '.wl-portal-dark'],

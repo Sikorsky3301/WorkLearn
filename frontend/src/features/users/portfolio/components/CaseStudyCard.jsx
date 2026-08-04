@@ -9,7 +9,7 @@ import { resolveMediaUrl } from '../../../../lib/client'
  * project description standing in for a project that doesn't exist yet. */
 export default function CaseStudyCard({ sim }) {
   const navigate = useNavigate()
-  const branding = SIM_BRANDING[sim.id]
+  const branding = SIM_BRANDING[sim.slug]
   const logoSrc = sim.logo_url ? resolveMediaUrl(sim.logo_url) : branding?.logo
 
   return (

@@ -22,7 +22,10 @@ export default function Dashboard() {
   const simulations = simulationsData?.simulations ?? []
   const assignments = assignmentsData?.assignments ?? []
 
-  const isUniStudent = user?.role === ROLES.UNIVERSITY_STUDENT
+  // Independent students are on the DEFAULT university row too (every user
+  // gets one now, see backend's app/models/university.py) — real
+  // affiliation means a non-default university, not just role === STUDENT.
+  const isUniStudent = user?.role === ROLES.STUDENT && user?.university && !user.university.is_default
   const firstName    = user?.name?.split(' ')[0] || 'there'
 
   return (
@@ -32,7 +35,7 @@ export default function Dashboard() {
         <h1 className="text-3xl font-bold text-on-surface tracking-tight mb-1">Welcome back, {firstName}</h1>
         <p className="text-on-surface-variant text-sm">
           {isUniStudent
-            ? `${user.institution} · ${user.department} · Section ${user.section}`
+            ? `${user.university.name}${user.department ? ` · ${user.department}` : ''}${user.section ? ` · Section ${user.section}` : ''}`
             : 'Your AI-managed career learning platform.'}
         </p>
       </div>
@@ -97,7 +100,7 @@ export default function Dashboard() {
           ) : (
             <div className="space-y-3">
               {assignments.map((a) => (
-                <AssignmentCard key={a.simulation_id} assignment={a} onGo={() => navigate(`/simulations/${a.simulation_id}`)} />
+                <AssignmentCard key={a.simulation_id} assignment={a} onGo={() => navigate(`/simulations/${a.simulation_slug}`)} />
               ))}
             </div>
           )}

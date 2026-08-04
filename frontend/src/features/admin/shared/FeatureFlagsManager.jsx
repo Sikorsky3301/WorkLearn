@@ -7,7 +7,10 @@ import {
 import DataTable from '../../../components/design-system/DataTable'
 import PermissionGate from '../../../components/design-system/PermissionGate'
 
-const ROLE_OPTIONS = ['DIRECT_USER', 'UNIVERSITY_STUDENT', 'CLASS_MENTOR', 'ADMIN']
+// Role-scoped overrides match against the backend's role slug (see
+// app/models/roles.py's RoleSlug) — SUPER_ADMIN isn't listed since it always
+// bypasses feature-flag resolution entirely (see AuthContext's hasFeature).
+const ROLE_OPTIONS = ['student', 'teacher', 'university_admin', 'admin']
 
 /** Real, DB-backed feature-flag manager — global default + role/university/
  * user overrides. Used by both portals (gated by feature_flags.view/.manage

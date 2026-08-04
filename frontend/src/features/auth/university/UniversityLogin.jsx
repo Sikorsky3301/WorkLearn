@@ -41,7 +41,7 @@ export default function UniversityLogin() {
     const result = await loginUniversity(rollNo, password)
     setLoading(false)
     if (result.error) { setError(result.error); return }
-    if (result.role === ROLES.CLASS_MENTOR) navigate('/mentor')
+    if (result.role === ROLES.TEACHER) navigate('/mentor')
     else navigate('/dashboard')
   }
 

@@ -5,7 +5,6 @@ import {
   BadgeCheck, ChevronDown, ChevronUp, Camera, Check,
 } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
-import { ROLES } from '../../../rbac/roles'
 import { useUserSkills, useUserBadges, useDeleteEducation, useSimulations, useMyAssignments, useUserCertificates } from '../../../hooks'
 import { downloadFile, resolveMediaUrl } from '../../../lib/client'
 import EditProfileModal from './components/EditProfileModal'
@@ -168,7 +167,7 @@ export default function Portfolio() {
               <div className="min-w-0 pb-1">
                 <h1 className="text-xl font-bold text-on-surface truncate">{user?.name || 'Your Portfolio'}</h1>
                 <p className="text-sm text-on-surface-variant mt-0.5 truncate">
-                  {user?.headline || (user?.role === ROLES.UNIVERSITY_STUDENT ? `${user.institution} · ${user.department}` : 'Building my career on WorkLearn')}
+                  {user?.headline || (user?.university && !user.university.is_default ? `${user.university.name}${user.department ? ` · ${user.department}` : ''}` : 'Building my career on WorkLearn')}
                 </p>
                 {(user?.location || user?.email) && (
                   <div className="flex items-center gap-3 mt-1.5 text-xs text-on-surface-variant flex-wrap">

@@ -2,11 +2,11 @@ import UniversitiesTable from '../../shared/UniversitiesTable'
 import UsersTable from '../../shared/UsersTable'
 
 /**
- * Universities + the mentor accounts tied to them. CLASS_MENTOR is the only
- * university-side administrative role this platform has (there's no
- * separate "university admin" role in the schema), so managing mentors here
- * — search, suspend/activate, delete — is what "manage university admins
- * and mentors" means in practice.
+ * Universities + the teacher (formerly "mentor") accounts tied to them.
+ * A separate UNIVERSITY_ADMIN role slug now exists in the schema (see
+ * app/models/roles.py) but has no dedicated management surface here yet —
+ * this section still only lists TEACHER-role accounts, unchanged in scope
+ * from before that role was added.
  */
 export default function UniversitiesPage() {
   return (
@@ -16,8 +16,8 @@ export default function UniversitiesPage() {
         <UniversitiesTable />
       </div>
       <div>
-        <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 mb-3">University Admins &amp; Mentors</h3>
-        <UsersTable role="CLASS_MENTOR" title="Mentors" />
+        <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 mb-3">Teachers</h3>
+        <UsersTable role="teacher" title="Teachers" />
       </div>
     </div>
   )

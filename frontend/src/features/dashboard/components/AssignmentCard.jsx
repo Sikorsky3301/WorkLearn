@@ -5,7 +5,7 @@ import { SIM_BRANDING } from '../../../lib/simBranding'
  * renders one of these per entry in useMyAssignments() so a student running
  * several job simulations at once sees every manager, not just the latest. */
 export default function AssignmentCard({ assignment, onGo }) {
-  const branding = SIM_BRANDING[assignment.simulation_id]
+  const branding = SIM_BRANDING[assignment.simulation_slug]
 
   const simChip = (
     <div className="inline-flex items-center gap-1.5 mb-3 px-2 py-1 rounded-md bg-primary/[0.06] border border-primary/10">

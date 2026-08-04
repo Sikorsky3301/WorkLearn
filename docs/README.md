@@ -5,6 +5,7 @@ Supporting documentation that doesn't belong in the repo root or inside
 
 | File | What it is |
 |---|---|
+| [`file_structure.md`](./file_structure.md) | File-by-file reference for the whole monorepo — what each file is for and how it works, backend and frontend. |
 | [`routes-flow.txt`](./routes-flow.txt) | ASCII diagram of the app's routes/entry points per role (Direct User, University Student, Class Mentor, Admin, SuperAdmin). |
 | [`sales-simulation-proposal.md`](./sales-simulation-proposal.md) | Original design proposal for the Enterprise SaaS Sales Representative job simulation (Nimbus CRM). |
 | [`nimbus-crm-test-data.txt`](./nimbus-crm-test-data.txt) | Copy/paste answer sheet for manually testing the Nimbus CRM sales simulation stage-by-stage without re-deriving consistent test data each time. |

@@ -333,7 +333,7 @@ print("output.json written")
 
 def da_job_sim():
     sim = dict(
-        id="da-job-sim",
+        slug="da-job-sim",
         title="Junior Data Analyst Job Simulation",
         description="Real-world DA tasks from Lumen Corporation: clean data, build reports, segment customers, run A/B tests, and deliver an executive brief.",
         company="Lumen Corporation",
@@ -963,7 +963,7 @@ FE_FINAL_ASSESSMENT = {
 
 def frontend_dev_sim():
     sim = dict(
-        id="frontend-dev-sim",
+        slug="frontend-dev-sim",
         title="Frontend Developer Job Simulation",
         description="Real-world frontend tickets from Enigma: build a responsive landing page, wire up interactivity, fetch live data, and ship a stateful React app.",
         company="Enigma",
@@ -1360,7 +1360,7 @@ def _quiz(stage_index: int) -> dict:
 
 def sales_crm_sim():
     sim = dict(
-        id="sales-crm-sim",
+        slug="sales-crm-sim",
         title="Enterprise SaaS Sales Representative",
         description="A full sales cycle at Nimbus CRM: qualify a lead, research the account, send cold outreach, run a discovery call, work the deal in a real CRM, handle objections, write a proposal, and close.",
         company="Nimbus CRM",
@@ -1873,9 +1873,9 @@ def sales_crm_sim():
 
 
 async def _insert_sim(db, sim_kwargs: dict, task_kwargs_list: list[dict]):
-    exists = await db.execute(select(Simulation).where(Simulation.id == sim_kwargs["id"]))
+    exists = await db.execute(select(Simulation).where(Simulation.slug == sim_kwargs["slug"]))
     if exists.scalar_one_or_none():
-        print(f"  skip {sim_kwargs['id']} — already migrated")
+        print(f"  skip {sim_kwargs['slug']} — already migrated")
         return
     sim = Simulation(status=SimulationStatus.PUBLISHED, published_at=datetime.now(timezone.utc), **sim_kwargs)
     db.add(sim)
@@ -1883,7 +1883,7 @@ async def _insert_sim(db, sim_kwargs: dict, task_kwargs_list: list[dict]):
     for t in task_kwargs_list:
         db.add(SimulationTask(simulation_id=sim.id, **t))
     await db.commit()
-    print(f"  migrated {sim_kwargs['id']} ({len(task_kwargs_list)} tasks)")
+    print(f"  migrated {sim_kwargs['slug']} ({len(task_kwargs_list)} tasks)")
 
 
 async def run():
