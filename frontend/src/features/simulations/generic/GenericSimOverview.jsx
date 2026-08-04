@@ -3,13 +3,18 @@ import { ArrowLeft, ArrowRight, Clock, ListChecks, BarChart3 } from 'lucide-reac
 import { useSimulationFull, useEnrollment } from '../../../hooks'
 import { resolveMediaUrl } from '../../../lib/client'
 import { resolveDomainIcon } from '../../../lib/domainIcons'
+import { SIM_BRANDING } from '../../../lib/simBranding'
 import { Badge } from '../../../components/ui/shadcn/badge'
 import { Button } from '../../../components/ui/shadcn/button'
 import RatingStars from '../../../components/ui/RatingStars'
+import Avatar from '../../../components/ui/Avatar'
+import WhatYoullLearn from './WhatYoullLearn'
+import SimReviews from './SimReviews'
+import SimPricing from './SimPricing'
 
 function SectionHeading({ children }) {
   return (
-    <h2 className="flex items-center gap-2 text-base font-bold text-on-surface mb-4">
+    <h2 className="flex items-center gap-2 text-lg font-bold text-on-surface mb-4">
       <span className="h-4 w-1 rounded-full bg-primary shrink-0" />
       {children}
     </h2>
@@ -35,11 +40,12 @@ function groupByWeek(tasks) {
 
 /** Generic pre-enrollment overview/detail page for any CMS-authored (or
  * migrated) simulation — replaces the 3 bespoke per-sim Overview pages.
- * Styled as a real course-landing page: a big editorial title with the
- * details underneath on the left, a logo/enrollment card on the right, and
- * the curriculum broken out week by week below — rather than a generic
- * hero band + stat-card grid. Stays entirely sim-agnostic — every value
- * rendered here comes from the CMS record. */
+ * Laid out like a real course-detail page: a dark editorial hero band, a
+ * stat strip straddling its lower edge, then each content area (what you'll
+ * learn / skills / curriculum / reviews) as its own visually separated
+ * block, with a sticky enrollment card overlapping up into the hero.
+ * Stays entirely sim-agnostic — every value rendered comes from the CMS
+ * record. */
 export default function GenericSimOverview() {
   const { slug } = useParams()
   const navigate = useNavigate()
@@ -65,6 +71,10 @@ export default function GenericSimOverview() {
   const { simulation, tasks } = full
   const manager = simulation.manager
   const DomainIcon = resolveDomainIcon(simulation.domain)
+  // Cosmetic per-sim banner (client-side only, see lib/simBranding.js) —
+  // heads the enrollment card the way a course page leads with its preview
+  // image. `accent_color` is the fallback wash when a sim has no banner.
+  const banner = SIM_BRANDING[slug]?.banner
   const accent = simulation.accent_color || 'bg-primary'
   const sectionLabels = simulation.section_labels || {}
   const weekGroups = groupByWeek(tasks)
@@ -75,94 +85,181 @@ export default function GenericSimOverview() {
 
   return (
     <div className="bg-white min-h-screen">
-      <div className="max-w-container mx-auto px-6 pt-6 pb-14">
-        <button
-          onClick={() => navigate('/simulations')}
-          className="flex items-center gap-1.5 text-sm text-on-surface-variant hover:text-on-surface transition-colors mb-6 cursor-pointer"
-        >
-          <ArrowLeft className="h-4 w-4" /> Simulations
-        </button>
+      {/* ── Hero band — dark and editorial. The enrollment card overlaps up
+          into it from the body below, so the hero text reserves room on the
+          right at lg+ rather than running underneath the card. ── */}
+      <div className="bg-gradient-to-br from-[#151046] via-primary-dark to-[#0f0d2e] text-white">
+        <div className="max-w-container mx-auto px-6 pt-6 pb-16">
+          <button
+            onClick={() => navigate('/simulations')}
+            className="flex items-center gap-1.5 text-sm text-white/60 hover:text-white transition-colors mb-7 cursor-pointer"
+          >
+            <ArrowLeft className="h-4 w-4" /> Simulations
+          </button>
 
-        {/* ── Header: big title + details on the left, logo/enrollment
-            card on the right — a real course-landing layout, not a
-            colored hero band. ── */}
-        <div className="grid lg:grid-cols-[1fr_340px] gap-10 mb-14">
-          <div className="min-w-0">
+          <div className="lg:pr-[400px]">
             <div className="flex items-center gap-2 mb-4 flex-wrap">
-              <Badge className="gap-1">
+              <Badge className="gap-1 bg-white/10 text-white border-transparent hover:bg-white/20">
                 <DomainIcon className="h-3 w-3" /> {simulation.domain}
               </Badge>
-              <Badge variant="outline">{simulation.difficulty}</Badge>
+              <Badge variant="outline" className="border-white/25 text-white/80">
+                {simulation.difficulty}
+              </Badge>
             </div>
 
-            <h1 className="text-4xl sm:text-5xl font-extrabold text-on-surface leading-[1.05] tracking-tight mb-3">
+            <p className="text-xs font-bold uppercase tracking-widest text-white/50 mb-2.5">
+              {simulation.company}
+            </p>
+
+            {/* Title — size, weight and tracking deliberately unchanged. */}
+            <h1 className="text-4xl sm:text-5xl font-extrabold leading-[1.05] tracking-tight mb-4">
               {simulation.title}
             </h1>
-            <p className="text-base font-medium text-on-surface-variant mb-3">{simulation.company}</p>
-            <RatingStars rating={simulation.rating} count={simulation.rating_count} />
 
-            <p className="text-sm text-on-surface leading-relaxed mt-6 max-w-2xl">{simulation.description}</p>
+            <p className="text-base text-white/75 leading-relaxed max-w-2xl mb-6">
+              {simulation.description}
+            </p>
 
-            {/* Course details row — the "details below the title" */}
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-3 mt-6 pt-6 border-t border-border">
-              <span className="flex items-center gap-2 text-sm text-on-surface">
-                <ListChecks className="h-4 w-4 text-primary shrink-0" />
-                <span className="font-semibold">{tasks.length}</span> tasks
-              </span>
-              <span className="flex items-center gap-2 text-sm text-on-surface">
-                <Clock className="h-4 w-4 text-primary shrink-0" />
-                <span className="font-semibold">{simulation.estimated_hours}</span>
-              </span>
-              <span className="flex items-center gap-2 text-sm text-on-surface">
-                <BarChart3 className="h-4 w-4 text-primary shrink-0" />
-                <span className="font-semibold">{simulation.difficulty}</span> difficulty
-              </span>
-              {manager?.name && (
-                <span className="flex items-center gap-2 text-sm text-on-surface-variant">
-                  {manager.photo_url ? (
-                    <img src={resolveMediaUrl(manager.photo_url)} alt={manager.name} className="h-5 w-5 rounded-full object-cover shrink-0" />
-                  ) : (
-                    <span className="h-5 w-5 rounded-full bg-primary text-white flex items-center justify-center text-[9px] font-bold shrink-0">
-                      {manager.avatar || 'M'}
-                    </span>
-                  )}
-                  Led by <span className="font-semibold text-on-surface">{manager.name}</span>
-                </span>
-              )}
-            </div>
-
-            {simulation.skills?.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-5">
-                {simulation.skills.map((s) => (
-                  <span key={s} className="chip bg-surface-container text-on-surface normal-case tracking-normal font-semibold">
-                    {s}
-                  </span>
-                ))}
+            {manager?.name && (
+              <div className="flex items-center gap-2 text-sm text-white/70 mb-6">
+                <Avatar
+                  src={manager.photo_url ? resolveMediaUrl(manager.photo_url) : null}
+                  alt={manager.name}
+                  initials={manager.avatar || 'M'}
+                  size="xs"
+                  className="bg-white/20"
+                />
+                Led by <span className="font-semibold text-white">{manager.name}</span>
+                {manager.role && <span className="text-white/40">· {manager.role}</span>}
               </div>
             )}
+
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-white/70">
+              <span className="flex items-center gap-2">
+                <ListChecks className="h-4 w-4 shrink-0" />
+                <span className="font-semibold text-white">{tasks.length}</span> tasks
+              </span>
+              <span className="flex items-center gap-2">
+                <Clock className="h-4 w-4 shrink-0" />
+                <span className="font-semibold text-white">{simulation.estimated_hours}</span>
+              </span>
+              <span className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 shrink-0" />
+                <span className="font-semibold text-white">{simulation.difficulty}</span> difficulty
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Body ── */}
+      <div className="max-w-container mx-auto px-6 pb-16">
+        <div className="grid lg:grid-cols-[1fr_360px] gap-10 items-start">
+          <div className="min-w-0">
+            {/* Stat strip — straddles the hero's lower edge. */}
+            {simulation.rating != null && (
+              <div className="-mt-8 mb-10 rounded-xl border border-border bg-white shadow-lg px-6 py-5 flex flex-wrap items-center gap-x-10 gap-y-5">
+                <div>
+                  <p className="text-2xl font-extrabold text-on-surface leading-none mb-1.5">
+                    {simulation.rating.toFixed(1)}
+                  </p>
+                  <RatingStars rating={simulation.rating} showCount={false} size="sm" />
+                  {simulation.rating_count > 0 && (
+                    <p className="text-xs text-on-surface-variant mt-1.5">
+                      {simulation.rating_count.toLocaleString()} ratings
+                    </p>
+                  )}
+                </div>
+                <div className="lg:border-l lg:border-border lg:pl-10">
+                  <p className="text-2xl font-extrabold text-on-surface leading-none mb-1.5">{tasks.length}</p>
+                  <p className="text-xs text-on-surface-variant">graded tasks</p>
+                </div>
+                <div className="lg:border-l lg:border-border lg:pl-10">
+                  <p className="text-2xl font-extrabold text-on-surface leading-none mb-1.5">
+                    {simulation.estimated_hours}
+                  </p>
+                  <p className="text-xs text-on-surface-variant">to complete</p>
+                </div>
+              </div>
+            )}
+
+            <WhatYoullLearn skills={simulation.skills} />
+
+            {/* ── Skills — its own block, separated from the checklist above. ── */}
+            {simulation.skills?.length > 0 && (
+              <div className="mt-12">
+                <SectionHeading>Skills you'll build</SectionHeading>
+                <div className="flex flex-wrap gap-1.5">
+                  {simulation.skills.map((s) => (
+                    <span key={s} className="chip bg-surface-container text-on-surface normal-case tracking-normal font-semibold">
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── Curriculum — grouped by week, each task's objective spelled
+                out so it's clear what gets learned before enrolling. ── */}
+            <div className="mt-12">
+              <SectionHeading>Curriculum</SectionHeading>
+              <div className="space-y-8">
+                {weekGroups.map((group, gi) => (
+                  <div key={gi}>
+                    {group.week != null && (
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-bold text-on-surface">
+                          {sectionLabels[String(group.week)] || `Week ${group.week}`}
+                        </h3>
+                        <span className="text-xs text-on-surface-variant">
+                          {group.tasks.length} task{group.tasks.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                    )}
+                    <div className="rounded-xl border border-border divide-y divide-border overflow-hidden bg-white">
+                      {group.tasks.map((t) => (
+                        <div key={t.id} className="flex items-start gap-4 p-4 hover:bg-surface-low/60 transition-colors">
+                          <span className="h-7 w-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                            {t.task_index}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-on-surface">{t.title}</p>
+                            {t.objective && <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">{t.objective}</p>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <SimReviews rating={simulation.rating} ratingCount={simulation.rating_count} />
           </div>
 
-          {/* ── Right: logo/enrollment card ── */}
-          <div className="lg:sticky lg:top-6 h-fit">
-            <div className="rounded-2xl border border-border shadow-lg overflow-hidden bg-white">
-              <div className="p-6 pb-5">
-                {simulation.logo_url ? (
-                  <img
-                    src={resolveMediaUrl(simulation.logo_url)}
-                    alt={simulation.company}
-                    className="h-14 max-w-full w-auto object-contain mx-auto mb-4"
-                  />
-                ) : (
-                  <p className="text-2xl font-bold text-on-surface text-center mb-4">
-                    {(simulation.company || simulation.title).split(' ').map((w) => w[0]).slice(0, 2).join('')}
-                  </p>
-                )}
-                <p className="text-sm font-bold text-on-surface text-center mb-0.5">{simulation.company}</p>
-                <p className="text-xs text-on-surface-variant text-center mb-4">{simulation.title}</p>
+          {/* ── Right: enrollment card, pulled up over the hero band. Leads
+              with the simulation's banner image (a course page's preview
+              slot), not the company logo — the company is named in the hero
+              and again just below the CTA. ── */}
+          <div className="lg:-mt-[340px] lg:sticky lg:top-6 h-fit">
+            <div className="rounded-2xl border border-border shadow-xl overflow-hidden bg-white">
+              {banner ? (
+                <img src={banner} alt="" className="w-full h-44 object-cover" />
+              ) : (
+                <div className={`w-full h-44 ${accent} flex items-center justify-center`}>
+                  <DomainIcon className="h-10 w-10 text-white/40" />
+                </div>
+              )}
 
-                <Button size="lg" className="w-full mb-4" onClick={() => navigate(`/simulations/${slug}`)}>
+              <div className="p-6">
+                <SimPricing slug={slug} />
+
+                <Button size="lg" className="w-full mb-3" onClick={() => navigate(`/simulations/${slug}`)}>
                   {ctaLabel} <ArrowRight className="h-4 w-4" />
                 </Button>
+                <p className="text-xs text-on-surface-variant text-center mb-5">
+                  Real tasks reviewed by your manager at {simulation.company}
+                </p>
 
                 <ul className="space-y-2.5 text-sm text-on-surface border-t border-border pt-4">
                   <li className="flex items-center justify-between"><span className="text-on-surface-variant">Tasks</span><span className="font-semibold">{tasks.length}</span></li>
@@ -173,13 +270,13 @@ export default function GenericSimOverview() {
 
                 {manager?.name && (
                   <div className="flex items-center gap-3 border-t border-border pt-4 mt-4">
-                    {manager.photo_url ? (
-                      <img src={resolveMediaUrl(manager.photo_url)} alt={manager.name} className="h-10 w-10 rounded-full object-cover shrink-0" />
-                    ) : (
-                      <span className="h-10 w-10 rounded-full bg-gradient-to-br from-primary to-indigo-500 text-white flex items-center justify-center text-sm font-bold shrink-0">
-                        {manager.avatar || 'M'}
-                      </span>
-                    )}
+                    <Avatar
+                      src={manager.photo_url ? resolveMediaUrl(manager.photo_url) : null}
+                      alt={manager.name}
+                      initials={manager.avatar || 'M'}
+                      size="md"
+                      className="bg-gradient-to-br from-primary to-indigo-500"
+                    />
                     <div className="min-w-0">
                       <p className="text-xs text-on-surface-variant leading-tight">Your manager</p>
                       <p className="text-sm font-bold text-on-surface truncate leading-tight mt-0.5">{manager.name}</p>
@@ -189,41 +286,6 @@ export default function GenericSimOverview() {
                 )}
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* ── Curriculum — grouped by week, each task's objective spelled
-            out so it's clear what gets learned before enrolling. ── */}
-        <div>
-          <SectionHeading>Curriculum</SectionHeading>
-          <div className="space-y-8">
-            {weekGroups.map((group, gi) => (
-              <div key={gi}>
-                {group.week != null && (
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-bold text-on-surface">
-                      {sectionLabels[String(group.week)] || `Week ${group.week}`}
-                    </h3>
-                    <span className="text-xs text-on-surface-variant">
-                      {group.tasks.length} task{group.tasks.length !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                )}
-                <div className="rounded-xl border border-border divide-y divide-border overflow-hidden bg-white">
-                  {group.tasks.map((t) => (
-                    <div key={t.id} className="flex items-start gap-4 p-4 hover:bg-surface-low/60 transition-colors">
-                      <span className="h-7 w-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
-                        {t.task_index}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-on-surface">{t.title}</p>
-                        {t.objective && <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">{t.objective}</p>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </div>

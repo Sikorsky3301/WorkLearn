@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useOnboarding, useAcceptOnboarding } from '../../hooks'
 import { resolveMediaUrl } from '../../lib/client'
+import Avatar from '../../components/ui/Avatar'
 
 function SimLogo({ logoUrl, alt, size = 'md' }) {
   const h = { sm: 'h-5', md: 'h-7', lg: 'h-9' }[size]
@@ -88,13 +89,7 @@ export default function SimOnboarding({ sim = 'da-job-sim', onAccept }) {
           {/* Manager intro */}
           <div className="card">
             <div className="flex items-center gap-3 mb-4 pb-4 border-b border-border">
-              {manager?.photo_url ? (
-                <img src={resolveMediaUrl(manager.photo_url)} alt={manager?.name} className="w-11 h-11 rounded-full object-cover shrink-0" />
-              ) : (
-                <div className="w-11 h-11 bg-primary rounded-full flex items-center justify-center shrink-0">
-                  <span className="text-white text-sm font-bold">{manager?.avatar}</span>
-                </div>
-              )}
+              <Avatar src={manager?.photo_url ? resolveMediaUrl(manager.photo_url) : null} alt={manager?.name} initials={manager?.avatar} size="lg" />
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-bold text-on-surface">{manager?.name}</p>
