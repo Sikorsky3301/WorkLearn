@@ -207,7 +207,9 @@ function SimCard({ sim }) {
   const tasksDone = enrollment?.task_completions?.length ?? 0
   const progress = status ? Math.round((tasksDone / sim.tasks) * 100) : 0
   const manager = sim.manager
-  const overviewPath = `/simulations/${sim.id}/overview`
+  // Slug, not id — the overview page keys its per-sim branding (banner,
+  // explainer video) off the slug, so a numeric URL silently drops them.
+  const overviewPath = `/simulations/${sim.slug}/overview`
   const goToOverview = () => navigate(overviewPath)
 
   return (

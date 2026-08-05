@@ -11,6 +11,8 @@ import Avatar from '../../../components/ui/Avatar'
 import WhatYoullLearn from './WhatYoullLearn'
 import SimReviews from './SimReviews'
 import SimPricing from './SimPricing'
+import SimExplainerVideo from './SimExplainerVideo'
+import CodingEnvironmentPreview from './CodingEnvironmentPreview'
 
 function SectionHeading({ children }) {
   return (
@@ -74,8 +76,17 @@ export default function GenericSimOverview() {
   // Cosmetic per-sim banner (client-side only, see lib/simBranding.js) —
   // heads the enrollment card the way a course page leads with its preview
   // image. `accent_color` is the fallback wash when a sim has no banner.
-  const banner = SIM_BRANDING[slug]?.banner
+  // Key branding off the record's own slug, never the URL param — the URL
+  // may carry the numeric id instead (several nav links build it from
+  // sim.id, and the backend resolves either), which would silently miss
+  // every SIM_BRANDING entry and drop the banner/video with no error.
+  const branding = SIM_BRANDING[simulation.slug] || {}
+  const banner = branding.banner
+  const explainerVideo = branding.explainerVideo
   const accent = simulation.accent_color || 'bg-primary'
+  // Only advertise the code sandbox on simulations that actually use it —
+  // a sales/CRM sim has no code_sandbox tasks and shouldn't show an editor.
+  const hasCodeSandbox = tasks.some((t) => t.type === 'code_sandbox')
   const sectionLabels = simulation.section_labels || {}
   const weekGroups = groupByWeek(tasks)
 
@@ -185,6 +196,15 @@ export default function GenericSimOverview() {
 
             <WhatYoullLearn skills={simulation.skills} />
 
+            <SimExplainerVideo
+              src={explainerVideo}
+              poster={banner}
+              title={simulation.title}
+              company={simulation.company}
+            />
+
+            {hasCodeSandbox && <CodingEnvironmentPreview />}
+
             {/* ── Skills — its own block, separated from the checklist above. ── */}
             {simulation.skills?.length > 0 && (
               <div className="mt-12">
@@ -254,7 +274,7 @@ export default function GenericSimOverview() {
               <div className="p-6">
                 <SimPricing slug={slug} />
 
-                <Button size="lg" className="w-full mb-3" onClick={() => navigate(`/simulations/${slug}`)}>
+                <Button size="lg" className="w-full mb-3" onClick={() => navigate(`/simulations/${simulation.slug}`)}>
                   {ctaLabel} <ArrowRight className="h-4 w-4" />
                 </Button>
                 <p className="text-xs text-on-surface-variant text-center mb-5">
