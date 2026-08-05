@@ -26,7 +26,8 @@ export default function HeroSection() {
       <div className="pointer-events-none absolute -top-40 -right-24 h-[480px] w-[480px] rounded-full bg-secondary/25 blur-3xl" aria-hidden="true" />
       <div className="pointer-events-none absolute -bottom-52 -left-32 h-[420px] w-[420px] rounded-full bg-primary-light/20 blur-3xl" aria-hidden="true" />
 
-      <div className="relative max-w-container mx-auto px-6 pt-20 pb-24 grid lg:grid-cols-[1.05fr_1fr] gap-14 items-center">
+      {/* pt clears the fixed pill nav (see MarketingNav). */}
+      <div className="relative max-w-container mx-auto px-6 pt-32 pb-24 grid lg:grid-cols-[1.05fr_1fr] gap-14 items-center">
         <div>
           <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold mb-6">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />

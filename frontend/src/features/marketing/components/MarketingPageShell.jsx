@@ -10,7 +10,8 @@ export default function MarketingPageShell({ eyebrow, title, intro, children }) 
       <MarketingNav />
       <main className="flex-1">
         <div className="bg-gradient-to-br from-[#151046] via-primary-dark to-[#0f0d2e] text-white">
-          <div className="max-w-container mx-auto px-6 py-16">
+          {/* pt clears the fixed pill nav (see MarketingNav). */}
+          <div className="max-w-container mx-auto px-6 pt-32 pb-16">
             {eyebrow && (
               <p className="text-xs font-bold uppercase tracking-widest text-white/50 mb-3">{eyebrow}</p>
             )}

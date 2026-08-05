@@ -1,6 +1,7 @@
 import MarketingNav from './components/MarketingNav'
 import MarketingFooter from './components/MarketingFooter'
 import HeroSection from './sections/HeroSection'
+import ProductTourSection from './sections/ProductTourSection'
 import TrustSection from './sections/TrustSection'
 import HowItWorksSection from './sections/HowItWorksSection'
 import SimulationsShowcase from './sections/SimulationsShowcase'
@@ -16,6 +17,7 @@ export default function LandingPage() {
       <MarketingNav />
       <main>
         <HeroSection />
+        <ProductTourSection />
         <HowItWorksSection />
         <TrustSection />
         <SimulationsShowcase />

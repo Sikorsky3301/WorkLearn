@@ -209,10 +209,23 @@ async def grade_text(
         "Grade this submission 0-100 and give 2-4 sentences of specific feedback. "
         "Respond with ONLY JSON: {{\"overall\": <0-100>, \"feedback\": \"...\"}}\n\nSubmission:\n{text}"
     )
+    # An admin-authored llm_judge_prompt can reference any field key the task
+    # collects (e.g. {subject}/{body}/{cta}). The retry below used to drop
+    # **fields and call format() again *outside* a try — so when the template
+    # genuinely needed a field the caller hadn't sent, the retry raised the
+    # same KeyError uncaught and surfaced as an opaque 500. A missing field is
+    # a bad request, so say that instead.
     try:
         prompt = prompt_template.format(text=body.text, **body.fields)
-    except (KeyError, IndexError):
-        prompt = prompt_template.format(text=body.text)
+    except (KeyError, IndexError, ValueError) as exc:
+        try:
+            prompt = prompt_template.format(text=body.text)
+        except (KeyError, IndexError, ValueError):
+            missing = str(exc).strip("'") if isinstance(exc, KeyError) else str(exc)
+            raise HTTPException(
+                400,
+                f"This task's grading prompt needs a '{missing}' value that wasn't submitted.",
+            ) from exc
 
     try:
         with traced_context(user_id=token_user_id(token), tags=["sim-runtime", "text-rubric", sim_id]):
