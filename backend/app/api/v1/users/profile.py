@@ -45,8 +45,17 @@ async def update_profile(
     body: ProfileUpdateBody, db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user),
 ):
     user = await _get_user(db, token_user_id(token))
-    for field, value in body.model_dump().items():
-        setattr(user, field, value.strip() if isinstance(value, str) else value)
+    # exclude_unset: every ProfileUpdateBody field defaults to None, so a
+    # plain model_dump() turns "field not sent" into an explicit NULL write.
+    # That made this a destructive full-document overwrite — e.g. the
+    # Portfolio's edit form omits preferred_domain, so saving it wiped the
+    # domain chosen during onboarding.
+    for field, value in body.model_dump(exclude_unset=True).items():
+        if isinstance(value, str):
+            # Store a genuinely-unset optional field as NULL rather than "",
+            # so the UI can tell "skipped" apart from "answered with blank".
+            value = value.strip() or None
+        setattr(user, field, value)
     await db.commit()
     await db.refresh(user)
     return {"ok": True}

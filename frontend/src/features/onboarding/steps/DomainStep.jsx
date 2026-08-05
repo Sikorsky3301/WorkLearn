@@ -1,36 +1,34 @@
 import { Check } from 'lucide-react'
-import { resolveDomainIcon } from '../../../lib/domainIcons'
-import { domainDescription } from '../../../lib/domainMeta'
+import { CAREER_DOMAINS } from '../../../lib/careerDomains'
 
-/** Domains come from whatever's actually published (see useSimulations —
- * same source SimulationWorkspace's DomainFilterBar uses), never a
- * hardcoded list, so a new CMS-authored domain shows up here automatically. */
-export default function DomainStep({ domains, selected, onSelect }) {
-  if (domains.length === 0) {
-    return <p className="text-sm text-on-surface-variant">No job simulations are published yet — you can pick a domain later from your Portfolio.</p>
-  }
-
+/** Career-interest picker, driven by the curated catalogue in
+ * lib/careerDomains.js — deliberately not by whatever simulations happen to
+ * be published. The old version derived its list from useSimulations(),
+ * which showed only 3 options and, on a fresh database, showed none at all
+ * while still requiring a selection (an unfinishable wizard). Picking a
+ * domain with no simulations yet is fine — it's an interest, not a filter. */
+export default function DomainStep({ selected, onSelect }) {
   return (
-    <div className="grid sm:grid-cols-2 gap-3">
-      {domains.map((domain) => {
-        const Icon = resolveDomainIcon(domain)
-        const active = selected === domain
+    <div className="grid sm:grid-cols-2 gap-2.5 max-h-[380px] overflow-y-auto pr-1 -mr-1">
+      {CAREER_DOMAINS.map(({ key, label, description, Icon }) => {
+        const active = selected === label
         return (
           <button
-            key={domain}
+            key={key}
             type="button"
-            onClick={() => onSelect(domain)}
-            className={`relative flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-colors cursor-pointer ${
+            onClick={() => onSelect(label)}
+            aria-pressed={active}
+            className={`relative flex items-start gap-3 p-3.5 rounded-xl border-2 text-left transition-colors cursor-pointer ${
               active ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
             }`}
           >
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${active ? 'bg-primary text-white' : 'bg-surface-low text-primary'}`}>
-              <Icon className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <p className={`text-sm font-bold ${active ? 'text-primary' : 'text-on-surface'}`}>{domain}</p>
-              <p className="text-xs text-on-surface-variant mt-0.5 leading-snug">{domainDescription(domain)}</p>
-            </div>
+            <span className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${active ? 'bg-primary text-white' : 'bg-surface-low text-primary'}`}>
+              <Icon className="h-4.5 w-4.5" />
+            </span>
+            <span className="min-w-0 pr-4">
+              <span className={`block text-sm font-bold ${active ? 'text-primary' : 'text-on-surface'}`}>{label}</span>
+              <span className="block text-xs text-on-surface-variant mt-0.5 leading-snug">{description}</span>
+            </span>
             {active && <Check className="h-4 w-4 text-primary absolute top-3 right-3 shrink-0" />}
           </button>
         )

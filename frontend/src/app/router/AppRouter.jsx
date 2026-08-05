@@ -9,7 +9,14 @@ import Footer from '../../components/Footer'
 import ProtectedRoute from './guards/ProtectedRoute'
 import RequireAdmin from './guards/RequireAdmin'
 import RequireSuperAdmin from './guards/RequireSuperAdmin'
+import PublicOnlyRoute from './guards/PublicOnlyRoute'
 import PortalSpinner from './guards/PortalSpinner'
+
+// ── (public) — the marketing site ───────────────────────────────────────────
+import LandingPage from '../../features/marketing/LandingPage'
+import AboutPage from '../../features/marketing/AboutPage'
+import ContactPage from '../../features/marketing/ContactPage'
+import BlogPage from '../../features/marketing/BlogPage'
 
 // ── (public) — reachable without being logged in, not part of the auth flow ──
 import NotFoundPage from '../../components/NotFound'
@@ -85,6 +92,16 @@ function MiraLayout() {
 export default function AppRouter() {
   return (
     <Routes>
+      {/* (public) — marketing site, no login required. Wrapped in
+          PublicOnlyRoute so a signed-in user still lands on /dashboard,
+          preserving the behaviour `/` had before this page existed. These
+          carry their own MarketingNav/Footer, NOT MainLayout — that renders
+          the app Navbar, which depends on authenticated queries. */}
+      <Route path="/"        element={<PublicOnlyRoute><LandingPage /></PublicOnlyRoute>} />
+      <Route path="/about"   element={<AboutPage />} />
+      <Route path="/contact" element={<ContactPage />} />
+      <Route path="/blog"    element={<BlogPage />} />
+
       {/* (auth) — no login required */}
       <Route path="/login"            element={<LoginPage />} />
       <Route path="/university/login" element={<UniversityLoginPage />} />
@@ -131,7 +148,6 @@ export default function AppRouter() {
         <Route path="/onboarding" element={<OnboardingWizard />} />
 
         <Route element={<MainLayout />}>
-          <Route path="/"                        element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard"               element={<Dashboard />} />
           <Route path="/simulations"                element={<SimulationWorkspace />} />
           <Route path="/simulations/:slug/overview" element={<GenericSimOverview />} />

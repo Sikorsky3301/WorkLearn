@@ -16,6 +16,11 @@ export default function EditProfileModal({ onClose }) {
     linkedin_url: user?.linkedin_url || '',
     github_url: user?.github_url || '',
     website_url: user?.website_url || '',
+    // Not edited by this form, but carried through so saving the profile
+    // doesn't drop the domain chosen during onboarding. (The backend now
+    // also ignores unsent fields — see profile.py's exclude_unset — this is
+    // the belt-and-braces half of that fix.)
+    preferred_domain: user?.preferred_domain || '',
   })
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')

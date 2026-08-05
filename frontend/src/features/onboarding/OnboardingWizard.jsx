@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Info } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
-import { useSimulations, useUpdateProfile, useUploadPhoto, useAddEducation, useCompleteOnboarding } from '../../hooks'
+import { useUpdateProfile, useUploadPhoto, useAddEducation, useCompleteOnboarding } from '../../hooks'
 import OnboardingLayout from './components/OnboardingLayout'
 import WelcomeStep from './steps/WelcomeStep'
 import ProfileStep from './steps/ProfileStep'
@@ -34,12 +35,6 @@ export default function OnboardingWizard() {
     if (user?.onboarding_completed) navigate('/dashboard', { replace: true })
   }, [user, navigate])
 
-  const { data: simsData } = useSimulations()
-  const domains = useMemo(
-    () => [...new Set((simsData?.simulations || []).map((s) => s.domain).filter(Boolean))],
-    [simsData]
-  )
-
   const [stepIdx, setStepIdx] = useState(0)
   const [form, setForm] = useState({
     headline: '', bio: '', phone: '', location: '',
@@ -65,7 +60,25 @@ export default function OnboardingWizard() {
 
   const step = STEPS[stepIdx]
   const isLast = stepIdx === STEPS.length - 1
-  const canGoNext = step !== 'domain' || Boolean(form.preferred_domain)
+  // Per-step gate. Previously only `domain` was validated, so a student could
+  // click Continue straight through profile/contact and finish with a
+  // completely empty profile — the "onboarding went through without the data"
+  // report. Returns a reason string when blocked so the UI can say why
+  // instead of just grey-ing the button out.
+  const blockedReason = (() => {
+    if (step === 'profile' && !form.headline.trim()) {
+      return 'Add a headline to continue — it’s the first thing recruiters see on your Portfolio.'
+    }
+    if (step === 'domain' && !form.preferred_domain) {
+      return 'Pick the area you want to build toward.'
+    }
+    return null // contact + education are genuinely optional, by design
+  })()
+  const canGoNext = !blockedReason
+
+  // Blank optional fields are sent as null, not "" — so the Portfolio can
+  // tell "skipped this" apart from "answered with an empty string".
+  const orNull = (v) => (typeof v === 'string' && v.trim() ? v.trim() : null)
 
   async function handleFinish() {
     setSubmitting(true)
@@ -73,21 +86,37 @@ export default function OnboardingWizard() {
     try {
       if (photoFile) await uploadPhoto.mutateAsync(photoFile)
       await updateProfile.mutateAsync({
-        headline: form.headline, bio: form.bio, phone: form.phone, location: form.location,
-        linkedin_url: form.linkedin_url, github_url: form.github_url, website_url: form.website_url,
-        preferred_domain: form.preferred_domain || null,
+        headline: orNull(form.headline), bio: orNull(form.bio),
+        phone: orNull(form.phone), location: orNull(form.location),
+        linkedin_url: orNull(form.linkedin_url), github_url: orNull(form.github_url),
+        website_url: orNull(form.website_url), preferred_domain: orNull(form.preferred_domain),
       })
+
+      // Education is optional and each row is independent — one bad entry
+      // must not block completing onboarding, which used to strand the
+      // student on this screen with their profile already saved.
+      let educationFailures = 0
       for (const entry of educationEntries) {
         if (!entry.institution?.trim()) continue
-        await addEducation.mutateAsync({
-          ...entry,
-          start_year: entry.start_year ? Number(entry.start_year) : null,
-          end_year: entry.end_year ? Number(entry.end_year) : null,
-        })
+        try {
+          await addEducation.mutateAsync({
+            ...entry,
+            start_year: entry.start_year ? Number(entry.start_year) : null,
+            end_year: entry.end_year ? Number(entry.end_year) : null,
+          })
+        } catch {
+          educationFailures += 1
+        }
       }
+
       await completeOnboarding.mutateAsync()
       await refreshUser()
-      navigate('/dashboard', { replace: true })
+      navigate('/dashboard', {
+        replace: true,
+        state: educationFailures
+          ? { onboardingNotice: `We couldn't save ${educationFailures} education entr${educationFailures === 1 ? 'y' : 'ies'} — you can add ${educationFailures === 1 ? 'it' : 'them'} from your Portfolio.` }
+          : undefined,
+      })
     } catch (err) {
       setError(err.message || 'Something went wrong — please try again.')
       setSubmitting(false)
@@ -106,11 +135,18 @@ export default function OnboardingWizard() {
       )}
       {step === 'contact' && <ContactStep value={form} onChange={set} />}
       {step === 'domain' && (
-        <DomainStep domains={domains} selected={form.preferred_domain} onSelect={(d) => set('preferred_domain', d)} />
+        <DomainStep selected={form.preferred_domain} onSelect={(d) => set('preferred_domain', d)} />
       )}
       {step === 'education' && <EducationStep entries={educationEntries} onChange={setEducationEntries} />}
       {step === 'review' && (
         <ReviewStep form={{ ...form, educationEntries }} photoPreview={photoPreview} name={user?.name} email={user?.email} />
+      )}
+
+      {blockedReason && (
+        <p className="text-xs text-on-surface-variant mt-5 flex items-start gap-1.5">
+          <Info className="h-3.5 w-3.5 shrink-0 mt-px text-primary" />
+          {blockedReason}
+        </p>
       )}
 
       <div className="flex items-center justify-between mt-8 pt-5 border-t border-border">

@@ -24,7 +24,12 @@ class EducationIn(BaseModel):
 
 
 class EducationOut(BaseModel):
-    id: str
+    # int, matching EducationEntry.id (app/models/profile.py). Declaring this
+    # `str` made every education response fail validation *after* the row was
+    # already committed — Pydantic v2 won't coerce int -> str in lax mode — so
+    # POST /education 500'd while still writing the row, which aborted the
+    # onboarding wizard before it could mark itself complete.
+    id: int
     institution: str
     degree: str | None
     field_of_study: str | None
