@@ -1,13 +1,12 @@
 import { ShieldCheck, BadgeCheck, Briefcase, Quote } from 'lucide-react'
-import { SiCoursera, SiUdemy, SiEdx, SiKhanacademy, SiDuolingo, SiGooglescholar } from 'react-icons/si'
-import { TRUST_PILLARS, EDUCATOR_QUOTES, PARTNER_INSTITUTIONS } from '../data/trustPlaceholders'
+import { AnimatedTooltip } from '../../../components/ui/animated-tooltip'
+import { TRUST_PILLARS, EDUCATOR_QUOTES } from '../data/trustPlaceholders'
 
 const PILLAR_ICONS = { graded: ShieldCheck, evidence: BadgeCheck, realwork: Briefcase }
 
-// Generic academic/education glyphs standing in for institution crests —
-// see data/trustPlaceholders.js: the institutions themselves are fictional,
-// so these are decorative marks, not any real organisation's logo.
-const CREST_MARKS = [SiCoursera, SiUdemy, SiEdx, SiKhanacademy, SiDuolingo, SiGooglescholar]
+// The institution logo strip now lives in the hero (HeroSection.jsx) so it
+// reads as the "featured on" band directly under the fold — it was showing
+// twice on the same page.
 
 export default function TrustSection() {
   return (
@@ -15,7 +14,7 @@ export default function TrustSection() {
       <div className="max-w-container mx-auto px-6">
         <div className="text-center max-w-2xl mx-auto mb-14">
           <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">Why it counts</p>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-on-surface tracking-tight mb-4">
+          <h2 className="font-display text-3xl sm:text-4xl font-extrabold text-on-surface tracking-tight mb-4">
             Built for integrity, proven by educators
           </h2>
           <p className="text-base text-on-surface-variant leading-relaxed">
@@ -40,7 +39,17 @@ export default function TrustSection() {
         </div>
 
         {/* Educator voices */}
-        <div className="grid md:grid-cols-3 gap-5 mb-14">
+        <div className="flex flex-col items-center gap-3 mb-8">
+          <AnimatedTooltip
+            items={EDUCATOR_QUOTES.map((q) => ({
+              name: q.name,
+              designation: `${q.role} · ${q.institution}`,
+            }))}
+          />
+          <p className="text-xs text-on-surface-variant">Educators using WorkLearn with their cohorts</p>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-5">
           {EDUCATOR_QUOTES.map((q) => (
             <figure key={q.name} className="rounded-xl bg-surface-low border border-border p-6 flex flex-col">
               <Quote className="h-5 w-5 text-primary/40 mb-3 shrink-0" />
@@ -52,26 +61,6 @@ export default function TrustSection() {
               </figcaption>
             </figure>
           ))}
-        </div>
-
-        <div className="border-t border-border pt-10">
-          <p className="text-center text-xs font-semibold uppercase tracking-widest text-on-surface-variant mb-7">
-            Used by career teams at
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-6">
-            {PARTNER_INSTITUTIONS.map((name, i) => {
-              const Mark = CREST_MARKS[i % CREST_MARKS.length]
-              return (
-                <div key={name} className="flex items-center gap-2.5 text-on-surface-variant/70">
-                  <Mark className="h-5 w-5 shrink-0" />
-                  <span className="text-sm font-semibold">{name}</span>
-                </div>
-              )
-            })}
-          </div>
-          <p className="text-center text-[11px] text-on-surface-variant/60 mt-7">
-            Illustrative institutions — partner names shown here are placeholders.
-          </p>
         </div>
       </div>
     </section>

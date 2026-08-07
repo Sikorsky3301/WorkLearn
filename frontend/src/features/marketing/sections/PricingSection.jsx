@@ -1,16 +1,18 @@
 import { useNavigate } from 'react-router-dom'
 import { Check } from 'lucide-react'
 import { PRICING_TIERS } from '../data/pricingTiers'
+import { useMarketingLinks } from '../useMarketingLinks'
 
 export default function PricingSection() {
   const navigate = useNavigate()
+  const { startPath } = useMarketingLinks()
 
   return (
-    <section id="pricing" className="bg-surface-low py-20 scroll-mt-16">
+    <section id="pricing" className="bg-white py-20 scroll-mt-16">
       <div className="max-w-container mx-auto px-6">
         <div className="text-center max-w-2xl mx-auto mb-12">
           <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">Pricing</p>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-on-surface tracking-tight mb-4">
+          <h2 className="font-display text-3xl sm:text-4xl font-extrabold text-on-surface tracking-tight mb-4">
             Start free. Upgrade when it's paying off.
           </h2>
           <p className="text-base text-on-surface-variant leading-relaxed">
@@ -40,7 +42,7 @@ export default function PricingSection() {
               <p className="text-xs text-on-surface-variant mb-6">{tier.cadence}</p>
 
               <button
-                onClick={() => navigate(tier.key === 'campus' ? '/contact' : '/login')}
+                onClick={() => navigate(tier.key === 'campus' ? '/contact' : startPath)}
                 className={`w-full text-sm py-2.5 cursor-pointer ${tier.highlighted ? 'btn-primary' : 'btn-secondary'}`}
               >
                 {tier.cta}

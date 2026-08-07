@@ -29,7 +29,7 @@ export default function HowItWorksSection() {
       <div className="max-w-container mx-auto px-6">
         <div className="text-center max-w-2xl mx-auto mb-14">
           <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">How it works</p>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-on-surface tracking-tight mb-4">
+          <h2 className="font-display text-3xl sm:text-4xl font-extrabold text-on-surface tracking-tight mb-4">
             Four steps from curious to credentialed
           </h2>
           <p className="text-base text-on-surface-variant leading-relaxed">

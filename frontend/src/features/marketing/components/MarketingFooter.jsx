@@ -3,11 +3,14 @@ import { Link } from 'react-router-dom'
 // so it comes from Font Awesome instead — same visual weight.
 import { SiGithub, SiX } from 'react-icons/si'
 import { FaLinkedin } from 'react-icons/fa6'
+import { useMarketingLinks } from '../useMarketingLinks'
 import logo from '../../../assets/logo.png'
 
 // Only links that resolve. Product links point at real authenticated routes
 // (visiting them logged-out lands on /login, which is the correct behaviour).
-const COLUMNS = [
+// `homePath` is threaded through the on-page anchors because the landing page
+// answers on two paths — see AppRouter.jsx.
+const columns = (homePath) => [
   {
     title: 'Product',
     links: [
@@ -21,7 +24,7 @@ const COLUMNS = [
     title: 'Company',
     links: [
       { label: 'About Us', to: '/about' },
-      { label: 'Pricing', to: '/#pricing' },
+      { label: 'Pricing', to: `${homePath}#pricing` },
       { label: 'Contact', to: '/contact' },
       { label: 'Blog', to: '/blog' },
     ],
@@ -29,7 +32,7 @@ const COLUMNS = [
   {
     title: 'For Institutions',
     links: [
-      { label: 'Campus plans', to: '/#pricing' },
+      { label: 'Campus plans', to: `${homePath}#pricing` },
       { label: 'Mentor login', to: '/mentor/login' },
       { label: 'University login', to: '/university/login' },
     ],
@@ -45,12 +48,15 @@ const SOCIALS = [
 ]
 
 export default function MarketingFooter() {
+  const { homePath } = useMarketingLinks()
+  const COLUMNS = columns(homePath)
+
   return (
     <footer className="border-t border-border bg-surface-low">
       <div className="max-w-container mx-auto px-6 py-14">
         <div className="grid gap-10 md:grid-cols-[1.4fr_repeat(3,1fr)]">
           <div>
-            <Link to="/" className="flex items-center gap-2 mb-3">
+            <Link to={homePath} className="flex items-center gap-2 mb-3">
               <img src={logo} alt="" className="w-8 h-8 rounded-lg object-cover" />
               <span className="font-extrabold text-on-surface tracking-tight">WorkLearn</span>
             </Link>

@@ -2,13 +2,16 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Menu, X } from 'lucide-react'
 import { cn } from '../../../lib/cn'
+import { useMarketingLinks } from '../useMarketingLinks'
 import logo from '../../../assets/logo.png'
 
 // Pricing is an on-page section rather than its own route, so it's an anchor
 // from anywhere else on the site. Every item here resolves to something real.
-const NAV_ITEMS = [
+// `homePath` is threaded through because the landing page answers on two
+// paths — see AppRouter.jsx.
+const navItems = (homePath) => [
   { label: 'About Us', to: '/about' },
-  { label: 'Pricing', to: '/#pricing' },
+  { label: 'Pricing', to: `${homePath}#pricing` },
   { label: 'Contact', to: '/contact' },
   { label: 'Blog', to: '/blog' },
 ]
@@ -22,6 +25,11 @@ export default function MarketingNav() {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+
+  // A signed-in visitor can reach the marketing site via /home (the app
+  // Navbar's logo points there), so the CTAs have to switch — offering
+  // "Log in" to someone already logged in is a dead end.
+  const { signedIn, homePath, startPath, startLabel } = useMarketingLinks()
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24)
@@ -46,13 +54,13 @@ export default function MarketingNav() {
               : 'bg-white/70 border-white/40 shadow-md backdrop-blur-md px-5 py-2.5'
           )}
         >
-          <Link to="/" className="flex items-center gap-2 shrink-0">
+          <Link to={homePath} className="flex items-center gap-2 shrink-0">
             <img src={logo} alt="" className="w-7 h-7 rounded-lg object-cover" />
             <span className="font-extrabold text-on-surface tracking-tight text-sm">WorkLearn</span>
           </Link>
 
           <div className="hidden md:flex items-center gap-1 mx-auto">
-            {NAV_ITEMS.map((item) => (
+            {navItems(homePath).map((item) => (
               <Link
                 key={item.label}
                 to={item.to}
@@ -64,18 +72,29 @@ export default function MarketingNav() {
           </div>
 
           <div className="hidden md:flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => navigate('/login')}
-              className="text-sm font-semibold text-on-surface hover:text-primary px-3 py-1.5 transition-colors cursor-pointer"
-            >
-              Log in
-            </button>
-            <button
-              onClick={() => navigate('/login')}
-              className="bg-primary hover:bg-primary-dark text-white text-sm font-bold rounded-full px-4 py-1.5 transition-colors cursor-pointer active:scale-[0.98]"
-            >
-              Get started
-            </button>
+            {signedIn ? (
+              <button
+                onClick={() => navigate(startPath)}
+                className="bg-primary hover:bg-primary-dark text-white text-sm font-bold rounded-full px-4 py-1.5 transition-colors cursor-pointer active:scale-[0.98]"
+              >
+                {startLabel}
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => navigate('/login')}
+                  className="text-sm font-semibold text-on-surface hover:text-primary px-3 py-1.5 transition-colors cursor-pointer"
+                >
+                  Log in
+                </button>
+                <button
+                  onClick={() => navigate('/login')}
+                  className="bg-primary hover:bg-primary-dark text-white text-sm font-bold rounded-full px-4 py-1.5 transition-colors cursor-pointer active:scale-[0.98]"
+                >
+                  Get started
+                </button>
+              </>
+            )}
           </div>
 
           <button
@@ -91,7 +110,7 @@ export default function MarketingNav() {
         {/* Mobile sheet — a rounded card under the pill, same floating language */}
         {open && (
           <div className="md:hidden mt-2 rounded-2xl border border-border bg-white/95 backdrop-blur-xl shadow-lg p-4 space-y-1">
-            {NAV_ITEMS.map((item) => (
+            {navItems(homePath).map((item) => (
               <Link
                 key={item.label}
                 to={item.to}
@@ -102,18 +121,29 @@ export default function MarketingNav() {
               </Link>
             ))}
             <div className="pt-3 mt-2 border-t border-border flex gap-2">
-              <button
-                onClick={() => navigate('/login')}
-                className="flex-1 text-sm font-semibold text-on-surface border border-border rounded-full py-2 cursor-pointer"
-              >
-                Log in
-              </button>
-              <button
-                onClick={() => navigate('/login')}
-                className="flex-1 bg-primary text-white text-sm font-bold rounded-full py-2 cursor-pointer"
-              >
-                Get started
-              </button>
+              {signedIn ? (
+                <button
+                  onClick={() => navigate(startPath)}
+                  className="flex-1 bg-primary text-white text-sm font-bold rounded-full py-2 cursor-pointer"
+                >
+                  {startLabel}
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => navigate('/login')}
+                    className="flex-1 text-sm font-semibold text-on-surface border border-border rounded-full py-2 cursor-pointer"
+                  >
+                    Log in
+                  </button>
+                  <button
+                    onClick={() => navigate('/login')}
+                    className="flex-1 bg-primary text-white text-sm font-bold rounded-full py-2 cursor-pointer"
+                  >
+                    Get started
+                  </button>
+                </>
+              )}
             </div>
           </div>
         )}

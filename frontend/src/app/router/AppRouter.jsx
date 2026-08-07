@@ -6,6 +6,7 @@ import Navbar from '../../components/Navbar'
 import Footer from '../../components/Footer'
 
 // ── guards ────────────────────────────────────────────────────────────────
+import ScrollToHash from './ScrollToHash'
 import ProtectedRoute from './guards/ProtectedRoute'
 import RequireAdmin from './guards/RequireAdmin'
 import RequireSuperAdmin from './guards/RequireSuperAdmin'
@@ -91,13 +92,23 @@ function MiraLayout() {
 
 export default function AppRouter() {
   return (
+    <>
+    <ScrollToHash />
     <Routes>
-      {/* (public) — marketing site, no login required. Wrapped in
-          PublicOnlyRoute so a signed-in user still lands on /dashboard,
-          preserving the behaviour `/` had before this page existed. These
-          carry their own MarketingNav/Footer, NOT MainLayout — that renders
-          the app Navbar, which depends on authenticated queries. */}
+      {/* (public) — marketing site, no login required. These carry their own
+          MarketingNav/Footer, NOT MainLayout — that renders the app Navbar,
+          which depends on authenticated queries.
+
+          Two paths reach the landing page, deliberately:
+          - `/` is guarded by PublicOnlyRoute, so a signed-in user opening the
+            bare domain still lands on /dashboard, preserving the behaviour `/`
+            had before this page existed.
+          - `/home` is the landing page's own unguarded route. Without it a
+            signed-in user has no way *back* to the marketing site — every link
+            to `/` would bounce straight to /dashboard. This is where the app
+            Navbar's logo points (see components/Navbar.jsx). */}
       <Route path="/"        element={<PublicOnlyRoute><LandingPage /></PublicOnlyRoute>} />
+      <Route path="/home"    element={<LandingPage />} />
       <Route path="/about"   element={<AboutPage />} />
       <Route path="/contact" element={<ContactPage />} />
       <Route path="/blog"    element={<BlogPage />} />
@@ -172,5 +183,6 @@ export default function AppRouter() {
       {/* (public) — catch-all, any unmatched URL, logged in or not */}
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
+    </>
   )
 }

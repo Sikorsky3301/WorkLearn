@@ -149,8 +149,11 @@ export default function Navbar() {
           side on wide screens. */}
       <div className="w-full px-6 flex items-center gap-1" style={{ height: 52 }}>
 
-        {/* Logo */}
-        <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 shrink-0 mr-4">
+        {/* Logo — goes back out to the marketing site. `/home` rather than
+            `/`, which PublicOnlyRoute bounces straight back to /dashboard for
+            a signed-in user (see app/router/AppRouter.jsx). Dashboard is one
+            click away in the nav immediately to the right. */}
+        <button onClick={() => navigate('/home')} className="flex items-center gap-2 shrink-0 mr-4" aria-label="WorkLearn home">
           <img src={logo} alt="WorkLearn" className="w-8 h-8 rounded object-cover" />
           <span className="font-bold text-on-surface text-sm tracking-tight">WorkLearn</span>
         </button>

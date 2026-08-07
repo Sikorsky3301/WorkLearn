@@ -5,21 +5,23 @@ import { SIM_BRANDING } from '../../../lib/simBranding'
 import { resolveDomainIcon } from '../../../lib/domainIcons'
 import RatingStars from '../../../components/ui/RatingStars'
 import { CAREER_DOMAINS } from '../../../lib/careerDomains'
+import { useMarketingLinks } from '../useMarketingLinks'
 
 /** Real published simulations, straight from the same public endpoint the
  * app itself uses (`GET /api/simulations` needs no auth). Renders nothing
  * rather than a fake catalogue if none are published. */
 export default function SimulationsShowcase() {
   const navigate = useNavigate()
+  const { signedIn } = useMarketingLinks()
   const { data, isLoading } = useSimulations()
   const sims = data?.simulations ?? []
 
   return (
-    <section id="simulations" className="bg-white py-20">
+    <section id="simulations" className="bg-surface-low py-20">
       <div className="max-w-container mx-auto px-6">
         <div className="text-center max-w-2xl mx-auto mb-12">
           <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">The catalogue</p>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-on-surface tracking-tight mb-4">
+          <h2 className="font-display text-3xl sm:text-4xl font-extrabold text-on-surface tracking-tight mb-4">
             Start with a role that fits
           </h2>
           <p className="text-base text-on-surface-variant leading-relaxed">
@@ -91,7 +93,7 @@ export default function SimulationsShowcase() {
 
         <div className="text-center mt-10">
           <button
-            onClick={() => navigate('/login')}
+            onClick={() => navigate(signedIn ? '/simulations' : '/login')}
             className="btn-primary text-sm px-6 py-2.5 cursor-pointer"
           >
             Browse all simulations <ArrowRight className="h-4 w-4" />
