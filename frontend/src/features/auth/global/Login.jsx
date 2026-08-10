@@ -1,9 +1,31 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { Eye, EyeOff } from 'lucide-react'
+import { MultiStepLoader } from '../../../components/ui/multi-step-loader'
+import { api } from '../../../lib/client'
 import { useAuth } from '../AuthContext'
 import { ROLES } from '../../../rbac/roles'
 import logo from '../../../assets/logo.png'
+
+// Shown between a successful sign-in and the first authenticated screen. The
+// steps are not decoration: the same window is used to prefetch the queries
+// the dashboard mounts with (see `warmUp` below), so the app is already
+// populated by the time the redirect happens instead of showing a second
+// round of spinners on arrival.
+const SIGN_IN_STATES = [
+  { text: 'Verifying your credentials' },
+  { text: 'Loading your simulations' },
+  { text: 'Syncing your progress' },
+  { text: 'Setting up your workspace' },
+]
+
+const SIGN_UP_STATES = [
+  { text: 'Creating your account' },
+  { text: 'Setting up your profile' },
+  { text: 'Loading available simulations' },
+  { text: 'Getting you started' },
+]
 
 function GoogleIcon() {
   return (
@@ -18,6 +40,7 @@ function GoogleIcon() {
 
 export default function Login() {
   const navigate                  = useNavigate()
+  const queryClient               = useQueryClient()
   const { loginDirect, register } = useAuth()
 
   const [mode,     setMode]     = useState('signin') // 'signin' | 'signup'
@@ -29,11 +52,29 @@ export default function Login() {
   const [error,    setError]    = useState('')
   const [loading,  setLoading]  = useState(false)
   const [notice,   setNotice]   = useState('')
+  // Where to go once the loader finishes. Non-null means "authenticated,
+  // loader running" — the redirect is deferred to the loader's onComplete.
+  const [destination, setDestination] = useState(null)
 
   const switchMode = (m) => {
     setMode(m); setError(''); setNotice('')
     setName(''); setEmail(''); setPassword(''); setConfirm('')
   }
+
+  // Fire-and-forget: warm the caches the first authenticated screen reads.
+  // Deliberately not awaited — the loader's own timing governs how long the
+  // user waits, and a slow endpoint must not extend that or block the
+  // redirect. Failures are swallowed because these are pure optimisations;
+  // the destination screen refetches through its own hooks regardless.
+  const warmUp = useCallback(() => {
+    const prefetch = [
+      ['simulations', '/api/simulations'],
+      ['my-assignments', '/api/my-assignments'],
+    ]
+    for (const [key, url] of prefetch) {
+      queryClient.prefetchQuery({ queryKey: [key], queryFn: () => api.get(url) }).catch(() => {})
+    }
+  }, [queryClient])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -47,13 +88,25 @@ export default function Login() {
       : await register(name, email, password)
     setLoading(false)
     if (result.error) { setError(result.error); return }
-    if (result.role === ROLES.SUPER_ADMIN) navigate('/super-admin')
-    else if (result.role === ROLES.ADMIN) navigate('/admin')
-    else navigate('/dashboard')
+
+    // Admins and super-admins land in their own portals, which share none of
+    // the student dashboard's queries — no point warming those.
+    let to = '/dashboard'
+    if (result.role === ROLES.SUPER_ADMIN) to = '/super-admin'
+    else if (result.role === ROLES.ADMIN) to = '/admin'
+    else warmUp()
+
+    setDestination(to)
   }
 
   return (
     <div className="h-screen flex overflow-hidden">
+      <MultiStepLoader
+        loadingStates={mode === 'signin' ? SIGN_IN_STATES : SIGN_UP_STATES}
+        loading={destination !== null}
+        duration={620}
+        onComplete={() => navigate(destination)}
+      />
 
       {/* ── Left: form — its own scroll container, so a tall signup form
           (or a short viewport) never breaks the page layout; the right

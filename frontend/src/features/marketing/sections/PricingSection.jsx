@@ -1,5 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { Check } from 'lucide-react'
+import { Highlight } from '../../../components/ui/hero-highlight'
+import { Reveal, RevealGroup, RevealItem } from '../../../components/ui/reveal'
 import { PRICING_TIERS } from '../data/pricingTiers'
 import { useMarketingLinks } from '../useMarketingLinks'
 
@@ -8,28 +10,26 @@ export default function PricingSection() {
   const { startPath } = useMarketingLinks()
 
   return (
-    <section id="pricing" className="bg-white py-20 scroll-mt-16">
+    <section id="pricing" className="bg-surface-low py-20 scroll-mt-16">
       <div className="max-w-container mx-auto px-6">
-        <div className="text-center max-w-2xl mx-auto mb-12">
-          <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">Pricing</p>
+        <Reveal className="text-center max-w-2xl mx-auto mb-12">
+          <p className="eyebrow mb-3">Pricing</p>
           <h2 className="font-display text-3xl sm:text-4xl font-extrabold text-on-surface tracking-tight mb-4">
-            Start free. Upgrade when it's paying off.
+            Start free. <Highlight>Upgrade when it's paying off.</Highlight>
           </h2>
           <p className="text-base text-on-surface-variant leading-relaxed">
             Try a full task before you decide anything.
           </p>
-        </div>
+        </Reveal>
 
-        <div className="grid md:grid-cols-3 gap-5 items-start">
+        <RevealGroup className="grid md:grid-cols-3 gap-5 items-start">
           {PRICING_TIERS.map((tier) => (
-            <div
+            <RevealItem
               key={tier.key}
-              className={`rounded-2xl border bg-white p-7 ${
-                tier.highlighted ? 'border-primary shadow-xl md:-mt-3 md:pb-10' : 'border-border'
-              }`}
+              className={`panel p-7 ${tier.highlighted ? 'border-primary shadow-panel-raised md:-mt-4 md:pb-10' : ''}`}
             >
               {tier.highlighted && (
-                <span className="inline-block text-[10px] font-bold uppercase tracking-wide bg-primary text-white rounded-full px-2.5 py-1 mb-3">
+                <span className="inline-block rounded-full bg-primary px-2.5 py-1 mb-3 text-[10px] font-bold uppercase tracking-wide text-white">
                   Most popular
                 </span>
               )}
@@ -43,7 +43,7 @@ export default function PricingSection() {
 
               <button
                 onClick={() => navigate(tier.key === 'campus' ? '/contact' : startPath)}
-                className={`w-full text-sm py-2.5 cursor-pointer ${tier.highlighted ? 'btn-primary' : 'btn-secondary'}`}
+                className={`w-full ${tier.highlighted ? 'pill-btn-primary' : 'pill-btn'}`}
               >
                 {tier.cta}
               </button>
@@ -56,13 +56,13 @@ export default function PricingSection() {
                   </li>
                 ))}
               </ul>
-            </div>
+            </RevealItem>
           ))}
-        </div>
+        </RevealGroup>
 
-        <p className="text-center text-[11px] text-on-surface-variant/70 mt-8">
+        <Reveal as="p" className="text-center text-[11px] text-on-surface-variant/70 mt-8">
           Indicative pricing — billing isn't live yet, and nothing on this page takes payment.
-        </p>
+        </Reveal>
       </div>
     </section>
   )

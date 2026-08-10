@@ -1,9 +1,11 @@
 import { Bot, Compass, ShieldCheck, Mic, FolderGit2, Layers, Check, ArrowUpRight } from 'lucide-react'
 import { BentoGrid, BentoGridItem } from '../../../components/ui/bento-grid'
+import { Highlight } from '../../../components/ui/hero-highlight'
+import { Reveal } from '../../../components/ui/reveal'
 import { CAREER_DOMAINS } from '../../../lib/careerDomains'
 
 /* Each header is a small abstract visual, not a screenshot — the product
-   shots live in ProductTourSection. Kept as tiny local components so the
+   shots live in AppShowcaseSection. Kept as tiny local components so the
    feature list below reads as data. Every figure shown is illustrative. */
 
 function ReviewHeader() {
@@ -14,7 +16,7 @@ function ReviewHeader() {
     { label: 'Clarity of write-up', got: 14, of: 15 },
   ]
   return (
-    <div className="rounded-lg border border-border bg-surface-low p-3">
+    <div className="rounded-xl border border-border bg-surface-low p-3">
       <div className="flex items-center justify-between mb-2.5">
         <span className="text-[10px] font-bold text-on-surface">Priya's review · Task 3</span>
         <span className="rounded border border-amber-200 bg-amber-50 px-1.5 py-px font-mono text-[10px] font-bold text-amber-800">
@@ -25,7 +27,7 @@ function ReviewHeader() {
         {rubric.map((r) => (
           <div key={r.label} className="flex items-center gap-2">
             <span className="w-[42%] shrink-0 truncate text-[9.5px] text-on-surface-variant">{r.label}</span>
-            <span className="h-1.5 flex-1 rounded-full bg-surface-highest overflow-hidden">
+            <span className="h-1.5 flex-1 track">
               <span
                 className={`block h-full rounded-full ${r.got / r.of >= 0.8 ? 'bg-emerald-500' : 'bg-amber-500'}`}
                 style={{ width: `${(r.got / r.of) * 100}%` }}
@@ -48,7 +50,7 @@ function SkillBarsHeader() {
     { label: 'Statistics', now: 41, need: 60 },
   ]
   return (
-    <div className="rounded-lg border border-border bg-surface-low p-3 space-y-2.5">
+    <div className="rounded-xl border border-border bg-surface-low p-3 space-y-2.5">
       {bars.map((b) => (
         <div key={b.label}>
           <div className="flex justify-between text-[9.5px] font-semibold mb-1">
@@ -58,7 +60,7 @@ function SkillBarsHeader() {
               <span className="text-on-surface-variant/60">/{b.need}</span>
             </span>
           </div>
-          <div className="relative h-1.5 rounded-full bg-surface-highest overflow-hidden">
+          <div className="relative h-1.5 track">
             <div
               className={`h-full rounded-full ${b.now >= b.need ? 'bg-emerald-500' : 'bg-rose-500'}`}
               style={{ width: `${b.now}%` }}
@@ -73,7 +75,7 @@ function SkillBarsHeader() {
 
 function CertificateHeader() {
   return (
-    <div className="rounded-lg border border-border bg-surface-low p-3">
+    <div className="rounded-xl border border-border bg-surface-low p-3">
       <div className="flex items-start gap-2.5">
         <span className="mt-px flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
           <ShieldCheck className="h-4 w-4" />
@@ -93,7 +95,7 @@ function CertificateHeader() {
 function InterviewHeader() {
   const heights = [30, 55, 82, 48, 96, 38, 70, 88, 44, 62, 34, 78, 52, 90, 40]
   return (
-    <div className="rounded-lg border border-border bg-surface-low p-3">
+    <div className="rounded-xl border border-border bg-surface-low p-3">
       <div className="flex items-end justify-center gap-[3px] h-9 mb-2.5">
         {heights.map((h, i) => (
           <span key={i} className="w-[3px] rounded-full bg-violet-400" style={{ height: `${h}%` }} />
@@ -122,9 +124,9 @@ function PortfolioHeader() {
     { t: 'Responsive nav rebuild', m: '5 tasks · 91% avg' },
   ]
   return (
-    <div className="rounded-lg border border-border bg-surface-low p-3 space-y-1.5">
+    <div className="rounded-xl border border-border bg-surface-low p-3 space-y-1.5">
       {entries.map((e) => (
-        <div key={e.t} className="flex items-center gap-2 rounded-md border border-border bg-white px-2.5 py-2">
+        <div key={e.t} className="flex items-center gap-2 rounded-lg border border-border bg-white px-2.5 py-2">
           <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-orange-100 text-orange-700">
             <Check className="h-3 w-3" strokeWidth={3} />
           </span>
@@ -142,7 +144,7 @@ function PortfolioHeader() {
 
 function DomainsHeader() {
   return (
-    <div className="flex flex-wrap content-start gap-1.5 rounded-lg border border-border bg-surface-low p-3 overflow-hidden">
+    <div className="flex flex-wrap content-start gap-1.5 rounded-xl border border-border bg-surface-low p-3 overflow-hidden">
       {CAREER_DOMAINS.slice(0, 12).map(({ key, label, Icon }) => (
         <span
           key={key}
@@ -241,15 +243,15 @@ export default function FeaturesBentoSection() {
   return (
     <section id="features" className="bg-white py-20">
       <div className="max-w-container mx-auto px-6">
-        <div className="text-center max-w-2xl mx-auto mb-12">
-          <p className="text-xs font-bold uppercase tracking-widest text-teal-600 mb-3">Everything included</p>
+        <Reveal className="text-center max-w-2xl mx-auto mb-12">
+          <p className="eyebrow mb-3">Everything included</p>
           <h2 className="font-display text-3xl sm:text-4xl font-extrabold text-on-surface tracking-tight mb-4">
-            More than a course platform
+            More than a <Highlight>course platform</Highlight>
           </h2>
           <p className="text-base text-on-surface-variant leading-relaxed">
             The support structure around the work matters as much as the work itself.
           </p>
-        </div>
+        </Reveal>
 
         <BentoGrid>
           {FEATURES.map((f) => (

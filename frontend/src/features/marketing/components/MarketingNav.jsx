@@ -11,6 +11,7 @@ import logo from '../../../assets/logo.png'
 // paths — see AppRouter.jsx.
 const navItems = (homePath) => [
   { label: 'About Us', to: '/about' },
+  { label: 'For Institutions', to: '/institutions' },
   { label: 'Pricing', to: `${homePath}#pricing` },
   { label: 'Contact', to: '/contact' },
   { label: 'Blog', to: '/blog' },
@@ -48,10 +49,8 @@ export default function MarketingNav() {
       >
         <nav
           className={cn(
-            'flex items-center gap-6 rounded-full border transition-all duration-300 ease-out',
-            scrolled
-              ? 'bg-white/90 border-border shadow-lg backdrop-blur-xl px-4 py-2'
-              : 'bg-white/70 border-white/40 shadow-md backdrop-blur-md px-5 py-2.5'
+            'flex items-center gap-6 rounded-full border border-border transition-all duration-300 ease-out',
+            scrolled ? 'bg-white/95 shadow-panel-raised backdrop-blur-xl px-4 py-2' : 'bg-white/85 shadow-panel backdrop-blur-md px-5 py-2.5'
           )}
         >
           <Link to={homePath} className="flex items-center gap-2 shrink-0">
@@ -59,38 +58,35 @@ export default function MarketingNav() {
             <span className="font-extrabold text-on-surface tracking-tight text-sm">WorkLearn</span>
           </Link>
 
-          <div className="hidden md:flex items-center gap-1 mx-auto">
+          {/* `lg` rather than `md`: five items plus the logo and both CTAs
+              overflow the pill at tablet widths — below that the hamburger
+              sheet carries them. */}
+          <div className="hidden lg:flex items-center gap-1 mx-auto">
             {navItems(homePath).map((item) => (
               <Link
                 key={item.label}
                 to={item.to}
-                className="text-sm font-medium text-on-surface-variant hover:text-on-surface px-3 py-1.5 rounded-full hover:bg-surface-container transition-colors"
+                className="text-sm font-semibold text-on-surface-variant hover:text-on-surface px-3 py-1.5 rounded-full hover:bg-surface-low transition-colors duration-200"
               >
                 {item.label}
               </Link>
             ))}
           </div>
 
-          <div className="hidden md:flex items-center gap-2 shrink-0">
+          <div className="hidden lg:flex items-center gap-2 shrink-0">
             {signedIn ? (
-              <button
-                onClick={() => navigate(startPath)}
-                className="bg-primary hover:bg-primary-dark text-white text-sm font-bold rounded-full px-4 py-1.5 transition-colors cursor-pointer active:scale-[0.98]"
-              >
+              <button onClick={() => navigate(startPath)} className="pill-btn-primary px-4 py-2 text-xs">
                 {startLabel}
               </button>
             ) : (
               <>
                 <button
                   onClick={() => navigate('/login')}
-                  className="text-sm font-semibold text-on-surface hover:text-primary px-3 py-1.5 transition-colors cursor-pointer"
+                  className="text-sm font-bold text-on-surface hover:text-primary px-3 py-1.5 transition-colors cursor-pointer"
                 >
                   Log in
                 </button>
-                <button
-                  onClick={() => navigate('/login')}
-                  className="bg-primary hover:bg-primary-dark text-white text-sm font-bold rounded-full px-4 py-1.5 transition-colors cursor-pointer active:scale-[0.98]"
-                >
+                <button onClick={() => navigate('/login')} className="pill-btn-primary px-4 py-2 text-xs">
                   Get started
                 </button>
               </>
@@ -101,7 +97,7 @@ export default function MarketingNav() {
             onClick={() => setOpen((v) => !v)}
             aria-label={open ? 'Close menu' : 'Open menu'}
             aria-expanded={open}
-            className="md:hidden ml-auto p-1.5 text-on-surface cursor-pointer"
+            className="lg:hidden ml-auto p-1.5 text-on-surface cursor-pointer"
           >
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
@@ -109,7 +105,7 @@ export default function MarketingNav() {
 
         {/* Mobile sheet — a rounded card under the pill, same floating language */}
         {open && (
-          <div className="md:hidden mt-2 rounded-2xl border border-border bg-white/95 backdrop-blur-xl shadow-lg p-4 space-y-1">
+          <div className="lg:hidden mt-2 panel bg-white/95 backdrop-blur-xl p-4 space-y-1">
             {navItems(homePath).map((item) => (
               <Link
                 key={item.label}
@@ -120,26 +116,17 @@ export default function MarketingNav() {
                 {item.label}
               </Link>
             ))}
-            <div className="pt-3 mt-2 border-t border-border flex gap-2">
+            <div className="pt-4 mt-2 border-t border-border flex gap-2">
               {signedIn ? (
-                <button
-                  onClick={() => navigate(startPath)}
-                  className="flex-1 bg-primary text-white text-sm font-bold rounded-full py-2 cursor-pointer"
-                >
+                <button onClick={() => navigate(startPath)} className="pill-btn-primary flex-1 py-2.5">
                   {startLabel}
                 </button>
               ) : (
                 <>
-                  <button
-                    onClick={() => navigate('/login')}
-                    className="flex-1 text-sm font-semibold text-on-surface border border-border rounded-full py-2 cursor-pointer"
-                  >
+                  <button onClick={() => navigate('/login')} className="pill-btn flex-1 py-2.5">
                     Log in
                   </button>
-                  <button
-                    onClick={() => navigate('/login')}
-                    className="flex-1 bg-primary text-white text-sm font-bold rounded-full py-2 cursor-pointer"
-                  >
+                  <button onClick={() => navigate('/login')} className="pill-btn-primary flex-1 py-2.5">
                     Get started
                   </button>
                 </>

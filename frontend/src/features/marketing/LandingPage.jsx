@@ -1,7 +1,7 @@
 import MarketingNav from './components/MarketingNav'
 import MarketingFooter from './components/MarketingFooter'
 import HeroSection from './sections/HeroSection'
-import ProductTourSection from './sections/ProductTourSection'
+import AppShowcaseSection from './sections/AppShowcaseSection'
 import FeaturesBentoSection from './sections/FeaturesBentoSection'
 import HowItWorksSection from './sections/HowItWorksSection'
 import TrustSection from './sections/TrustSection'
@@ -13,16 +13,21 @@ import FinalCtaSection from './sections/FinalCtaSection'
  * owns its own content and data fetching. Carries its own nav/footer rather
  * than MainLayout, whose Navbar hard-depends on authenticated queries.
  *
- * The page is light throughout — rhythm comes from alternating white and
- * `surface-low` bands plus the colour accents, not from dark sections:
- * hero → tour → features → how → trust → catalogue → pricing → CTA. */
+ * Minimal and light throughout — see the `.panel` / `.pill-btn` /
+ * `.eyebrow` classes in styles/index.css. Rhythm comes from alternating
+ * white with `surface-low` bands, never from dark sections or decoration:
+ * hero → app → features → how → trust → catalogue → pricing → CTA.
+ *
+ * There used to be a second scroll-driven tour section between the hero and
+ * the app showcase. It was cut: `AppShowcaseSection` now cycles through the
+ * same screens on its own, so the tour was saying the same thing twice. */
 export default function LandingPage() {
   return (
     <div className="bg-white">
       <MarketingNav />
       <main>
         <HeroSection />
-        <ProductTourSection />
+        <AppShowcaseSection />
         <FeaturesBentoSection />
         <HowItWorksSection />
         <TrustSection />

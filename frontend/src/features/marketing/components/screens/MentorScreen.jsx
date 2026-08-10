@@ -19,7 +19,7 @@ const CONTEXT = [
 const bubble = (delay, reduce) => ({
   initial: reduce ? false : { opacity: 0, y: 12, scale: 0.97 },
   animate: { opacity: 1, y: 0, scale: 1 },
-  transition: { duration: 0.4, delay, ease: [0.22, 1, 0.36, 1] },
+  transition: { duration: 0.42, delay, ease: [0.16, 1, 0.3, 1] },
 })
 
 export default function MentorScreen() {
@@ -45,14 +45,14 @@ export default function MentorScreen() {
 
           {/* Messages */}
           <div className="flex-1 min-h-0 overflow-hidden px-5 py-4 space-y-3">
-            <motion.div className="flex justify-end" {...bubble(0.3, reduce)}>
+            <motion.div className="flex justify-end" {...bubble(0.18, reduce)}>
               <p className="max-w-[78%] rounded-xl rounded-br-sm bg-primary px-3.5 py-2.5 text-[11.5px] leading-relaxed text-white">
                 I got 68% on the segmentation task. The feedback says my cut-offs weren't defensible
                 — what did I actually get wrong?
               </p>
             </motion.div>
 
-            <motion.div className="flex justify-start" {...bubble(0.62, reduce)}>
+            <motion.div className="flex justify-start" {...bubble(0.42, reduce)}>
               <div className="max-w-[86%] rounded-xl rounded-bl-sm border border-border bg-surface-low px-3.5 py-3">
                 <p className="text-[11.5px] leading-relaxed text-on-surface mb-2.5">
                   Two things, and only one of them is really about statistics.
@@ -91,7 +91,7 @@ export default function MentorScreen() {
                   key={c}
                   initial={reduce ? false : { opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: 0.95 + i * 0.08 }}
+                  transition={{ duration: 0.3, delay: 0.66 + i * 0.06 }}
                   className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[10px] font-semibold text-violet-700"
                 >
                   {c}

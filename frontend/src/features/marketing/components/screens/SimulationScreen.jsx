@@ -41,7 +41,7 @@ export default function SimulationScreen() {
                 <motion.span
                   initial={reduce ? false : { width: 0 }}
                   animate={{ width: '40%' }}
-                  transition={{ duration: 0.6, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                  transition={{ duration: 0.55, delay: 0.22, ease: [0.16, 1, 0.3, 1] }}
                   className="block h-full rounded-full bg-emerald-500"
                 />
               </span>
@@ -61,7 +61,7 @@ export default function SimulationScreen() {
                 key={t.n}
                 initial={reduce ? false : { opacity: 0, x: -8 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3, delay: 0.3 + i * 0.06 }}
+                transition={{ duration: 0.32, delay: 0.16 + i * 0.045 }}
                 className={`flex items-start gap-2 rounded-lg px-2 py-2 ${
                   t.state === 'active' ? 'bg-orange-50 border border-orange-200' : ''
                 }`}

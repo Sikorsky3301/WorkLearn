@@ -13,7 +13,7 @@ export default function MarketingPageShell({ eyebrow, title, intro, children }) 
           {/* pt clears the fixed pill nav (see MarketingNav). */}
           <div className="max-w-container mx-auto px-6 pt-32 pb-16">
             {eyebrow && (
-              <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">{eyebrow}</p>
+              <p className="eyebrow mb-3">{eyebrow}</p>
             )}
             <h1 className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight text-on-surface mb-3">{title}</h1>
             {intro && <p className="text-base text-on-surface-variant leading-relaxed max-w-2xl">{intro}</p>}

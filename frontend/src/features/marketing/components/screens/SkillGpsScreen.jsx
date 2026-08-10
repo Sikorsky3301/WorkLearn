@@ -84,7 +84,7 @@ export default function SkillGpsScreen() {
                       <motion.div
                         initial={animated ? { width: 0 } : false}
                         animate={{ width: `${s.now}%` }}
-                        transition={{ duration: 0.6, delay: 0.28 + i * 0.07, ease: [0.22, 1, 0.36, 1] }}
+                        transition={{ duration: 0.55, delay: 0.16 + i * 0.05, ease: [0.16, 1, 0.3, 1] }}
                         className={`h-full rounded-full ${tone.bar}`}
                       />
                       {/* Benchmark tick */}

@@ -86,7 +86,7 @@ export default function AnalyticsScreen() {
                   <motion.span
                     initial={animated ? { height: 0 } : false}
                     animate={{ height: `${(d.hrs / PEAK) * 100}%` }}
-                    transition={{ duration: 0.5, delay: 0.28 + i * 0.035, ease: [0.22, 1, 0.36, 1] }}
+                    transition={{ duration: 0.5, delay: 0.16 + i * 0.025, ease: [0.16, 1, 0.3, 1] }}
                     className={`w-full rounded-t-[3px] ${i === WEEKS.length - 1 ? 'bg-orange-500' : 'bg-orange-300'}`}
                   />
                   <span className="font-mono text-[8px] text-on-surface-variant/50">{d.w}</span>
@@ -115,7 +115,7 @@ export default function AnalyticsScreen() {
                   strokeLinejoin="round"
                   initial={animated ? { pathLength: 0 } : false}
                   animate={{ pathLength: 1 }}
-                  transition={{ duration: 0.9, delay: 0.45, ease: 'easeInOut' }}
+                  transition={{ duration: 0.75, delay: 0.34, ease: 'easeInOut' }}
                 />
               </svg>
             </div>

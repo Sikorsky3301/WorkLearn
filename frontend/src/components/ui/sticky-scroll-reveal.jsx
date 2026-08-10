@@ -1,18 +1,20 @@
-// Aceternity UI — Sticky Scroll Reveal, ported to plain JSX and re-laid-out.
+// Aceternity UI — Sticky Scroll Reveal, ported to plain JSX and reduced to
+// its essentials.
 //
-// Three departures from the source:
-//   1. The original scrolls an inner `overflow-y-auto` container, which nests
-//      a second scrollbar inside the page. This port drives the same
-//      active-index tracking off the *page* scroll with a `sticky` panel, so
-//      the page keeps one natural scroll.
-//   2. The source is a two-column split (copy left, panel right), which caps
-//      the panel at half the container. This lays the panel out centred and
-//      full-width with the copy above it, so the product shot can be large
-//      enough to actually read.
-//   3. The panel is scroll-animated on the way in — it starts tilted back in
-//      perspective and flattens as the section arrives, borrowing the idea
-//      from Aceternity's Container Scroll Animation. Steps then swap with a
-//      directional slide rather than a straight cross-fade.
+// Departures from the source:
+//   1. The original scrolls an inner `overflow-y-auto` container, nesting a
+//      second scrollbar inside the page. This drives the same active-index
+//      tracking off the *page* scroll with a `sticky` panel, so the page
+//      keeps one natural scroll.
+//   2. The source is a two-column split (copy left, panel right). All the
+//      copy, headings and step tabs are gone: the panel is centred, full
+//      width, and the only thing on screen. The product shot has to carry
+//      the section on its own.
+//   3. The panel is scroll-animated in — tilted back in perspective, then
+//      flattening as the section arrives (the idea comes from Aceternity's
+//      Container Scroll Animation). Steps swap with a directional slide.
+//   4. A synthetic cursor tracks a per-step target inside the panel, so the
+//      screens read as being operated rather than merely swapped.
 //
 // Sources: https://ui.aceternity.com/components/sticky-scroll-reveal
 //          https://ui.aceternity.com/components/container-scroll-animation
@@ -32,19 +34,40 @@ import { cn } from '../../lib/cn'
 // forward through the steps and -1 when scrolling back, so the outgoing panel
 // always leaves the way you came from.
 const SCREEN_VARIANTS = {
-  enter: (d) => ({ opacity: 0, x: d >= 0 ? 64 : -64, scale: 0.965 }),
-  center: { opacity: 1, x: 0, scale: 1 },
-  exit: (d) => ({ opacity: 0, x: d >= 0 ? -64 : 64, scale: 0.965 }),
+  enter: (d) => ({ opacity: 0, x: d >= 0 ? 44 : -44, y: 14, scale: 0.972 }),
+  center: { opacity: 1, x: 0, y: 0, scale: 1 },
+  exit: (d) => ({ opacity: 0, x: d >= 0 ? -44 : 44, y: -14, scale: 0.972 }),
 }
 
-const COPY_VARIANTS = {
-  enter: { opacity: 0, y: 10 },
-  center: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -10 },
+// Expo-out. The long tail is the point: the incoming panel covers most of its
+// distance early and then coasts, so the swap reads as one continuous move
+// rather than a cut.
+const SWAP_EASE = [0.16, 1, 0.3, 1]
+
+// Loose and slightly overdamped — a hand moving a mouse arrives with a small
+// settle, it does not snap onto the target.
+const CURSOR_SPRING = { type: 'spring', stiffness: 55, damping: 17, mass: 1.15 }
+
+const DEFAULT_CURSOR = { x: 50, y: 50 }
+
+function Pointer() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-5 w-5 drop-shadow-[0_1px_3px_rgba(16,24,40,0.45)]" aria-hidden="true">
+      <path
+        d="M4 2.2 15.6 9.4a.6.6 0 0 1-.13 1.09l-4.4 1.32a.6.6 0 0 0-.38.35l-1.8 4.3a.6.6 0 0 1-1.12-.08L3.36 3.0A.6.6 0 0 1 4 2.2Z"
+        fill="#1b1b21"
+        stroke="#ffffff"
+        strokeWidth="1.1"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
 }
 
 /**
- * @param {Array<{id: string, title: string, description: string, content: React.ReactNode}>} content
+ * @param {Array<{id: string, content: React.ReactNode, cursor?: {x: number, y: number}}>} content
+ *        `cursor` is a position in percent of the panel; the synthetic cursor
+ *        travels there when that step becomes active.
  * @param {number} stepVh viewport heights of scroll each step occupies
  */
 export const StickyScroll = ({ content, className, stepVh = 90 }) => {
@@ -54,14 +77,13 @@ export const StickyScroll = ({ content, className, stepVh = 90 }) => {
   const [direction, setDirection] = useState(1)
 
   // 'start start' → 'end end': progress runs from the moment the section's top
-  // reaches the viewport top (which is when the sticky child pins) to the
-  // moment its bottom does (when the child unpins). That maps 1:1 onto the
-  // time the panel is actually pinned, so each step gets an equal share.
+  // reaches the viewport top (when the sticky child pins) to the moment its
+  // bottom does (when it unpins) — a 1:1 map onto the time the panel is
+  // actually pinned, so each step gets an equal share.
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end end'] })
 
-  // A second range covering the *approach* — from the section's top entering
-  // the viewport bottom to it reaching the viewport top. `scrollYProgress`
-  // above is still 0 throughout this window, so the entrance needs its own.
+  // A second range covering the *approach*. `scrollYProgress` is still 0
+  // throughout that window, so the entrance needs its own.
   const { scrollYProgress: approach } = useScroll({ target: ref, offset: ['start end', 'start start'] })
 
   // Spring-smoothed so the tilt settles rather than tracking the wheel
@@ -69,15 +91,17 @@ export const StickyScroll = ({ content, className, stepVh = 90 }) => {
   const eased = useSpring(approach, { stiffness: 120, damping: 26, restDelta: 0.001 })
 
   const rotateX = useTransform(eased, [0, 1], [17, 0])
-  const y = useTransform(eased, [0, 1], [72, 0])
-  // Scale combines the entrance (0.86 → 1) with a slight settle-back over the
-  // last 8% of the pinned scroll, so the panel recedes as the section hands
-  // off to whatever follows instead of cutting.
+  const entryY = useTransform(eased, [0, 1], [72, 0])
+  // A slow, monotonic drift across the whole pinned section. Without it the
+  // panel is completely static between swaps and each change reads as a cut in
+  // an otherwise motionless frame. Monotonic matters — a per-step drift would
+  // snap back at every boundary.
+  const driftY = useTransform(scrollYProgress, [0, 1], [14, -14])
+  const y = useTransform([entryY, driftY], ([a, b]) => a + b)
   const scaleIn = useTransform(eased, [0, 1], [0.86, 1])
   const scaleOut = useTransform(scrollYProgress, [0.92, 1], [1, 0.955])
   const scale = useTransform([scaleIn, scaleOut], ([a, b]) => a * b)
 
-  // Continuous scroll position within the section, for the progress rail.
   const railWidth = useTransform(scrollYProgress, [0, 1], ['0%', '100%'])
 
   useMotionValueEvent(scrollYProgress, 'change', (latest) => {
@@ -90,73 +114,14 @@ export const StickyScroll = ({ content, className, stepVh = 90 }) => {
   })
 
   const active = content[activeCard]
-
-  const scrollToStep = (i) => {
-    if (!ref.current) return
-    const { top, height } = ref.current.getBoundingClientRect()
-    const start = window.scrollY + top
-    // Land mid-slice so the step reads as settled, not mid-transition.
-    window.scrollTo({
-      top: start + (height * (i + 0.5)) / content.length - window.innerHeight / 2,
-      behavior: reduceMotion ? 'auto' : 'smooth',
-    })
-  }
+  const cursor = active.cursor ?? DEFAULT_CURSOR
 
   return (
     <div ref={ref} className={cn('relative', className)} style={{ height: `${content.length * stepVh}vh` }}>
-      <div className="sticky top-0 h-screen flex flex-col items-center justify-center pt-20 pb-8">
-
-        {/* Step tabs, with a rail underneath tracking continuous progress */}
-        <div className="w-full max-w-2xl px-4 mb-6">
-          <div className="flex flex-wrap justify-center gap-1.5 mb-3">
-            {content.map((item, i) => (
-              <button
-                key={item.id}
-                onClick={() => scrollToStep(i)}
-                className={cn(
-                  'rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors duration-200 cursor-pointer',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-                  activeCard === i
-                    ? 'bg-on-surface text-white'
-                    : 'bg-white text-on-surface-variant border border-border hover:border-on-surface/30'
-                )}
-                aria-current={activeCard === i ? 'step' : undefined}
-              >
-                {item.title}
-              </button>
-            ))}
-          </div>
-          <div className="h-0.5 w-full rounded-full bg-surface-highest overflow-hidden" aria-hidden="true">
-            <motion.span className="block h-full rounded-full bg-on-surface" style={{ width: railWidth }} />
-          </div>
-        </div>
-
-        {/* Copy — swaps with the panel. Fixed min-height so the panel doesn't
-            jump when a description wraps to a different number of lines. */}
-        <div className="relative min-h-[4.5rem] w-full max-w-2xl px-6 mb-6 text-center">
-          <AnimatePresence initial={false} mode="wait">
-            <motion.p
-              key={active.id}
-              variants={reduceMotion ? undefined : COPY_VARIANTS}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ duration: 0.25, ease: 'easeOut' }}
-              className="text-base sm:text-lg text-on-surface-variant leading-relaxed"
-            >
-              {active.description}
-            </motion.p>
-          </AnimatePresence>
-        </div>
-
-        {/* The panel. The outer div owns the perspective; the inner motion.div
-            is what tilts, so the transform has something to project against. */}
-        <div
-          className="w-full max-w-6xl px-4 flex-1 min-h-0 max-h-[620px]"
-          style={{ perspective: '1400px' }}
-        >
+      <div className="sticky top-0 flex h-screen flex-col items-center justify-center px-4 pt-20 pb-10">
+        <div className="w-full max-w-6xl flex-1 min-h-0 max-h-[640px]" style={{ perspective: '1400px' }}>
           <motion.div
-            className="relative h-full w-full rounded-2xl"
+            className="relative h-full w-full"
             style={
               reduceMotion
                 ? undefined
@@ -173,13 +138,42 @@ export const StickyScroll = ({ content, className, stepVh = 90 }) => {
                 initial="enter"
                 animate="center"
                 exit="exit"
-                transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+                transition={{ duration: 0.62, ease: SWAP_EASE }}
                 className="absolute inset-0"
               >
                 {active.content}
               </motion.div>
             </AnimatePresence>
+
+            {/* Synthetic cursor. Decorative — it points at whatever the current
+                screen is demonstrating. Absolutely positioned, so animating
+                left/top costs one element's layout and nothing else's. */}
+            {!reduceMotion && (
+              <motion.div
+                className="pointer-events-none absolute z-20"
+                initial={false}
+                animate={{ left: `${cursor.x}%`, top: `${cursor.y}%` }}
+                transition={CURSOR_SPRING}
+                aria-hidden="true"
+              >
+                <Pointer />
+                {/* Click ring — keyed on the step so it replays on arrival. */}
+                <motion.span
+                  key={active.id}
+                  className="absolute left-0.5 top-0.5 block h-4 w-4 rounded-full border border-on-surface/40"
+                  initial={{ opacity: 0, scale: 0.4 }}
+                  animate={{ opacity: [0, 0.55, 0], scale: [0.4, 2.6, 3.2] }}
+                  transition={{ duration: 0.9, delay: 0.55, ease: 'easeOut' }}
+                />
+              </motion.div>
+            )}
           </motion.div>
+        </div>
+
+        {/* Hairline progress rail — the only chrome left. No labels: it exists
+            so the section reads as having a length, not to be read. */}
+        <div className="mt-8 h-px w-full max-w-6xl bg-border" aria-hidden="true">
+          <motion.span className="block h-full bg-on-surface/50" style={{ width: railWidth }} />
         </div>
       </div>
     </div>

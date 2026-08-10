@@ -32,6 +32,7 @@ const columns = (homePath) => [
   {
     title: 'For Institutions',
     links: [
+      { label: 'Overview', to: '/institutions' },
       { label: 'Campus plans', to: `${homePath}#pricing` },
       { label: 'Mentor login', to: '/mentor/login' },
       { label: 'University login', to: '/university/login' },
@@ -68,7 +69,7 @@ export default function MarketingFooter() {
                 <span
                   key={label}
                   title={`${label} — coming soon`}
-                  className="w-8 h-8 rounded-lg border border-border bg-white flex items-center justify-center text-on-surface-variant"
+                  className="w-9 h-9 rounded-lg border border-border bg-white flex items-center justify-center text-on-surface-variant"
                 >
                   <Icon className="h-4 w-4" />
                 </span>

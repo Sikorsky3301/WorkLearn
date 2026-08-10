@@ -1,5 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { ArrowRight, Clock, ListChecks } from 'lucide-react'
+import { Highlight } from '../../../components/ui/hero-highlight'
+import { Reveal, RevealGroup, RevealItem } from '../../../components/ui/reveal'
 import { useSimulations } from '../../../hooks'
 import { SIM_BRANDING } from '../../../lib/simBranding'
 import { resolveDomainIcon } from '../../../lib/domainIcons'
@@ -17,34 +19,37 @@ export default function SimulationsShowcase() {
   const sims = data?.simulations ?? []
 
   return (
-    <section id="simulations" className="bg-surface-low py-20">
+    <section id="simulations" className="bg-white py-20">
       <div className="max-w-container mx-auto px-6">
-        <div className="text-center max-w-2xl mx-auto mb-12">
-          <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">The catalogue</p>
+        <Reveal className="text-center max-w-2xl mx-auto mb-12">
+          <p className="eyebrow mb-3">The catalogue</p>
           <h2 className="font-display text-3xl sm:text-4xl font-extrabold text-on-surface tracking-tight mb-4">
-            Start with a role that fits
+            Start with a <Highlight>role that fits</Highlight>
           </h2>
           <p className="text-base text-on-surface-variant leading-relaxed">
             Every simulation is authored around work people are actually hired to do.
           </p>
-        </div>
+        </Reveal>
 
         {isLoading ? (
           <div className="grid md:grid-cols-3 gap-5">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-72 rounded-xl border border-border bg-surface-low animate-pulse" />
+              <div key={i} className="h-72 rounded-2xl border border-border bg-surface-low animate-pulse" />
             ))}
           </div>
         ) : sims.length > 0 ? (
-          <div className="grid md:grid-cols-3 gap-5">
+          /* Mounts only once the fetch resolves, so the cascade runs when the
+             cards actually appear rather than against an empty grid. */
+          <RevealGroup className="grid md:grid-cols-3 gap-5">
             {sims.slice(0, 6).map((sim) => {
               const DomainIcon = resolveDomainIcon(sim.domain)
               const banner = SIM_BRANDING[sim.slug]?.banner
               return (
-                <button
+                <RevealItem
+                  as="button"
                   key={sim.id}
                   onClick={() => navigate(`/simulations/${sim.slug}/overview`)}
-                  className="group text-left rounded-xl border border-border overflow-hidden bg-white hover:shadow-lg hover:border-primary/40 transition-all cursor-pointer"
+                  className="group panel panel-interactive text-left overflow-hidden"
                 >
                   <div className="relative h-36 bg-surface-low overflow-hidden">
                     {banner ? (
@@ -64,10 +69,10 @@ export default function SimulationsShowcase() {
                       <span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> {sim.estimated_hours}</span>
                     </div>
                   </div>
-                </button>
+                </RevealItem>
               )
             })}
-          </div>
+          </RevealGroup>
         ) : (
           <p className="text-center text-sm text-on-surface-variant">
             New simulations are on the way — check back soon.
@@ -76,29 +81,30 @@ export default function SimulationsShowcase() {
 
         {/* Domains we build toward, from the shared catalogue. */}
         <div className="mt-14 pt-10 border-t border-border">
-          <p className="text-center text-xs font-semibold uppercase tracking-widest text-on-surface-variant mb-6">
+          <Reveal as="p" className="text-center text-xs font-semibold uppercase tracking-widest text-on-surface-variant mb-6">
             Career areas you can build toward
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-2">
+          </Reveal>
+          <RevealGroup className="flex flex-wrap items-center justify-center gap-2" stagger={0.04}>
             {CAREER_DOMAINS.map(({ key, label, Icon }) => (
-              <span
+              <RevealItem
+                as="span"
                 key={key}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-low px-3 py-1.5 text-xs font-semibold text-on-surface-variant"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-white px-3 py-1.5 text-xs font-medium text-on-surface-variant"
               >
-                <Icon className="h-3.5 w-3.5 text-primary" /> {label}
-              </span>
+                <Icon className="h-3.5 w-3.5 text-on-surface-variant/60" /> {label}
+              </RevealItem>
             ))}
-          </div>
+          </RevealGroup>
         </div>
 
-        <div className="text-center mt-10">
+        <Reveal className="text-center mt-10">
           <button
             onClick={() => navigate(signedIn ? '/simulations' : '/login')}
-            className="btn-primary text-sm px-6 py-2.5 cursor-pointer"
+            className="pill-btn-primary"
           >
             Browse all simulations <ArrowRight className="h-4 w-4" />
           </button>
-        </div>
+        </Reveal>
       </div>
     </section>
   )

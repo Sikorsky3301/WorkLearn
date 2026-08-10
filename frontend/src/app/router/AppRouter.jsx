@@ -16,6 +16,7 @@ import PortalSpinner from './guards/PortalSpinner'
 // ── (public) — the marketing site ───────────────────────────────────────────
 import LandingPage from '../../features/marketing/LandingPage'
 import AboutPage from '../../features/marketing/AboutPage'
+import InstitutionsPage from '../../features/marketing/InstitutionsPage'
 import ContactPage from '../../features/marketing/ContactPage'
 import BlogPage from '../../features/marketing/BlogPage'
 
@@ -109,9 +110,10 @@ export default function AppRouter() {
             Navbar's logo points (see components/Navbar.jsx). */}
       <Route path="/"        element={<PublicOnlyRoute><LandingPage /></PublicOnlyRoute>} />
       <Route path="/home"    element={<LandingPage />} />
-      <Route path="/about"   element={<AboutPage />} />
-      <Route path="/contact" element={<ContactPage />} />
-      <Route path="/blog"    element={<BlogPage />} />
+      <Route path="/about"        element={<AboutPage />} />
+      <Route path="/institutions" element={<InstitutionsPage />} />
+      <Route path="/contact"      element={<ContactPage />} />
+      <Route path="/blog"         element={<BlogPage />} />
 
       {/* (auth) — no login required */}
       <Route path="/login"            element={<LoginPage />} />

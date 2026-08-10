@@ -49,6 +49,13 @@ export default {
         lg: '8px',
         xl: '12px',
       },
+      boxShadow: {
+        // Marketing surfaces. Restrained on purpose — depth comes from a
+        // hairline border plus a barely-there lift, not from a visible
+        // shadow. `-raised` is the hover state.
+        panel: '0 1px 2px rgba(16,24,40,0.04), 0 2px 8px -2px rgba(16,24,40,0.06)',
+        'panel-raised': '0 2px 4px rgba(16,24,40,0.05), 0 12px 28px -8px rgba(16,24,40,0.12)',
+      },
       maxWidth: {
         container: '1280px',
       },

@@ -1,14 +1,14 @@
 import { motion, useReducedMotion } from 'motion/react'
 import { LayoutDashboard, Briefcase, Bot, Compass, BarChart3, FolderGit2, Lock } from 'lucide-react'
 
-// Shared chrome for the four product mockups in ProductTourSection. These are
+// Shared chrome for the product mockups in AppShowcaseSection. These are
 // hand-built rather than screenshots so they stay legible at any size, keep
 // the real type scale, and don't go stale every time the app is restyled.
 //
 // The whole window is remounted by the AnimatePresence in
-// components/ui/sticky-scroll-reveal.jsx each time the active step changes,
-// so the mount animations below replay on every swap — the app reads as
-// assembling itself rather than appearing whole.
+// features/marketing/sections/AppShowcaseSection.jsx each time the active page
+// changes, so the mount animations below replay on every swap — the app reads
+// as assembling itself rather than appearing whole.
 //
 // Everything inside is illustrative sample data — see each screen file.
 
@@ -31,7 +31,7 @@ export default function AppWindow({ url, active, children }) {
   const animated = !reduceMotion
 
   return (
-    <div className="h-full w-full rounded-2xl border border-border bg-white shadow-2xl shadow-on-surface/10 overflow-hidden flex flex-col select-none">
+    <div className="h-full w-full rounded-2xl border border-border bg-white shadow-panel-raised overflow-hidden flex flex-col select-none">
       {/* Browser bar */}
       <div className="flex items-center gap-3 px-4 py-2.5 bg-surface-low border-b border-border shrink-0">
         <span className="flex gap-1.5 shrink-0">
@@ -42,7 +42,7 @@ export default function AppWindow({ url, active, children }) {
         <motion.span
           initial={animated ? { opacity: 0, y: -4 } : false}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.1 }}
+          transition={{ duration: 0.28, delay: 0.06 }}
           className="mx-auto flex items-center gap-1.5 rounded-full bg-white border border-border px-3 py-1 text-[11px] font-medium text-on-surface-variant max-w-[60%] truncate"
         >
           <Lock className="h-2.5 w-2.5 text-emerald-600 shrink-0" />
@@ -55,7 +55,7 @@ export default function AppWindow({ url, active, children }) {
         <motion.nav
           initial={animated ? 'hidden' : false}
           animate="show"
-          transition={{ staggerChildren: 0.035, delayChildren: 0.12 }}
+          transition={{ staggerChildren: 0.025, delayChildren: 0.08 }}
           className="hidden sm:flex w-[168px] shrink-0 flex-col gap-0.5 border-r border-border bg-surface-low/60 p-2.5"
         >
           <motion.div variants={NAV_ITEM} className="flex items-center gap-2 px-2 py-2 mb-2">
@@ -90,7 +90,7 @@ export default function AppWindow({ url, active, children }) {
         <motion.div
           initial={animated ? { opacity: 0, y: 12 } : false}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.16, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.38, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
           className="flex-1 min-w-0 overflow-hidden"
         >
           {children}
