@@ -11,6 +11,7 @@ export default function ProtectedRoute() {
   // Admins/SuperAdmins have no student profile — keep them in their own portal
   if (user.role === ROLES.SUPER_ADMIN) return <Navigate to="/super-admin" replace />
   if (user.role === ROLES.ADMIN) return <Navigate to="/admin" replace />
+  if (user.role === ROLES.UNIVERSITY_ADMIN) return <Navigate to="/university-admin" replace />
   // First-login onboarding wizard (features/onboarding/) — gated to STUDENT
   // (independent and university-affiliated students are the same role now);
   // TEACHER never sees it (mentors aren't picking a job-simulation domain).

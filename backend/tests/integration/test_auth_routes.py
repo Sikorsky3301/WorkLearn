@@ -55,6 +55,20 @@ async def test_login_wrong_password_rejected(client):
     assert resp.status_code == 401
 
 
+async def test_unified_login_accepts_academy_student(client):
+    await client.post("/api/auth/register", json={
+        "name": "Unified Login", "email": "unified-login@example.com", "password": "correctpass",
+    })
+    resp = await client.post("/api/auth/login", json={
+        "email": "unified-login@example.com", "password": "correctpass",
+    })
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["user"]["email"] == "unified-login@example.com"
+    assert body["user"]["role"] == "student"
+    assert body["token"]
+
+
 async def test_me_requires_a_token(client):
     resp = await client.get("/api/auth/me")
     assert resp.status_code in (401, 403)  # HTTPBearer's own default is 403 when the header is missing entirely
