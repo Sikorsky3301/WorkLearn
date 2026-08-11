@@ -10,7 +10,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 
-from app.core.permissions import require_permission
+from app.core.permissions import require_cms_access
 from app.core.paths import UPLOAD_DIR
 
 router = APIRouter(prefix="/api/admin/uploads", tags=["admin-uploads"])
@@ -22,7 +22,7 @@ MAX_UPLOAD_BYTES = 5 * 1024 * 1024  # 5MB
 
 
 @router.post("/image")
-async def upload_image(file: UploadFile = File(...), _=Depends(require_permission("simulations.edit"))):
+async def upload_image(file: UploadFile = File(...), _=Depends(require_cms_access())):
     ext = Path(file.filename or "").suffix.lower()
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(400, f"Unsupported image type '{ext}' — use one of {sorted(ALLOWED_EXTENSIONS)}")

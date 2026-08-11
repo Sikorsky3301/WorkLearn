@@ -12,6 +12,7 @@ export default function ProtectedRoute() {
   if (user.role === ROLES.SUPER_ADMIN) return <Navigate to="/super-admin" replace />
   if (user.role === ROLES.ADMIN) return <Navigate to="/admin" replace />
   if (user.role === ROLES.UNIVERSITY_ADMIN) return <Navigate to="/university-admin" replace />
+  if (user.role === ROLES.TEACHER) return <Navigate to="/mentor" replace />
   // First-login onboarding wizard (features/onboarding/) — gated to STUDENT
   // (independent and university-affiliated students are the same role now);
   // TEACHER never sees it (mentors aren't picking a job-simulation domain).

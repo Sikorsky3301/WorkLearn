@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { X, Trash2, AlertTriangle, Ban, CheckCircle2 } from 'lucide-react'
-import { useUserEnrollments, useDeleteUser, useDeleteEnrollment, useSuspendUser, useActivateUser } from '../../../hooks'
+import { X, Trash2, AlertTriangle, Ban, CheckCircle2, Blocks } from 'lucide-react'
+import { useUserEnrollments, useDeleteUser, useDeleteEnrollment, useSuspendUser, useActivateUser, useSetTeacherCmsAccess } from '../../../hooks'
 
 /** Shared by both portals' user tables — course enrollments, real
  * suspend/activate (previously only hard delete existed), and delete. */
@@ -10,10 +10,17 @@ export default function ManageUserModal({ user, onClose }) {
   const deleteEnrollment = useDeleteEnrollment()
   const suspendUser = useSuspendUser()
   const activateUser = useActivateUser()
+  const setCmsAccess = useSetTeacherCmsAccess()
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [cmsEnabled, setCmsEnabled] = useState(!!user.cms_access)
+
+  useEffect(() => {
+    setCmsEnabled(!!user.cms_access)
+  }, [user.id, user.cms_access])
 
   const enrollments = data?.enrollments ?? []
   const isActive = user.is_active !== false
+  const isTeacher = user.role === 'teacher'
 
   useEffect(() => {
     const onKeyDown = (e) => { if (e.key === 'Escape') onClose() }
@@ -34,6 +41,12 @@ export default function ManageUserModal({ user, onClose }) {
   const handleToggleSuspend = () => {
     if (isActive) suspendUser.mutate(user.id)
     else activateUser.mutate(user.id)
+  }
+
+  const handleToggleCms = async () => {
+    const next = !cmsEnabled
+    await setCmsAccess.mutateAsync({ userId: user.id, enabled: next })
+    setCmsEnabled(next)
   }
 
   return (
@@ -96,6 +109,32 @@ export default function ManageUserModal({ user, onClose }) {
             </div>
           )}
         </div>
+
+        {isTeacher && (
+          <div className="p-5 border-t border-slate-200 dark:border-slate-800">
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">CMS access</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+              Allow this teacher to use Simulations CMS and Sim Builder. Published sims appear in the student catalog.
+            </p>
+            <button
+              type="button"
+              onClick={handleToggleCms}
+              disabled={setCmsAccess.isPending}
+              className={`w-full flex items-center justify-center gap-2 text-sm font-semibold rounded-lg px-4 py-2 transition-colors cursor-pointer disabled:opacity-50 ${
+                cmsEnabled
+                  ? 'text-emerald-700 border border-emerald-200 hover:bg-emerald-50'
+                  : 'text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
+              }`}
+            >
+              <Blocks className="h-4 w-4" />
+              {setCmsAccess.isPending
+                ? 'Saving…'
+                : cmsEnabled
+                  ? 'CMS enabled — click to disable'
+                  : 'Enable CMS access'}
+            </button>
+          </div>
+        )}
 
         <div className="p-5 border-t border-slate-200 dark:border-slate-800">
           <button

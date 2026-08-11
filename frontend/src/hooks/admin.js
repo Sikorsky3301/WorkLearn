@@ -130,6 +130,14 @@ export function useActivateUser() {
   })
 }
 
+export function useSetTeacherCmsAccess() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ userId, enabled }) => api.put(`/api/admin/users/${userId}/cms-access`, { enabled }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
+  })
+}
+
 export function useDeleteUser() {
   const qc = useQueryClient()
   return useMutation({

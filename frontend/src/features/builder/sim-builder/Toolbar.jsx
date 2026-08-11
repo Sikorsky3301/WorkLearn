@@ -1,17 +1,19 @@
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown, Eye, Undo2, Redo2, History, Sparkles, Save, Loader2 } from 'lucide-react'
 import SimBuilderLogo from './SimBuilderLogo'
+import { useCmsBasePath } from '../../../hooks/useCmsBasePath'
 
 export default function Toolbar({
   project, onSave, saving, canUndo, canRedo, onUndo, onRedo,
   onOpenPreview, onOpenVersions, onOpenAiGenerate, onPublish, publishing,
 }) {
   const navigate = useNavigate()
+  const cmsBase = useCmsBasePath()
 
   return (
     <header className="h-16 border-b border-border bg-white flex items-center gap-3 px-4 shrink-0">
       <button
-        onClick={() => navigate('/admin/sim-builder')}
+        onClick={() => navigate(`${cmsBase}/sim-builder`)}
         title="Back to Sim Builder projects"
         className="flex items-center gap-2 shrink-0 cursor-pointer group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-lg px-1 -mx-1"
       >

@@ -17,9 +17,9 @@ const STEP_COPY = {
   welcome:   { title: 'Welcome to WorkLearn', subtitle: "Let's get your profile set up." },
   profile:   { title: 'Tell us about yourself', subtitle: 'This appears on your public Portfolio.' },
   contact:   { title: 'How can recruiters reach you?', subtitle: "All optional — add what you're comfortable sharing." },
-  domain:    { title: 'Choose your career domain', subtitle: "We'll highlight matching job simulations for you." },
+  domain:    { title: 'Choose your career domain', subtitle: 'We’ll enroll you in matching job simulations available at your university.' },
   education: { title: 'Your education', subtitle: 'Optional — add your academic background.' },
-  review:    { title: 'Review & finish', subtitle: 'Confirm everything looks right, then get started.' },
+  review:    { title: 'Review & finish', subtitle: 'Confirm everything looks right — finishing enrolls you in matching simulations.' },
 }
 
 /** First-login onboarding wizard — gated in app/router/guards/ProtectedRoute

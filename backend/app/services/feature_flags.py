@@ -23,6 +23,8 @@ FEATURE_FLAG_CATALOG: list[dict] = [
      "description": "Download the raw dataset behind a data task."},
     {"key": "assign_tasks", "label": "Task Assignment", "category": "Core",
      "description": "Assign specific tasks to individual students."},
+    {"key": "cms_access", "label": "CMS / Sim Builder", "category": "Admin Tools",
+     "description": "Author and publish job simulations via CMS and Sim Builder. Teachers receive this only when University Admin enables it."},
 ]
 
 # Independent students (default university) get the open catalog; university-

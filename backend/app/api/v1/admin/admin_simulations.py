@@ -8,12 +8,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import ValidationError, BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, delete
+from sqlalchemy.orm import selectinload
 
 from app.db.database import get_db
-from app.core.permissions import require_permission
+from app.core.permissions import require_cms_access, require_roles
 from app.core.auth import token_user_id
 from app.models import Enrollment, UserBadge
 from app.models.cms import Simulation, SimulationTask, SimulationStatus
+from app.models.roles import RoleSlug
 from app.api.v1.simulations.enrollments import JOURNEY_BADGE_KEY
 from app.schemas.cms import (
     SimulationCreate, SimulationUpdate, SimulationTaskCreate, SimulationTaskUpdate,
@@ -25,6 +27,12 @@ from app.services import sandbox
 from app.services.graders import declarative_rules
 from app.services.audit import log_action, resolve_actor_info
 from app.services.simulation_lookup import get_simulation as lookup_simulation
+from app.services.simulation_scope import (
+    assert_can_mutate_simulation,
+    apply_publish_scope_for_actor,
+    is_platform_admin,
+    scope_payload,
+)
 
 router = APIRouter(prefix="/api/admin/simulations", tags=["admin-simulations"])
 
@@ -33,13 +41,20 @@ class PreviewRunSandboxBody(BaseModel):
     code: str
 
 
+class PublishScopeBody(BaseModel):
+    available_to_all: bool | None = None
+    university_ids: list[int] | None = None
+
+
 def _sim_summary(sim: Simulation, task_count: int, enrollment_count: int) -> dict:
     return {
         "id": sim.id, "slug": sim.slug, "title": sim.title, "domain": sim.domain,
         "category": sim.category, "status": sim.status.value,
         "task_count": task_count, "enrollment_count": enrollment_count,
+        "created_by": sim.created_by,
         "updated_at": sim.updated_at.isoformat(),
         "published_at": sim.published_at.isoformat() if sim.published_at else None,
+        **scope_payload(sim),
     }
 
 
@@ -64,10 +79,11 @@ def _sim_dict(sim: Simulation) -> dict:
         "skills": sim.skills, "rating": sim.rating, "rating_count": sim.rating_count,
         "manager": sim.manager, "onboarding": sim.onboarding,
         "onboarding_xp_award": sim.onboarding_xp_award, "section_labels": sim.section_labels,
-        "status": sim.status.value,
+        "status": sim.status.value, "created_by": sim.created_by,
         "created_at": sim.created_at.isoformat(), "updated_at": sim.updated_at.isoformat(),
         "published_at": sim.published_at.isoformat() if sim.published_at else None,
         "tasks": [_task_dict(t) for t in sorted(sim.tasks, key=lambda t: t.task_index)],
+        **scope_payload(sim),
     }
 
 
@@ -75,12 +91,16 @@ async def _get_sim_or_404(sim_key: str, db: AsyncSession) -> Simulation:
     sim = await lookup_simulation(db, sim_key)
     if not sim:
         raise HTTPException(404, "Simulation not found")
+    await db.refresh(sim, attribute_names=["university_links"])
     return sim
 
 
 @router.get("")
-async def list_simulations(db: AsyncSession = Depends(get_db), _=Depends(require_permission("simulations.view"))):
-    result = await db.execute(select(Simulation))
+async def list_simulations(db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access())):
+    q = select(Simulation).options(selectinload(Simulation.university_links))
+    if not is_platform_admin(token):
+        q = q.where(Simulation.created_by == token_user_id(token))
+    result = await db.execute(q)
     sims = result.scalars().all()
     out = []
     for sim in sims:
@@ -95,7 +115,7 @@ async def list_simulations(db: AsyncSession = Depends(get_db), _=Depends(require
 
 
 @router.post("")
-async def create_simulation(body: SimulationCreate, db: AsyncSession = Depends(get_db), token: dict = Depends(require_permission("simulations.create"))):
+async def create_simulation(body: SimulationCreate, db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access())):
     existing = await db.execute(select(Simulation).where(Simulation.slug == body.slug))
     if existing.scalar_one_or_none():
         raise HTTPException(409, f"Simulation slug '{body.slug}' already exists")
@@ -113,15 +133,20 @@ async def create_simulation(body: SimulationCreate, db: AsyncSession = Depends(g
     db.add(sim)
     await db.commit()
     await db.refresh(sim, attribute_names=["tasks"])
+    # New sims have no targeting rows yet — set committed empty collection so
+    # _sim_dict/scope_payload never async-lazy-loads university_links.
+    from sqlalchemy.orm.attributes import set_committed_value
+    set_committed_value(sim, "university_links", [])
     return _sim_dict(sim)
 
 
 @router.post("/{sim_id}/duplicate")
 async def duplicate_simulation(
     sim_id: str, body: DuplicateSimulationBody,
-    db: AsyncSession = Depends(get_db), token: dict = Depends(require_permission("simulations.create")),
+    db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access()),
 ):
     source = await _get_sim_or_404(sim_id, db)
+    assert_can_mutate_simulation(token, source)
     await db.refresh(source, attribute_names=["tasks"])
 
     existing = await db.execute(select(Simulation).where(Simulation.slug == body.new_slug))
@@ -155,13 +180,15 @@ async def duplicate_simulation(
 
     await db.commit()
     await db.refresh(new_sim, attribute_names=["tasks"])
+    from sqlalchemy.orm.attributes import set_committed_value
+    set_committed_value(new_sim, "university_links", [])
     return _sim_dict(new_sim)
 
 
 @router.post("/from-template/{template_key}")
 async def create_from_template(
     template_key: str, body: CreateFromTemplateBody,
-    db: AsyncSession = Depends(get_db), token: dict = Depends(require_permission("simulations.create")),
+    db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access()),
 ):
     template = TEMPLATES.get(template_key)
     if not template:
@@ -205,19 +232,23 @@ async def create_from_template(
 
     await db.commit()
     await db.refresh(sim, attribute_names=["tasks"])
+    from sqlalchemy.orm.attributes import set_committed_value
+    set_committed_value(sim, "university_links", [])
     return _sim_dict(sim)
 
 
 @router.get("/{sim_id}")
-async def get_simulation(sim_id: str, db: AsyncSession = Depends(get_db), _=Depends(require_permission("simulations.view"))):
+async def get_simulation(sim_id: str, db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access())):
     sim = await _get_sim_or_404(sim_id, db)
+    assert_can_mutate_simulation(token, sim)
     await db.refresh(sim, attribute_names=["tasks"])
     return _sim_dict(sim)
 
 
 @router.get("/{sim_id}/preview-full")
-async def preview_full_simulation(sim_id: str, db: AsyncSession = Depends(get_db), _=Depends(require_permission("simulations.view"))):
+async def preview_full_simulation(sim_id: str, db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access())):
     sim = await _get_sim_or_404(sim_id, db)
+    assert_can_mutate_simulation(token, sim)
     tasks_res = await db.execute(
         select(SimulationTask).where(SimulationTask.simulation_id == sim.id).order_by(SimulationTask.task_index)
     )
@@ -226,8 +257,9 @@ async def preview_full_simulation(sim_id: str, db: AsyncSession = Depends(get_db
 
 
 @router.patch("/{sim_id}")
-async def update_simulation(sim_id: str, body: SimulationUpdate, db: AsyncSession = Depends(get_db), _=Depends(require_permission("simulations.edit"))):
+async def update_simulation(sim_id: str, body: SimulationUpdate, db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access())):
     sim = await _get_sim_or_404(sim_id, db)
+    assert_can_mutate_simulation(token, sim)
     patch = body.model_dump(exclude_unset=True)
     if "slug" in patch and patch["slug"] is not None and patch["slug"] != sim.slug:
         clash = await db.execute(select(Simulation).where(Simulation.slug == patch["slug"]))
@@ -239,13 +271,19 @@ async def update_simulation(sim_id: str, body: SimulationUpdate, db: AsyncSessio
     for key, value in patch.items():
         setattr(sim, key, value)
     await db.commit()
-    await db.refresh(sim, attribute_names=["tasks"])
+    await db.refresh(sim, attribute_names=["tasks", "university_links"])
     return _sim_dict(sim)
 
 
 @router.post("/{sim_id}/publish")
-async def publish_simulation(sim_id: str, db: AsyncSession = Depends(get_db), _=Depends(require_permission("simulations.publish"))):
+async def publish_simulation(
+    sim_id: str,
+    body: PublishScopeBody | None = None,
+    db: AsyncSession = Depends(get_db),
+    token: dict = Depends(require_cms_access()),
+):
     sim = await _get_sim_or_404(sim_id, db)
+    assert_can_mutate_simulation(token, sim)
     tasks_res = await db.execute(select(SimulationTask).where(SimulationTask.simulation_id == sim.id))
     tasks = tasks_res.scalars().all()
     if not tasks:
@@ -263,15 +301,33 @@ async def publish_simulation(sim_id: str, db: AsyncSession = Depends(get_db), _=
     if issues:
         raise HTTPException(400, "Cannot publish — grading configuration is incomplete: " + "; ".join(issues))
 
+    await apply_publish_scope_for_actor(db, token, sim, body.model_dump() if body else {})
     sim.status = SimulationStatus.PUBLISHED
     sim.published_at = datetime.now(timezone.utc)
     await db.commit()
-    return {"ok": True, "status": sim.status.value}
+    await db.refresh(sim, attribute_names=["university_links"])
+    return {"ok": True, "status": sim.status.value, **scope_payload(sim)}
+
+
+@router.patch("/{sim_id}/publish-scope")
+async def patch_publish_scope(
+    sim_id: str,
+    body: PublishScopeBody,
+    db: AsyncSession = Depends(get_db),
+    token: dict = Depends(require_roles(RoleSlug.SUPER_ADMIN, RoleSlug.ADMIN)),
+):
+    """Platform admin only — change university targeting without unpublishing."""
+    sim = await _get_sim_or_404(sim_id, db)
+    await apply_publish_scope_for_actor(db, token, sim, body.model_dump())
+    await db.commit()
+    await db.refresh(sim, attribute_names=["university_links"])
+    return {"ok": True, **scope_payload(sim)}
 
 
 @router.post("/{sim_id}/unpublish")
-async def unpublish_simulation(sim_id: str, db: AsyncSession = Depends(get_db), _=Depends(require_permission("simulations.publish"))):
+async def unpublish_simulation(sim_id: str, db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access())):
     sim = await _get_sim_or_404(sim_id, db)
+    assert_can_mutate_simulation(token, sim)
     sim.status = SimulationStatus.DRAFT
     sim.published_at = None
     await db.commit()
@@ -279,8 +335,9 @@ async def unpublish_simulation(sim_id: str, db: AsyncSession = Depends(get_db), 
 
 
 @router.delete("/{sim_id}")
-async def delete_simulation(sim_id: str, db: AsyncSession = Depends(get_db), _=Depends(require_permission("simulations.delete"))):
+async def delete_simulation(sim_id: str, db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access())):
     sim = await _get_sim_or_404(sim_id, db)
+    assert_can_mutate_simulation(token, sim)
     enroll_count = await db.execute(
         select(func.count()).select_from(Enrollment).where(Enrollment.simulation_id == sim.id)
     )
@@ -293,9 +350,10 @@ async def delete_simulation(sim_id: str, db: AsyncSession = Depends(get_db), _=D
 
 @router.delete("/{sim_id}/enrollments")
 async def unenroll_all_students(
-    sim_id: str, db: AsyncSession = Depends(get_db), token: dict = Depends(require_permission("simulations.delete"))
+    sim_id: str, db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access())
 ):
     sim = await _get_sim_or_404(sim_id, db)
+    assert_can_mutate_simulation(token, sim)
     result = await db.execute(select(Enrollment).where(Enrollment.simulation_id == sim.id))
     enrollments = result.scalars().all()
     if not enrollments:
@@ -321,8 +379,9 @@ async def unenroll_all_students(
 
 
 @router.post("/{sim_id}/tasks")
-async def create_task(sim_id: str, body: SimulationTaskCreate, db: AsyncSession = Depends(get_db), _=Depends(require_permission("simulations.edit"))):
+async def create_task(sim_id: str, body: SimulationTaskCreate, db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access())):
     sim = await _get_sim_or_404(sim_id, db)
+    assert_can_mutate_simulation(token, sim)
     try:
         validated_config = validate_task_config(body.type, body.config)
     except (ValidationError, KeyError) as e:
@@ -365,9 +424,10 @@ async def _get_task_or_404(sim: Simulation, task_id: int, db: AsyncSession) -> S
 @router.post("/{sim_id}/tasks/{task_id}/preview-run-sandbox")
 async def preview_run_sandbox(
     sim_id: str, task_id: int, body: PreviewRunSandboxBody,
-    db: AsyncSession = Depends(get_db), _=Depends(require_permission("simulations.edit")),
+    db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access()),
 ):
     sim = await _get_sim_or_404(sim_id, db)
+    assert_can_mutate_simulation(token, sim)
     task = await _get_task_or_404(sim, task_id, db)
     if task.type != "code_sandbox":
         raise HTTPException(400, "Only code_sandbox tasks support preview runs")
@@ -397,8 +457,9 @@ async def preview_run_sandbox(
 
 
 @router.patch("/{sim_id}/tasks/{task_id}")
-async def update_task(sim_id: str, task_id: int, body: SimulationTaskUpdate, db: AsyncSession = Depends(get_db), _=Depends(require_permission("simulations.edit"))):
+async def update_task(sim_id: str, task_id: int, body: SimulationTaskUpdate, db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access())):
     sim = await _get_sim_or_404(sim_id, db)
+    assert_can_mutate_simulation(token, sim)
     task = await _get_task_or_404(sim, task_id, db)
     patch = body.model_dump(exclude_unset=True)
     if "config" in patch and patch["config"] is not None:
@@ -414,8 +475,9 @@ async def update_task(sim_id: str, task_id: int, body: SimulationTaskUpdate, db:
 
 
 @router.post("/{sim_id}/tasks/{task_id}/duplicate")
-async def duplicate_task(sim_id: str, task_id: int, db: AsyncSession = Depends(get_db), _=Depends(require_permission("simulations.edit"))):
+async def duplicate_task(sim_id: str, task_id: int, db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access())):
     sim = await _get_sim_or_404(sim_id, db)
+    assert_can_mutate_simulation(token, sim)
     source = await _get_task_or_404(sim, task_id, db)
     max_index_res = await db.execute(
         select(func.max(SimulationTask.task_index)).where(SimulationTask.simulation_id == sim.id)
@@ -438,8 +500,9 @@ async def duplicate_task(sim_id: str, task_id: int, db: AsyncSession = Depends(g
 
 
 @router.delete("/{sim_id}/tasks/{task_id}")
-async def delete_task(sim_id: str, task_id: int, db: AsyncSession = Depends(get_db), _=Depends(require_permission("simulations.edit"))):
+async def delete_task(sim_id: str, task_id: int, db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access())):
     sim = await _get_sim_or_404(sim_id, db)
+    assert_can_mutate_simulation(token, sim)
     task = await _get_task_or_404(sim, task_id, db)
     await db.delete(task)
     await db.commit()
@@ -447,8 +510,9 @@ async def delete_task(sim_id: str, task_id: int, db: AsyncSession = Depends(get_
 
 
 @router.post("/{sim_id}/tasks/reorder")
-async def reorder_tasks(sim_id: str, body: ReorderTasksBody, db: AsyncSession = Depends(get_db), _=Depends(require_permission("simulations.edit"))):
+async def reorder_tasks(sim_id: str, body: ReorderTasksBody, db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access())):
     sim = await _get_sim_or_404(sim_id, db)
+    assert_can_mutate_simulation(token, sim)
     result = await db.execute(select(SimulationTask).where(SimulationTask.simulation_id == sim.id))
     tasks_by_id = {t.id: t for t in result.scalars().all()}
     if set(body.task_ids) != set(tasks_by_id.keys()):
