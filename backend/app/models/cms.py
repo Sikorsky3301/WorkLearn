@@ -5,7 +5,7 @@ CMS models for admin-authored job simulations.
 """
 import enum
 from datetime import datetime
-from sqlalchemy import String, Integer, Float, Text, DateTime, ForeignKey, JSON, Enum as SAEnum, UniqueConstraint
+from sqlalchemy import String, Integer, Float, Text, DateTime, ForeignKey, JSON, Enum as SAEnum, UniqueConstraint, Boolean
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 from app.db.database import Base
 from app.models.helpers import utcnow
@@ -52,11 +52,33 @@ class Simulation(Base):
     created_at:       Mapped[datetime]           = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at:       Mapped[datetime]           = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
     published_at:     Mapped[datetime | None]    = mapped_column(DateTime(timezone=True), nullable=True)
+    # When set, this CMS row was published from a Sim Builder project (re-publish sync).
+    sim_builder_project_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("sim_builder_projects.id", ondelete="SET NULL"),
+        nullable=True, unique=True, index=True,
+    )
+    # True = visible on every tenant; False = only universities in simulation_universities.
+    available_to_all_universities: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     tasks: Mapped[list["SimulationTask"]] = relationship(
         back_populates="simulation", cascade="all, delete-orphan",
         order_by="SimulationTask.task_index",
     )
+    university_links: Mapped[list["SimulationUniversity"]] = relationship(
+        back_populates="simulation", cascade="all, delete-orphan",
+    )
+
+
+class SimulationUniversity(Base):
+    """Which partner universities can see a published simulation (when not available_to_all)."""
+    __tablename__ = "simulation_universities"
+    __table_args__ = (UniqueConstraint("simulation_id", "university_id", name="uq_simulation_university"),)
+
+    id:            Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    simulation_id: Mapped[int] = mapped_column(Integer, ForeignKey("simulations.id", ondelete="CASCADE"), nullable=False, index=True)
+    university_id: Mapped[int] = mapped_column(Integer, ForeignKey("universities.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    simulation: Mapped["Simulation"] = relationship(back_populates="university_links")
 
 
 class SimulationTask(Base):

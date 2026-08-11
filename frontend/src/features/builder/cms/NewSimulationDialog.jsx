@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { FilePlus, Sparkles, ArrowLeft, Loader2 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../../components/ui/shadcn/dialog'
 import { useSimulationTemplates, useCreateSimulationFromTemplate } from '../../../hooks'
+import { useCmsBasePath } from '../../../hooks/useCmsBasePath'
 
 /** "New Simulation" entry point — a template gallery instead of dropping the
  * admin straight into a blank builder. Two steps: pick blank/template, then
  * (for a template) name the new simulation before it's instantiated. */
 export default function NewSimulationDialog({ open, onOpenChange }) {
   const navigate = useNavigate()
+  const cmsBase = useCmsBasePath()
   const { data, isLoading } = useSimulationTemplates()
   const createFromTemplate = useCreateSimulationFromTemplate()
   const [picked, setPicked] = useState(null) // template summary object, or null while browsing
@@ -40,7 +42,7 @@ export default function NewSimulationDialog({ open, onOpenChange }) {
     createFromTemplate.mutate(
       { templateKey: picked.key, id: id.trim(), title: title.trim() || undefined },
       {
-        onSuccess: (res) => { handleOpenChange(false); navigate(`/admin/simulations/${res.id}`) },
+        onSuccess: (res) => { handleOpenChange(false); navigate(`${cmsBase}/simulations/${res.id}`) },
         onError: (e) => setError(e?.message || 'Could not create — that id may already exist.'),
       }
     )
@@ -91,7 +93,7 @@ export default function NewSimulationDialog({ open, onOpenChange }) {
         ) : (
           <div className="grid grid-cols-2 gap-3">
             <button
-              onClick={() => { handleOpenChange(false); navigate('/admin/simulations/new') }}
+              onClick={() => { handleOpenChange(false); navigate(`${cmsBase}/simulations/new`) }}
               className="text-left rounded-xl border border-dashed border-border hover:border-primary/50 hover:bg-surface-low transition-colors p-4 cursor-pointer"
             >
               <FilePlus className="h-5 w-5 text-on-surface-variant mb-2" />

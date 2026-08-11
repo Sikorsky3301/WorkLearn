@@ -48,7 +48,15 @@ async function request(path, options = {}) {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
-    throw new Error(err.detail ?? err.error ?? 'Request failed')
+    const detail = err.detail ?? err.error ?? 'Request failed'
+    if (typeof detail === 'string') throw new Error(detail)
+    if (Array.isArray(detail)) {
+      const msg = detail
+        .map((d) => (d?.loc ? `${d.loc.filter((x) => x !== 'body').join('.')}: ${d.msg}` : d?.msg || JSON.stringify(d)))
+        .join('; ')
+      throw new Error(msg || 'Validation failed')
+    }
+    throw new Error(JSON.stringify(detail))
   }
 
   // SSE responses — caller handles the stream directly

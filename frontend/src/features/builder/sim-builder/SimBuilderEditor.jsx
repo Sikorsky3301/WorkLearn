@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useAuth } from '../../auth/AuthContext'
 import {
   useSimBuilderProject, useCreateSimBuilderPage, useDeleteSimBuilderPage, useReorderSimBuilderPages,
   useCreateSimBuilderBlock, useDeleteSimBuilderBlock, useReorderSimBuilderBlocks, useUpdateSimBuilderBlock,
@@ -15,6 +16,7 @@ import PropertiesPanel from './PropertiesPanel'
 import VersionHistoryPanel from './VersionHistoryPanel'
 import AiGenerateDialog from './AiGenerateDialog'
 import PreviewOverlay from './PreviewOverlay'
+import PublishScopeModal from '../shared/PublishScopeModal'
 
 /** Top-level 4-zone Sim Builder editor: toolbar / left sidebar / canvas /
  * properties panel. Structural edits (add/delete/reorder a page or block)
@@ -25,6 +27,8 @@ import PreviewOverlay from './PreviewOverlay'
  * — and are mirrored live into the Canvas for WYSIWYG feedback. */
 export default function SimBuilderEditor() {
   const { id: projectId } = useParams()
+  const { hasPermission } = useAuth()
+  const isPlatformAdmin = hasPermission()
   const { data: project, isLoading } = useSimBuilderProject(projectId)
 
   const [activePageId, setActivePageId] = useState(null)
@@ -33,6 +37,7 @@ export default function SimBuilderEditor() {
   const [overlay, setOverlay] = useState(null) // null | 'preview' | 'versions' | 'ai-generate'
   const [undoStack, setUndoStack] = useState([])
   const [redoStack, setRedoStack] = useState([])
+  const [scopeOpen, setScopeOpen] = useState(false)
 
   const createPage = useCreateSimBuilderPage(projectId)
   const deletePage = useDeleteSimBuilderPage(projectId)
@@ -203,8 +208,22 @@ export default function SimBuilderEditor() {
   }
 
   async function handlePublish() {
+    if (isPlatformAdmin) {
+      setScopeOpen(true)
+      return
+    }
     try {
-      await publishProject.mutateAsync()
+      await publishProject.mutateAsync({})
+      toast.success('Project published')
+    } catch (e) {
+      toast.error(e?.message || 'Could not publish')
+    }
+  }
+
+  async function handleScopeConfirm(body) {
+    try {
+      await publishProject.mutateAsync(body)
+      setScopeOpen(false)
       toast.success('Project published')
     } catch (e) {
       toast.error(e?.message || 'Could not publish')
@@ -274,6 +293,14 @@ export default function SimBuilderEditor() {
       {overlay === 'versions' && <VersionHistoryPanel projectId={projectId} onClose={() => setOverlay(null)} />}
       {overlay === 'ai-generate' && <AiGenerateDialog projectId={projectId} onClose={() => setOverlay(null)} />}
       {overlay === 'preview' && <PreviewOverlay project={project} onClose={() => setOverlay(null)} />}
+      <PublishScopeModal
+        open={scopeOpen}
+        onOpenChange={setScopeOpen}
+        onConfirm={handleScopeConfirm}
+        confirming={publishProject.isPending}
+        title="Publish to universities"
+        confirmLabel="Publish"
+      />
     </div>
   )
 }

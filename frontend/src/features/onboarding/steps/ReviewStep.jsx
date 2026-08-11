@@ -1,5 +1,18 @@
+import { useMemo } from 'react'
+import { useSimulations } from '../../../hooks'
+
 export default function ReviewStep({ form, photoPreview, name, email }) {
   const initial = name?.[0]?.toUpperCase() || '?'
+  const { data } = useSimulations()
+  const matching = useMemo(() => {
+    const want = (form.preferred_domain || '').trim().toLowerCase()
+    if (!want) return []
+    return (data?.simulations ?? []).filter((s) => {
+      const domain = (s.domain || '').trim().toLowerCase()
+      const category = (s.category || '').trim().toLowerCase()
+      return want === domain || (category && want === category)
+    })
+  }, [data, form.preferred_domain])
 
   return (
     <div className="space-y-4">
@@ -20,8 +33,26 @@ export default function ReviewStep({ form, photoPreview, name, email }) {
       <SummaryRow label="Contact info" value={[form.phone, form.location].filter(Boolean).join(' · ') || '—'} />
       <SummaryRow label="Education entries" value={String(form.educationEntries?.filter((e) => e.institution?.trim()).length || 0)} />
 
-      <p className="text-xs text-on-surface-variant leading-relaxed pt-3 border-t border-border">
-        You can edit any of this later from your Portfolio page.
+      <div className="pt-3 border-t border-border space-y-2">
+        <p className="text-xs font-semibold text-on-surface">You’ll start with</p>
+        {matching.length === 0 ? (
+          <p className="text-xs text-on-surface-variant leading-relaxed">
+            No published simulations for this domain are available at your university yet. You can still finish — browse the catalog later from your dashboard.
+          </p>
+        ) : (
+          <ul className="space-y-1.5">
+            {matching.map((s) => (
+              <li key={s.id} className="text-sm text-on-surface font-medium">
+                {s.title}
+                {s.company ? <span className="text-xs text-on-surface-variant font-normal"> · {s.company}</span> : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <p className="text-xs text-on-surface-variant leading-relaxed">
+        Finishing enrolls you in the matching simulations above. You can edit your profile later from Portfolio.
       </p>
     </div>
   )

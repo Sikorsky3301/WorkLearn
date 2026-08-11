@@ -1,14 +1,18 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Plus, Copy, Users } from 'lucide-react'
-import { useAdminSimulations, usePublishSimulation, useUnpublishSimulation, useDeleteSimulation, useDuplicateSimulation, useUnenrollAllStudents } from '../../../hooks'
+import { useAuth } from '../../auth/AuthContext'
+import { useCmsBasePath } from '../../../hooks/useCmsBasePath'
+import { useAdminSimulations, usePublishSimulation, useUnpublishSimulation, useDeleteSimulation, useDuplicateSimulation, useUnenrollAllStudents, usePatchPublishScope } from '../../../hooks'
 import NewSimulationDialog from './NewSimulationDialog'
+import PublishScopeModal from '../shared/PublishScopeModal'
 
 /** Simulations page inside the Admin portal — list/search/publish/delete.
  * The builder itself is a dedicated route (/admin/simulations/:id), not
  * nested here — see SimulationBuilder.jsx. */
 export default function SimulationsListPanel() {
   const navigate = useNavigate()
+  const cmsBase = useCmsBasePath()
   const [search, setSearch] = useState('')
   const [newDialogOpen, setNewDialogOpen] = useState(false)
   const { data, isLoading } = useAdminSimulations()
@@ -60,8 +64,8 @@ export default function SimulationsListPanel() {
               {sims.map((s) => (
                 <SimRow
                   key={s.id} sim={s}
-                  onEdit={() => navigate(`/admin/simulations/${s.id}`)}
-                  onDuplicated={(newSim) => navigate(`/admin/simulations/${newSim.id}`)}
+                  onEdit={() => navigate(`${cmsBase}/simulations/${s.id}`)}
+                  onDuplicated={(newSim) => navigate(`${cmsBase}/simulations/${newSim.id}`)}
                   deleteSim={deleteSim}
                 />
               ))}
@@ -73,15 +77,26 @@ export default function SimulationsListPanel() {
   )
 }
 
+function scopeLabel(sim) {
+  if (sim.available_to_all_universities !== false) return 'All universities'
+  const n = (sim.university_ids || []).length
+  return n ? `${n} universit${n === 1 ? 'y' : 'ies'}` : 'Scoped'
+}
+
 function SimRow({ sim, onEdit, onDuplicated, deleteSim }) {
+  const { hasPermission } = useAuth()
+  const isPlatformAdmin = hasPermission()
   const publish = usePublishSimulation(sim.id)
   const unpublish = useUnpublishSimulation(sim.id)
+  const patchScope = usePatchPublishScope(sim.id)
   const duplicateSim = useDuplicateSimulation(sim.id)
   const unenrollAll = useUnenrollAllStudents(sim.id)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [confirmUnenroll, setConfirmUnenroll] = useState(false)
   const [duplicating, setDuplicating] = useState(false)
   const [newId, setNewId] = useState('')
+  const [scopeOpen, setScopeOpen] = useState(false)
+  const [scopeMode, setScopeMode] = useState('publish')
 
   function startDuplicate() {
     setNewId(`${sim.id}-copy`)
@@ -96,9 +111,31 @@ function SimRow({ sim, onEdit, onDuplicated, deleteSim }) {
     })
   }
 
+  function handlePublishClick() {
+    if (isPlatformAdmin) {
+      setScopeMode('publish')
+      setScopeOpen(true)
+      return
+    }
+    publish.mutate({}, { onError: (e) => alert(e?.message || 'Could not publish this simulation.') })
+  }
+
+  function handleScopeConfirm(body) {
+    const mut = scopeMode === 'edit' ? patchScope : publish
+    mut.mutate(body, {
+      onSuccess: () => setScopeOpen(false),
+      onError: (e) => alert(e?.message || 'Could not update publish scope.'),
+    })
+  }
+
   return (
     <tr className="hover:bg-surface-low transition-colors">
-      <td className="px-4 py-3 font-medium text-on-surface">{sim.title}</td>
+      <td className="px-4 py-3 font-medium text-on-surface">
+        <div>{sim.title}</div>
+        {sim.status === 'PUBLISHED' && (
+          <div className="text-[11px] text-outline mt-0.5">{scopeLabel(sim)}</div>
+        )}
+      </td>
       <td className="px-4 py-3 text-xs text-on-surface-variant">{sim.domain}</td>
       <td className="px-4 py-3">
         <span className={`chip text-[10px] ${sim.status === 'PUBLISHED' ? 'bg-emerald-100 text-emerald-700' : 'bg-surface-high text-on-surface-variant'}`}>
@@ -139,12 +176,22 @@ function SimRow({ sim, onEdit, onDuplicated, deleteSim }) {
               <Copy className="h-3 w-3" /> Duplicate
             </button>
             {sim.status === 'PUBLISHED' ? (
-              <button onClick={() => unpublish.mutate()} disabled={unpublish.isPending} className="text-xs font-semibold text-on-surface-variant hover:text-on-surface mr-3 cursor-pointer disabled:cursor-not-allowed">
-                Unpublish
-              </button>
+              <>
+                {isPlatformAdmin && (
+                  <button
+                    onClick={() => { setScopeMode('edit'); setScopeOpen(true) }}
+                    className="text-xs font-semibold text-on-surface-variant hover:text-on-surface mr-3 cursor-pointer"
+                  >
+                    Edit scope
+                  </button>
+                )}
+                <button onClick={() => unpublish.mutate()} disabled={unpublish.isPending} className="text-xs font-semibold text-on-surface-variant hover:text-on-surface mr-3 cursor-pointer disabled:cursor-not-allowed">
+                  Unpublish
+                </button>
+              </>
             ) : (
               <button
-                onClick={() => publish.mutate(undefined, { onError: (e) => alert(e?.message || 'Could not publish this simulation.') })}
+                onClick={handlePublishClick}
                 disabled={publish.isPending || sim.task_count === 0}
                 className="text-xs font-semibold text-emerald-600 hover:text-emerald-800 mr-3 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >
@@ -194,6 +241,16 @@ function SimRow({ sim, onEdit, onDuplicated, deleteSim }) {
             )}
           </>
         )}
+        <PublishScopeModal
+          open={scopeOpen}
+          onOpenChange={setScopeOpen}
+          onConfirm={handleScopeConfirm}
+          confirming={publish.isPending || patchScope.isPending}
+          title={scopeMode === 'edit' ? 'Edit publish scope' : 'Publish to universities'}
+          confirmLabel={scopeMode === 'edit' ? 'Save scope' : 'Publish'}
+          initialAvailableToAll={sim.available_to_all_universities !== false}
+          initialUniversityIds={sim.university_ids || []}
+        />
       </td>
     </tr>
   )

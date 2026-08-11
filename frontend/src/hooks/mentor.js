@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/client'
 
-// ── Class Mentor (features/mentor/ClassMentor.jsx) — a mentor's own roster ──
+// Class Mentor (features/mentor/) — university-scoped roster
 
 export function useMentorStudents() {
   return useQuery({

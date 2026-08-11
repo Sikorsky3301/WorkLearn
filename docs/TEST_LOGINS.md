@@ -51,7 +51,9 @@ Re-running seed **resets** demo account passwords and roles (your own registered
 | Platform Admin | `localhost:5173` | `/login` — `platform@worklearn.ai` / `password` | Admin |
 | University Admin | `iitd.localhost:5173` | `/login` — `uniadmin@worklearn.ai` / `password` | University Admin |
 | University student | `iitd.localhost:5173` | `/login` — `rahul@iitd.ac.in` / `password` | Dashboard |
-| Teacher | `iitd.localhost:5173` | `/login` — `ananya@iitd.ac.in` / `password` | Mentor |
+| Teacher | `iitd.localhost:5173` | `/login` — `ananya@iitd.ac.in` / `password` | Mentor portal (`/mentor`) |
+
+University Admin can **Enable CMS access** for a teacher (Users → Manage). After the teacher refreshes or signs in again, Sim Builder / Simulations appear in the Mentor sidebar. Sim Builder **Publish** puts the sim in the student catalog (ongoing, not onboarding).
 
 Also seeded: `priya@iitd.ac.in` (student, `python_sandbox` unlocked).
 

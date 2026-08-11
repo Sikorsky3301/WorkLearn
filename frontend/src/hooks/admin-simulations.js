@@ -34,7 +34,11 @@ export function useSimulationTemplates() {
 export function useCreateSimulationFromTemplate() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ templateKey, id, title }) => api.post(`/api/admin/simulations/from-template/${templateKey}`, { id, title }),
+    mutationFn: ({ templateKey, id, title, slug }) =>
+      api.post(`/api/admin/simulations/from-template/${templateKey}`, {
+        slug: slug || id,
+        title,
+      }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-simulations'] }),
   })
 }
@@ -42,7 +46,26 @@ export function useCreateSimulationFromTemplate() {
 export function useCreateSimulation() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (body) => api.post('/api/admin/simulations', body),
+    mutationFn: (body) => {
+      const {
+        id,
+        status,
+        tasks,
+        created_at,
+        updated_at,
+        published_at,
+        created_by,
+        available_to_all_universities,
+        university_ids,
+        enrollment_count,
+        task_count,
+        ...rest
+      } = body || {}
+      return api.post('/api/admin/simulations', {
+        ...rest,
+        slug: rest.slug || id,
+      })
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-simulations'] }),
   })
 }
@@ -50,7 +73,29 @@ export function useCreateSimulation() {
 export function useUpdateSimulation(id) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (body) => api.patch(`/api/admin/simulations/${id}`, body),
+    mutationFn: (body) => {
+      const {
+        id: _id,
+        status,
+        tasks,
+        created_at,
+        updated_at,
+        published_at,
+        created_by,
+        available_to_all_universities,
+        university_ids,
+        enrollment_count,
+        task_count,
+        ...rest
+      } = body || {}
+      // UI stores the public slug in `id` while creating; after load, numeric
+      // id is separate from `slug`. Never send the integer PK as slug.
+      const payload = { ...rest }
+      if (typeof body?.id === 'string' && body.id && !payload.slug) {
+        payload.slug = body.id
+      }
+      return api.patch(`/api/admin/simulations/${id}`, payload)
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-simulation', id] })
       qc.invalidateQueries({ queryKey: ['admin-simulations'] })
@@ -61,7 +106,18 @@ export function useUpdateSimulation(id) {
 export function usePublishSimulation(id) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: () => api.post(`/api/admin/simulations/${id}/publish`, {}),
+    mutationFn: (body = {}) => api.post(`/api/admin/simulations/${id}/publish`, body || {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-simulation', id] })
+      qc.invalidateQueries({ queryKey: ['admin-simulations'] })
+    },
+  })
+}
+
+export function usePatchPublishScope(id) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body) => api.patch(`/api/admin/simulations/${id}/publish-scope`, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-simulation', id] })
       qc.invalidateQueries({ queryKey: ['admin-simulations'] })
@@ -103,7 +159,7 @@ export function useUnenrollAllStudents(id) {
 export function useDuplicateSimulation(id) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (newId) => api.post(`/api/admin/simulations/${id}/duplicate`, { new_id: newId }),
+    mutationFn: (newId) => api.post(`/api/admin/simulations/${id}/duplicate`, { new_slug: newId }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-simulations'] }),
   })
 }
