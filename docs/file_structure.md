@@ -5,6 +5,10 @@ it works. For the folder-level summary (the shape without the detail), see
 the root [`README.md`](../README.md)'s "Repo layout" section — this doc goes
 one level deeper, into individual files.
 
+Related docs: [`flow diagram.md`](flow%20diagram.md) (frontend user flow),
+[`flow_diagram_backend.md`](flow_diagram_backend.md) (backend API flow),
+[`TEST_LOGINS.md`](TEST_LOGINS.md) (demo accounts + tenant hosts).
+
 Organized backend-first, then frontend, in the same directory order the
 code is actually laid out in.
 
@@ -21,8 +25,8 @@ code is actually laid out in.
 - **`.env.example`** — template for `.env` (never committed): `DATABASE_URL`, JWT secret, one AI provider's key (`AI_PROVIDER` selects which), LiteLLM Proxy settings, Langfuse keys, sandbox runner config.
 - **`.dockerignore`** — excludes `wvenv/`, `__pycache__/`, `.env`, test artifacts from the Docker build context.
 - **`Dockerfile`** — `python:3.11-slim`, installs `requirements.txt`, copies `app/` + `seed.py`, runs `uvicorn app.main:app` on port 3001. Used by the local Docker-Desktop-K8s deployment (`k8s/backend/`), not by `docker-compose.yml` (which only runs Postgres + LiteLLM Proxy for local dev).
-- **`run_backend.bat`** — Windows convenience script: activates `wvenv`, runs `uvicorn app.main:app --reload --port 3001 --log-level info`.
-- **`seed.py`** — one-time/idempotent demo-account seeder (`python seed.py`): creates the tables (`create_all`) then upserts the fixed demo users documented in the root README's "Demo accounts" table (Direct User, SuperAdmin, two University Students, one Class Mentor), skipping any that already exist by email/roll_no.
+- **`seed.py`** — demo-account seeder (`python seed.py`): ensures tables exist, re-runs `seed_roles_and_universities`, then upserts demo users (password for every account: `password`). Documented in [`docs/TEST_LOGINS.md`](TEST_LOGINS.md): academy student `demo@worklearn.ai`, Super Admin `admin@worklearn.ai`, platform Admin `platform@worklearn.ai`, IITD students/teacher (and a seeded `university_admin` that has **no working frontend admin gate**). Existing demo rows are updated (password + role/profile), not skipped.
+- **`schema_recreate.sql`** — optional SQL reference for a clean Postgres schema rebuild (roles/universities ids align with `ROLE_IDS` / `roles_seed`).
 - **`check_ai_provider.py`** — manual (non-pytest) smoke test: prints the configured `AI_PROVIDER` and whether a key is present, then calls `app.ai.services.llm.generate()` with a trivial prompt and prints the real response — the fastest way to confirm an AI key actually works before starting the full server.
 - **`migrate_legacy_sims.py`** — one-time, idempotent migration that transcribes the 3 originally-hardcoded job simulations (da-job-sim, frontend-dev-sim, sales-crm-sim — previously defined as Python/JS dicts scattered across route files and frontend config) into real `Simulation`/`SimulationTask` rows in the new CMS schema. Already run; kept for history/reference, `_insert_sim` no-ops if a simulation id already exists.
 - **`resync_legacy_sims.py`** — companion to the above: since real enrollments now reference those simulation ids (so rows can't be dropped and re-inserted), this re-runs the same builder functions as an UPDATE against the existing rows whenever `migrate_legacy_sims.py`'s builders are edited after the fact.
@@ -34,8 +38,8 @@ code is actually laid out in.
 Cross-cutting concerns — config, auth primitives, permission checks, logging, request tracing. Nothing here is domain/business logic.
 
 - **`config.py`** — the single `Settings` (pydantic-settings) object every other module reads configuration from, plus a handful of genuinely-global product constants that don't belong to any one simulation: `TARGET_ROLE_REQUIREMENTS` (per-target-role skill thresholds used by Skill GPS), `SKILL_LABELS` (skill-key → display name), `QUIZ_BONUS_THRESHOLD`/`QUIZ_BONUS_XP`, `INACTIVITY_DAYS`. `_ENV_FILE` is resolved from `Path(__file__)`, not CWD, so `.env` loads correctly regardless of which directory `uvicorn` is launched from. `ai_provider` selects among `anthropic | gemini | groq | openai | litellm_proxy`.
-- **`auth.py`** — password hashing (`hash_password`/`verify_password`, bcrypt via passlib) and JWT helpers: `create_token()` (embeds `sub`/`role`/`exp`, optionally `sa: true` for SuperAdmin and a `permissions` array that is a **frontend-nav hint only**, never trusted server-side), `decode_token()`, and the `get_current_user` FastAPI dependency that every authenticated route ultimately depends on.
-- **`permissions.py`** — RBAC's canonical import site. Re-exports `Role` from `app.models` for convenience, and defines `require_permission(key)`, a dependency factory that lets `SUPER_ADMIN` through unconditionally and otherwise re-queries the ADMIN's live `AdminRolePermission` grants from the database on every single request (never trusts the JWT's embedded `permissions` claim, so revoking a permission takes effect on the admin's very next request). Used by ~9 route files across `app/api/v1/{admin,superadmin,builder}/`.
+- **`auth.py`** — password hashing (`hash_password`/`verify_password`, bcrypt via passlib) and JWT helpers: `create_token(user_id, role, expire_hours=None)` embeds `sub` (string user id) / `role` (RoleSlug) / `exp` only — no `sa` flag and no permissions array; `decode_token()`, `get_current_user`, and `token_user_id()`. Admin/superadmin logins pass a shorter `expire_hours` from settings.
+- **`permissions.py`** — role-slug access control. `require_roles(*allowed_slugs)` checks the JWT `role`, loads the live `User`, enforces `is_active`, and rejects if the DB role no longer matches the token. `require_permission(key)` is a **back-compat alias** that ignores `key` and allows `super_admin` | `admin` | `university_admin` — fine-grained AdminRole/Permission tables were removed.
 - **`logging_config.py`** — `configure_logging(level)`, called once at the top of `app/main.py` before anything else imports, wires up a single console handler with a `[request_id]`-tagged format string. `disable_existing_loggers: False` is deliberate — otherwise uvicorn's own access/error loggers would go silent.
 - **`request_context.py`** — `RequestIdMiddleware` assigns (or reuses an incoming `X-Request-ID` header for) a per-request correlation id, stored in a `ContextVar` so deep helpers with no `Request` object (like `llm.py`) can still have their logs tagged with it; `RequestIdLogFilter` is what actually injects it into every log record. The id is deliberately never reset in a `finally`, since the global exception handler needs to still see it after an unhandled exception propagates.
 - **`paths.py`** — canonical, single-source-of-truth filesystem paths (`BACKEND_ROOT`, `STATIC_DIR`, `UPLOAD_DIR`, `PHOTO_DIR`, `RESUME_DIR`), all derived once from `Path(__file__).resolve().parents[2]`. Added after a real bug where each route file independently hardcoded a `.parent.parent[.parent]` chain that silently broke (pointed at the wrong directory) the moment a route file moved one level deeper in the `routes/` → `routes/v1/` → `api/v1/<domain>/` restructures.
@@ -46,10 +50,13 @@ Cross-cutting concerns — config, auth primitives, permission checks, logging, 
 
 ### `app/models/`
 
-A package rather than one flat file — `__init__.py` holds the original/core tables, and each feature area that arrived later gets its own module (registered onto `Base.metadata` via explicit `# noqa: F401` imports in `app/main.py` so `create_all` sees them).
+A package rather than one flat file — `__init__.py` holds core tables; feature modules are registered onto `Base.metadata` via `# noqa: F401` imports in `app/main.py` so `create_all` sees them.
 
-- **`__init__.py`** — the core schema: `Role`/`EnrollmentStatus`/`MessageType` enums, plus `User` (auth + profile fields — password hash, role, XP, onboarding state, portfolio contact/photo/resume fields), `Enrollment` (a user's relationship to one simulation — status, current task index), `TaskCompletion` (one row per task attempt, holds `score`/`quiz_score`/`rubric_rating`), `UserSkill` (per-skill-key XP score), `XpLedger` (append-only XP award log, `source` string per entry), `AgentMessage` (manager-persona chat/standup/reminder messages), `UnlockedFeature` (per-user manual feature grants), `UserBadge` (milestone badges, e.g. accepting the offer letter), `MentorChatMessage` (AI Mentor chat history, with optional Langfuse `trace_id`/`feedback` for thumbs-up/down scoring), `SuperAdminCredential` (a separate table from `User` — SuperAdmin is not a `User.role` value with elevated permission, it's an entirely separate login). Also defines `utcnow()`/`new_uuid()` helpers every other model file imports.
-- **`rbac.py`** — the ADMIN tier's fine-grained permission system: `AdminRole` (an admin-creatable role like "Support" or "Content Editor", assigned to a `User` via `admin_role_id`), `Permission` (catalog row, natural key like `"users.suspend"`, seeded by `services/permissions_seed.py`), `AdminRolePermission` (the many-to-many join granting a permission to a role), `AuditLog` (append-only action log — no FK on `actor_id` since the actor could be a `User` or a `SuperAdminCredential`, two different tables). SuperAdmin bypasses all of this.
+- **`helpers.py`** — shared `utcnow()` (and related helpers) imported by model modules.
+- **`roles.py`** — platform persona roles as a real `roles` table + `RoleSlug` constants (`super_admin`, `admin`, `university_admin`, `teacher`, `student`) and stable `ROLE_IDS`. Access is by slug in code — there is no role_permissions join table.
+- **`university.py`** — multi-tenant org: `University` with unique `code` (e.g. `DEFAULT`, `IITD`), `name`, `is_default`. Subdomain `iitd` resolves to `code=IITD` (see `services/tenant.py`). `DEFAULT_UNIVERSITY_CODE = "DEFAULT"` for the Teaching Academy.
+- **`__init__.py`** — core schema: `EnrollmentStatus`/`MessageType` enums; `User` (email/roll_no, `role_id` FK → `roles`, `university_id` FK → `universities`, profile/onboarding/XP fields; `.role` property returns the slug string for JWT/frontend); `Enrollment`, `TaskCompletion`, `UserSkill`, `XpLedger`, `AgentMessage`, `UnlockedFeature`, `UserBadge`, `MentorChatMessage`. Super Admin is a normal `User` with `role_id` for `super_admin` — there is no separate `SuperAdminCredential` table.
+- **`rbac.py`** — `AuditLog` only (append-only admin-action trail). `AdminRole` / `Permission` / `AdminRolePermission` tables were removed; portal access is by `RoleSlug` via `require_roles` / `require_permission`.
 - **`cms.py`** — the Simulation CMS schema: `Simulation` (id is the same opaque string `Enrollment.simulation_id` already stored — admin-typed, immutable slug; carries title/company/logo/domain/manager persona/onboarding content/rating/`section_labels` for week-grouped display) and `SimulationTask` (one row per task — `task_index` is the same int `TaskCompletion.task_id` stores; carries briefing/what-to-do/hints/success-criteria/reference-data/model-solution/rubric/`config` — a type-specific JSON payload validated by `app/services/task_types.py` — plus `xp_award`/`skill_awards`). Also defines the fixed `TASK_TYPES` tuple (`text_rubric`, `structured_form`, `quiz`, `ai_roleplay_chat`, `crm_workspace`, `code_sandbox`).
 - **`sim_builder.py`** — a second, independent simulation-authoring schema for the drag-drop visual "Sim Builder" (Weeks → Pages → Blocks), deliberately separate from `cms.py`'s single-`type`-per-task model since a Sim Builder page is a free-form stack of blocks of different types: `SimBuilderProject`, `SimBuilderPage` (ordered, optionally grouped by `week`), `SimBuilderBlock` (one of `services/block_types.py`'s block types, type-specific `config` JSON), `SimBuilderVersion` (a full serialized snapshot taken on publish — powers both Publish and Version History via whole-snapshot restore, not field-level diffing). v1 is authoring-only; published content isn't yet rendered to students.
 - **`feature_flags.py`** — `FeatureFlag` (catalog row with an `enabled_default` fallback) and `FeatureFlagOverride` (layers on top at increasing specificity — role < university < user, resolved by `services/feature_flags.py`). Replaces a previously-hardcoded `ROLE_FEATURES` map that lived in the frontend's `AuthContext`.
@@ -62,10 +69,10 @@ A package rather than one flat file — `__init__.py` holds the original/core ta
 Pydantic request/response shapes, one file per feature area, mirroring `models/`'s split (no `schemas/__init__.py` core file — the original core routes use inline/simple shapes rather than a shared schema module).
 
 - **`cms.py`** — the largest schema file: per-task-type config shapes (`QuizConfig`, `TextRubricConfig`, `StructuredFormConfig`, `AiRoleplayChatConfig`, `CrmWorkspaceConfig`, `CodeSandboxConfig`, plus their sub-shapes like `QuizQuestion`/`FormField`/`RoleplayPersona`/`DeclarativeRule`), `ManagerPersona`/`OnboardingCompany`/`OnboardingOffer`/`OnboardingContent`, and the CRUD bodies (`SimulationCreate`/`Update`, `SimulationTaskCreate`/`Update`, `ReorderTasksBody`, `DuplicateSimulationBody`, `CreateFromTemplateBody`) plus `validate_task_config()` — dispatches to the right per-type Pydantic model based on `type` before a task is saved.
-- **`rbac.py`** — `PermissionOut`, `AdminRoleCreate`/`Update`/`Out`, `AdminCreate`/`Update`/`ResetPassword`/`Out`, `AuditLogOut` — request/response shapes for the SuperAdmin's Admin Management + Roles & Permissions pages.
+- **`rbac.py`** — request/response shapes still used by admin-management (e.g. `AdminCreate`/`AdminOut`, `AuditLogOut`). Permission/AdminRole CRUD schemas may remain for list-only/stub endpoints after the table removal.
 - **`sim_builder.py`** — one config shape per Sim Builder block type (`HeadingConfig`, `TextConfig`, `ImageConfig`, `QuizBlockConfig`, `VideoConfig`, `AiChatConfig`, `EmailExerciseConfig`, `CodingChallengeConfig`, `FileUploadConfig`, `AssessmentConfig` + `AssessmentCriterion`, `BranchingLogicConfig` + `BranchingLogicBranch`, `TimerConfig`, `XpRewardsConfig`), plus CRUD bodies for projects/pages/blocks and `AiGenerateBody` (AI-assisted block generation).
 - **`feature_flags.py`** — `FeatureFlagOverrideOut`, `FeatureFlagCreate`/`Update`/`Out`, `SetOverrideBody`.
-- **`profile.py`** — `ProfileUpdateBody`, `EducationIn`/`Out`.
+- **`profile.py`** — `ProfileUpdateBody`, `EducationIn`/`Out` (`EducationOut.id` should match the ORM `int` primary key).
 - **`platform_config.py`** — `ConfigEntryOut`, `SetConfigBody`.
 
 ### `app/utils/`
@@ -78,7 +85,19 @@ Every route file's own internal `APIRouter(prefix=...)` is unchanged from before
 
 #### `app/api/v1/auth/`
 
-- **`auth.py`** — every login/register flow: `POST /api/auth/register` (Direct User self-signup), `/login/direct`, `/login/superadmin` (against the separate `SuperAdminCredential` table, shorter-lived token, `sa: true` claim), `/login/admin` (checks `is_active`, resolves and embeds `permissions` + `admin_role_name`), `/login/university` (by roll number, rejects `CLASS_MENTOR` role with a pointer to the mentor login), `/login/mentor`, and `GET /api/auth/me` (session-refresh endpoint every `AuthContext` mount calls — re-checks admin suspension live, attaches unlocked features/badges/education/feature-flags/permissions). `_safe_user()` is the one place a `User` row is serialized for the client (never leaks `password_hash`).
+- **`auth.py`** — every login/register flow, all tenant-aware via `X-WorkLearn-Host` / request Host → `resolve_tenant`:
+  - `POST /api/auth/register` — academy-only self-signup as `student` on the default university
+  - `POST /api/auth/login/direct` — academy student (must be `student`, **no** `roll_no`)
+  - `POST /api/auth/login/superadmin` — `super_admin` user (same `users` table)
+  - `POST /api/auth/login/admin` — on default tenant: platform `admin`; on partner subdomain: `university_admin` for that university
+  - `POST /api/auth/login/university` — partner-only; `student` **with** `roll_no`, scoped to tenant
+  - `POST /api/auth/login/mentor` — partner-only; `teacher`, scoped to tenant
+  - `GET /api/auth/me` — session refresh (education, feature flags, unlocked features, badges)
+  `_safe_user()` serializes a `User` for the client (never leaks `password_hash`). Partner vs academy is enforced with `_require_partner` / `_require_academy`.
+
+#### `app/api/v1/tenant.py`
+
+- Public `GET /api/tenant` — resolves the current university from host / `X-WorkLearn-Host` and returns `{id, code, name, is_default, subdomain}`. No auth. Frontend `TenantContext` is written to call this, but see frontend notes — the provider is not currently mounted in `AppProviders`, and `client.js` does not yet send `X-WorkLearn-Host`.
 
 #### `app/api/v1/users/`
 
@@ -97,25 +116,26 @@ Every route file's own internal `APIRouter(prefix=...)` is unchanged from before
 
 #### `app/api/v1/admin/`
 
-- **`admin.py`** — Admin-portal-visible platform stats/universities/users/activity: `GET /stats`, `/universities` (student counts + mentor counts grouped by `institution_code`), `GET /users` (explicitly excludes `ADMIN`/`SUPER_ADMIN` roles — admin accounts are only visible via `admin_management.py`'s own permission), `GET /activity` (recent XP-ledger feed), `POST /users/{id}/unlock` (manual feature grant), `GET /users/{id}/enrollments`.
+- **`admin.py`** — Admin-portal stats/universities/users/activity: `GET /stats`, `/universities` (counts students/teachers per `University` row), `GET /users` (excludes platform `admin`/`super_admin`), `GET /activity`, unlock/suspend/activate/delete user, enrollment admin helpers.
+- **`provisioning.py`** — `POST /api/admin/provision/users` — create student/teacher/university_admin accounts into a university (gated to super_admin/admin/university_admin; uni-admins can only provision into their own org).
 - **`admin_simulations.py`** — CRUD for the (non-Sim-Builder) Simulation CMS: create/duplicate/publish/unpublish a `Simulation`, task CRUD + reordering, "create from template" (via `cms_templates/`), and `DELETE /{sim_id}/enrollments` — the bulk de-enroll-all-students endpoint (removes every `Enrollment` + `UserBadge` row for that simulation, audit-logged).
 - **`admin_simulation_templates.py`** — small: lists the available starter templates from `app/cms_templates/` for the "create from template" picker.
 - **`admin_uploads.py`** — generic image upload for CMS content (simulation logos, manager photos) — same validated-extension/size pattern as `profile.py`'s photo upload, writing into the shared `UPLOAD_DIR`.
 
 #### `app/api/v1/superadmin/`
 
-- **`admin_management.py`** — SuperAdmin-only lifecycle management of `ADMIN`-tier accounts and `AdminRole`s: create/edit/suspend/delete an admin, reset an admin's password, create/edit/delete `AdminRole`s and their permission grants, list the `AuditLog`. This is the "edit someone else's account" counterpart to `profile.py`'s self-service-only routes.
-- **`feature_flags.py`** — CRUD on `FeatureFlag` catalog rows plus `FeatureFlagOverride` set/delete (role/university/user-scoped), backing the SuperAdmin Feature Flags manager.
-- **`platform_analytics.py`** — platform-wide/cohort analytics (distinct from `analytics.py`'s per-user analytics) — growth charts, aggregate breakdowns, gated by the Analytics permission category.
-- **`platform_config.py`** — `GET`/`PUT` on `PlatformConfig` rows by `(category, key)` — backs the SuperAdmin Configuration Center (AI provider, billing, database settings display).
+- **`admin_management.py`** — SuperAdmin-only lifecycle of platform `admin` users (list/create/patch/suspend/activate/reset-password/delete) and `GET /audit-log`. Role/permission catalog endpoints list built-in `roles` table rows (or empty stubs) — custom AdminRole/Permission CRUD was removed; access is by role slug via `require_permission` (alias for admin-tier roles).
+- **`feature_flags.py`** — CRUD on `FeatureFlag` catalog rows plus `FeatureFlagOverride` set/delete (role/university/user-scoped), backing the Feature Flags manager.
+- **`platform_analytics.py`** — platform-wide/cohort analytics (distinct from `analytics.py`'s per-user analytics).
+- **`platform_config.py`** — `GET`/`PUT` on `PlatformConfig` rows by `(category, key)` — Configuration Center (AI provider, billing, database settings display).
 
 #### `app/api/v1/analytics/`
 
-- **`analytics.py`** — a student's own analytics (their skill trends, task history, XP over time) — `GET /api/analytics`. Distinct from `superadmin/platform_analytics.py`'s platform-wide view.
+- **`analytics.py`** — a student's own analytics (skill trends, task history, XP over time) — `GET /api/analytics`. Distinct from `superadmin/platform_analytics.py`'s platform-wide view.
 
 #### `app/api/v1/mentor/`
 
-- **`mentor.py`** — the Class Mentor role's endpoints: list their assigned students, view a student's progress/activity, mentor-side messaging.
+- **`mentor.py`** — Teacher (`teacher`) endpoints: list students in their university/section, grant/revoke per-student feature unlocks. Super Admin may also pass the mentor role check.
 
 ### `app/routes/`
 
@@ -125,19 +145,22 @@ Every route file's own internal `APIRouter(prefix=...)` is unchanged from before
 
 Business logic, kept out of route files so it's independently testable and reusable across route/AI-tool call sites.
 
-- **`skill_engine.py`** — `award_task_completion()`: upserts the `TaskCompletion` row, applies `SimulationTask.skill_awards` to the user's `UserSkill` rows (capped at 100), computes total XP (base `xp_award` + a `QUIZ_BONUS_XP` bonus if `quiz_score >= QUIZ_BONUS_THRESHOLD`), writes an `XpLedger` entry, bumps `User.xp`, and advances `Enrollment.current_task_idx`. Also `get_user_skills()` and `compute_skill_gps()` (gap analysis against `TARGET_ROLE_REQUIREMENTS` for the Skill GPS page — current vs. required per skill, overall readiness %, top 3 gaps).
-- **`permissions_seed.py`** — `PERMISSION_CATALOG` (every `Permission` key/category/label/description the ADMIN tier can be granted — `users.*`, `simulations.*`, `analytics.*`, `activity.*`, `feature_flags.*`, `admins.*`, `config.*`) and `seed_permissions()`, an idempotent startup upsert that also ensures a built-in "Administrator" `AdminRole` holds every permission.
+- **`permissions_seed.py`** — stub documenting that AdminRole/Permission seeding was removed; roles + universities are seeded by `roles_seed.py` instead.
+- **`roles_seed.py`** — idempotent upsert of the five `Role` rows and default universities (`DEFAULT` Teaching Academy + partner `IITD`). Called from `main.py` lifespan and from `seed.py`.
+- **`tenant.py`** — multi-tenant host resolution: `extract_partner_subdomain`, `host_from_request` (prefers `X-WorkLearn-Host`), `resolve_tenant` / `get_tenant`, `tenant_public_dict`. Maps `iitd.localhost` → university `code=IITD`; bare `localhost` → default academy.
+- **`simulation_lookup.py`** — `get_simulation(db, key)` resolves a simulation by integer id or public `slug`.
 - **`certificates.py`** — `build_certificate_number()` (format `WL-<SIM5>-<YEAR>-<RAND6>`, random tail so it can't leak issuance volume or be guessed), `issue_certificate_if_complete()` (idempotent — returns an existing certificate if present, checks `total_tasks == completed_count`, catches an `IntegrityError` on a lost race and refetches), and `certificate_dict()` (the API-facing serializer).
 - **`simulation_completion.py`** — `finalize_if_complete()`, the single place that decides "is this simulation finished?" and reacts: marks the `Enrollment` `COMPLETED`, posts the manager persona's congratulatory `AgentMessage`, and calls `certificates.py`'s issuance — all idempotent, safe to call after every single task completion regardless of which route (`enrollments.py` or `sandbox.py`) triggered it. Added specifically because `code_sandbox`-only simulations (da-job-sim, frontend-dev-sim) were never reaching completion when this logic lived only in `enrollments.py`.
-- **`audit.py`** — `resolve_actor_info()` (figures out whether the acting token belongs to a `User` (ADMIN) or `SuperAdminCredential`, for correct `AuditLog.actor_role`) and `log_action()` (appends an `AuditLog` row, tagged with the current request-id; doesn't commit itself — piggybacks on the caller's existing commit so a log entry and its action can never persist independently of each other).
+- **`audit.py`** — `resolve_actor_info()` / `log_action()` for `AuditLog` rows (piggybacks on the caller's commit; tags request-id).
 - **`artifacts.py`** — local-disk artifact store for chained sandbox tasks (Task 1's cleaned CSV becomes Task 2's input dataset): `save_artifact()`/`load_artifact()`, keyed by `enrollment_id` so each student's artifacts flow independently. No DB table — just files under `data/artifacts/<enrollment_id>/`.
 - **`block_types.py`** — `BLOCK_TYPES` registry for the Sim Builder's 13 block types (heading, text, image, video, quiz, ai_chat, coding_challenge, email_exercise, file_upload, timer, xp_rewards, assessment, branching_logic) — human label, palette category, and default `config` for a newly-inserted block. The 7 added after the original 6 are editor-preview only (no live grading wired up yet).
 - **`dataset.py`** — `generate_dataset()`, the canonical, seeded-random "lumen_orders" dataset generator for the Data Analyst job simulation. The seed derives from `enrollment_id`, so each student's dataset is distinct but reproducible — the same function is called both to hand the student their `dataset.csv` and to compute the backend's ground-truth reference solution, so the two can never disagree, and copy-pasted answers between students don't work.
-- **`feature_flags.py`** — `FEATURE_FLAG_CATALOG` + `ROLE_DEFAULTS` (a byte-for-byte replica of the frontend's old hardcoded `ROLE_FEATURES` map, seeded once so migrating to real DB-backed flags didn't change behavior on day one), `seed_feature_flags()` (idempotent upsert), and `resolve_feature_flags()` (precedence: `enabled_default` < role override < university override < user override — called on every login/`/me` response).
+- **`feature_flags.py`** — `FEATURE_FLAG_CATALOG` + `ROLE_DEFAULTS`, `seed_feature_flags()`, and `resolve_feature_flags()` (precedence: `enabled_default` < role override < university override < user override — called on every login/`/me` response). University overrides match `universities.code`.
 - **`frontend_specs.py`** — `FRONTEND_TEST_SPECS`, the hidden Jest `submission.test.js` source per task for the Frontend Developer job simulation — the sandbox writes this alongside the student's own submission file before running Jest. This is that simulation's equivalent of `dataset.py`'s computed reference solution for the DA sim.
-- **`platform_config.py`** — `CONFIG_CATALOG` (every `PlatformConfig` row the SuperAdmin Configuration Center can show/edit, grouped `ai`/`billing`/`database`, seeded from the app's real current `.env` values where one exists so the form isn't blank), `seed_platform_config()` (insert-if-missing, never clobbers an admin's saved value), `catalog_meta()`.
+- **`platform_config.py`** — `CONFIG_CATALOG` (every `PlatformConfig` row the Configuration Center can show/edit, grouped `ai`/`billing`/`database`, seeded from the app's real current `.env` values where one exists so the form isn't blank), `seed_platform_config()` (insert-if-missing, never clobbers an admin's saved value), `catalog_meta()`.
 - **`sandbox.py`** — the facade route files call instead of talking to a runner directly: `run_submission()` (dispatches to whichever runner `SANDBOX_RUNNER` configures — Docker or Kubernetes, see `sandbox_runners/`), `read_output()`, `cleanup()`.
 - **`sim_view.py`** — `build_simulation_public_dict()`/`build_task_public_dict()`, the shared "full simulation" response shape used by both the public student runtime and the admin draft-preview endpoint, factored out specifically so those two trust boundaries (published-only vs. any-status, and secret-config-stripped vs. not) can't silently drift apart.
+- **`skill_engine.py`** — `award_task_completion()`: upserts the `TaskCompletion` row, applies `SimulationTask.skill_awards` to the user's `UserSkill` rows (capped at 100), computes total XP (base `xp_award` + a `QUIZ_BONUS_XP` bonus if `quiz_score >= QUIZ_BONUS_THRESHOLD`), writes an `XpLedger` entry, bumps `User.xp`, and advances `Enrollment.current_task_idx`. Also `get_user_skills()` and `compute_skill_gps()` (gap analysis against `TARGET_ROLE_REQUIREMENTS` for the Skill GPS page — current vs. required per skill, overall readiness %, top 3 gaps).
 - **`task_types.py`** — `TASK_TYPES` registry for the CMS's 6 fixed task types (text_rubric, structured_form, quiz, ai_roleplay_chat, crm_workspace, code_sandbox) — which grading mechanism each uses, whether it needs a sandbox, and which `config` keys must be stripped (`strip_secrets()`) before a task is ever sent to a student (e.g. an LLM judge prompt or a quiz's correct answers).
 
 ### `app/services/graders/`
@@ -188,10 +211,10 @@ One starter-template module per domain for the Simulation CMS's "create from tem
 ### `app/main.py`
 
 The FastAPI app object and its wiring — the one file that ties every package above together:
-- **`lifespan()`** — on startup: `create_all` (dev-convenience schema sync, no Alembic), then three idempotent seed calls (`seed_permissions`, `seed_feature_flags`, `seed_platform_config`), starts the Manager's APScheduler (`agents/manager.py`), and initializes Langfuse tracing. On shutdown: stops the scheduler, flushes Langfuse.
-- **Middleware**: CORS (`_cors_origins()` deliberately allows both `localhost` and `127.0.0.1` forms of `FRONTEND_URL`, since browsers treat them as different origins) and `RequestIdMiddleware` (added after CORS so it runs outermost).
+- **`lifespan()`** — on startup: `create_all` (dev-convenience schema sync), then `seed_roles_and_universities`, `seed_feature_flags`, `seed_platform_config`, starts the Manager APScheduler (`agents/manager.py`), and initializes Langfuse tracing. On shutdown: stops the scheduler, flushes Langfuse.
+- **Middleware**: CORS — `_cors_origins()` allows both `localhost` and `127.0.0.1` forms of `FRONTEND_URL`, plus `allow_origin_regex` for partner subdomains (`http://iitd.localhost:5173` etc.); `RequestIdMiddleware` (added after CORS so it runs outermost).
 - **`unhandled_exception_handler`** — global catch-all for anything that isn't an intentional `HTTPException`, returns a generic 500 + request-id, logs the real traceback server-side only.
-- The full `import` + `include_router()` list for every route module across `api/v1/*`, `ai/routes/*`, and `routes/health`, plus the `# noqa: F401` model-registration imports needed for `create_all` to see every table.
+- The full `import` + `include_router()` list for every route module across `api/v1/*` (including `tenant` + `provisioning`), `ai/routes/*`, and `routes/health`, plus the `# noqa: F401` model-registration imports needed for `create_all` to see every table (roles, university, cms, sim_builder, rbac/audit, feature_flags, platform_config, profile, certificate).
 - Mounts `/static` to serve `STATIC_DIR` (uploaded photos/resumes/CMS images).
 
 ### `migrations/`
@@ -212,10 +235,10 @@ Numbered, idempotent one-off scripts for schema changes `Base.metadata.create_al
 pytest suite, split `unit/`/`integration/` — a real but intentionally-scoped suite (auth, RBAC enforcement, grading logic, a few pure utils), not full route/component coverage. See `tests/README.md` for the full rationale.
 
 - **`conftest.py`** — session-scoped fixtures run against a **real** Postgres database (a dedicated `<db>_test` database, created fresh and dropped after the session — not SQLite/mocks, since the app relies on Postgres-native enums/JSON columns). `DATABASE_URL` is overridden at module scope *before* any `app.*` import (the async engine is built at import time). `_clean_tables` truncates every table after each test for isolation, then re-seeds permissions. `client`/`db_session` fixtures give tests an httpx `AsyncClient` (via ASGI transport, no real network) and a raw DB session respectively.
-- **`unit/test_auth.py`** — pure-logic: password hash roundtrip, JWT create/decode, and confirms the `permissions` JWT claim is a nav hint only (re-verified server-side, per `core/permissions.py`'s docstring).
+- **`unit/test_auth.py`** — pure-logic: password hash roundtrip, JWT create/decode carrying `sub` + `role` (no permissions claim on the token).
 - **`unit/test_declarative_rules.py`** — pure-logic tests for the no-code grading DSL (`services/graders/declarative_rules.py`) against synthetic submitted JSON — no DB, no HTTP.
-- **`integration/test_auth_routes.py`** — real HTTP (in-process ASGI transport) tests of the direct-user register/login/`/me` flow against the real test database. Sets `pytestmark = pytest.mark.asyncio(loop_scope="session")` at module level — required because pytest-asyncio's auto-mode stamps a function-scoped loop marker before any collection hook could fix it up, and the session-scoped DB engine needs every test on that same loop.
-- **`integration/test_rbac.py`** — confirms `require_permission`'s core promise: it never trusts the JWT's embedded `permissions` claim, always re-querying the database, so revoking a permission takes effect immediately rather than after the token expires.
+- **`integration/test_auth_routes.py`** — real HTTP (in-process ASGI transport) tests of the academy student register/login/`/me` flow against the real test database. Sets `pytestmark = pytest.mark.asyncio(loop_scope="session")` at module level — required because pytest-asyncio's auto-mode stamps a function-scoped loop marker before any collection hook could fix it up, and the session-scoped DB engine needs every test on that same loop.
+- **`integration/test_rbac.py`** — role-gate coverage for `require_roles` / `require_permission` (admin-tier alias) against live DB users — access is by role slug, not a JWT permissions array.
 - **`README.md`** — documents what this suite does and deliberately does not cover, and the Postgres/`CREATEDB` privilege prerequisite for running it.
 
 ### `sandboxes/`
@@ -246,18 +269,24 @@ Entry point. `ReactDOM.createRoot(...).render(<AppProviders><AppRouter /></AppPr
 
 ### `src/app/providers/`
 
-- **`AppProviders.jsx`** — the app-wide provider stack, extracted out of `main.jsx`: `React.StrictMode` → a class-based `ErrorBoundary` (catches render errors, shows a "Something went wrong" fallback with a return-to-dashboard button) → `BrowserRouter` → `QueryClientProvider` (TanStack Query, `retry: 1`, `refetchOnWindowFocus: false`) → `AuthProvider` (see `features/auth/AuthContext.jsx`) → `{children}` (i.e. `AppRouter`) → the shadcn `Toaster` (toast host).
+- **`AppProviders.jsx`** — the app-wide provider stack: `React.StrictMode` → class-based `ErrorBoundary` → `BrowserRouter` → `QueryClientProvider` (TanStack Query, `retry: 1`, `refetchOnWindowFocus: false`) → `AuthProvider` → `{children}` (`AppRouter`) → shadcn `Toaster`. Note: `TenantProvider` exists under `features/auth/TenantContext.jsx` but is **not** currently wrapped here.
 
 ### `src/app/router/`
 
-- **`AppRouter.jsx`** — the entire route table (extracted from the old top-level `App.jsx`). `(auth)` routes (`/login`, `/university/login`, `/mentor/login`) need no auth. `/super-admin/*` and `/admin/*` are gated by their own guards below and lazy-loaded (`React.lazy`) so a regular student never downloads either portal's bundle; the Sim Builder/CMS editor routes are regular (non-lazy) imports since they're standalone full-screen tools re-hosted under `/admin/*`, siblings of the portal shell rather than nested in it. Everything else sits behind `ProtectedRoute` and (except `/mentor`/`/onboarding`, which are full-screen) `MainLayout` (Navbar + Outlet + conditional Footer — hidden on focused work sessions like a running simulation or a live MIRA interview, via `FOOTERLESS_ROUTES`/`FOOTERLESS_PATTERN`). MIRA's 4 routes additionally nest under `MiraLayout` (mounts `MiraProvider`).
+- **`AppRouter.jsx`** — the entire route table:
+  - **Marketing (public):** `/` (landing, wrapped in `PublicOnlyRoute`), `/about`, `/institutions`, `/contact`, `/blog` — use `MarketingNav`/`MarketingFooter`, not `MainLayout`.
+  - **Auth:** `/login` (academy student), `/university/login` (partner student), `/mentor/login` (partner teacher). Admin / Super Admin logins are shown by their guards when unauthenticated on `/admin` and `/super-admin`. Partner UI has **no** university-admin login page.
+  - **`/super-admin/*`** — `RequireSuperAdmin` + lazy `SuperAdminPortal`.
+  - **`/admin/*`** — `RequireAdmin` + lazy `AdminPortal`; sibling full-screen CMS/Sim Builder routes under `/admin/simulations/:id`, `/admin/sim-builder`.
+  - **Authenticated app** — behind `ProtectedRoute`; `/mentor` and `/onboarding` are full-screen; everything else under `MainLayout` (Navbar + Outlet + Footer, footer hidden on focused sim/MIRA session via `FOOTERLESS_*`). MIRA routes nest under `MiraLayout` (`MiraProvider`).
 
 #### `src/app/router/guards/`
 
-- **`ProtectedRoute.jsx`** — the base "must be logged in" gate for the whole authenticated route tree: redirects to `/login` if not signed in, bounces `SUPER_ADMIN`/`ADMIN` to their own portals (they have no student profile), and redirects to `/onboarding` for a `DIRECT_USER`/`UNIVERSITY_STUDENT` who hasn't finished the first-login wizard yet.
-- **`RequireAdmin.jsx`** — gates every `/admin*` route. Shows `AdminPortalLogin` if the signed-in user is neither `ADMIN` nor `SUPER_ADMIN` (SUPER_ADMIN is allowed through — the root role can always reach a lower tier's surface).
-- **`RequireSuperAdmin.jsx`** — gates every `/super-admin*` route. Shows `SuperAdminLogin` if not a signed-in `SUPER_ADMIN` — deliberately does **not** auto-redirect a signed-in `ADMIN` back to `/admin` (that used to happen and made it impossible to sign in as a super admin from a tab that already had an admin session; the real authorization boundary is server-side anyway).
-- **`PortalSpinner.jsx`** — the shared full-screen loading spinner shown while auth is resolving or a lazy portal chunk is downloading.
+- **`ProtectedRoute.jsx`** — must be logged in; redirects to `/login` if not; bounces `super_admin` → `/super-admin` and `admin` → `/admin`; redirects `student` with `onboarding_completed: false` to `/onboarding`.
+- **`RequireAdmin.jsx`** — gates `/admin*`; if not `admin` or `super_admin`, renders `AdminPortalLogin` inline. Does **not** allow `university_admin`.
+- **`RequireSuperAdmin.jsx`** — gates `/super-admin*`; if not `super_admin`, renders `SuperAdminLogin` inline (does not bounce an Admin session to `/admin`).
+- **`PublicOnlyRoute.jsx`** — wraps marketing `/`: signed-in users go to `/dashboard` so they don't land on the sales page.
+- **`PortalSpinner.jsx`** — full-screen spinner while auth resolves or a lazy portal chunk downloads.
 
 ### `src/app/store/`
 
@@ -269,11 +298,11 @@ Zustand stores — client-side, mostly-persisted state for the two simulation ru
 
 ### `src/rbac/`
 
-New this session — centralizes role/permission constants that used to be inline string literals scattered across `App.jsx` and `PermissionGate.jsx`.
+Role/permission constants for the frontend.
 
-- **`roles.js`** — `ROLES` object mirroring the backend's `Role` enum exactly (`DIRECT_USER`, `UNIVERSITY_STUDENT`, `CLASS_MENTOR`, `SUPER_ADMIN`, `ADMIN`). Consumed by `AuthContext.jsx`, the three router guards, and every component that branches on `user.role`.
-- **`permissions.js`** — `PERMISSIONS` object mirroring the backend's `PERMISSION_CATALOG` keys (`services/permissions_seed.py`) as named constants (`USERS_VIEW`, `SIMULATIONS_PUBLISH`, `CONFIG_MANAGE`, etc.), so call sites can stop passing raw string literals to `PermissionGate`/`usePermission`.
-- **`usePermission.js`** — `usePermission(key)` hook, a thin wrapper over `AuthContext`'s `hasPermission()` (itself: `SUPER_ADMIN` always true, otherwise checks `user.permissions.includes(key)` — a UI-nav convenience only, never the real authorization boundary, which is always server-side).
+- **`roles.js`** — `ROLES` matching backend `RoleSlug`: `student`, `teacher`, `university_admin`, `admin`, `super_admin`. Old names `DIRECT_USER` / `UNIVERSITY_STUDENT` / `CLASS_MENTOR` are gone — independent vs university-affiliated students share `student` and are distinguished by `user.university.is_default`.
+- **`permissions.js`** — named permission-key constants (historical catalog keys). Backend `require_permission` no longer checks per-key grants; UI `hasPermission` treats any admin-tier role as allowed.
+- **`usePermission.js`** — thin wrapper over `AuthContext.hasPermission()`.
 
 ### `src/hooks/`
 
@@ -288,7 +317,7 @@ React Query hooks, one file per domain — every hook wraps a single backend end
 - **`badges.js`** — `useUserBadges` (milestone badges, e.g. accepting an offer letter).
 - **`certificates.js`** — `useUserCertificates`, read-only (certificates are issued server-side on completion, never created client-side).
 - **`analytics.js`** — `useAnalytics`, a student's own per-period analytics — distinct from `platform-analytics.js`'s platform-wide view.
-- **`mentor.js`** — two unrelated "mentor" concepts share this file: the human Class Mentor's roster (`useMentorStudents`, `useUnlockFeature`/`useRevokeFeature`) and the AI Mentor's domain-aware quick-topic chips (`useMentorTopics`). Message send/stream/feedback itself is NOT here — that's a plain `fetch`-based SSE reader in `ai-mentor/useMentorChat.js`, since it's local chat state, not cacheable server data.
+- **`mentor.js`** — Teacher roster (`useMentorStudents`, `useUnlockFeature`/`useRevokeFeature`) and the AI Mentor's domain-aware quick-topic chips (`useMentorTopics`). Message send/stream/feedback itself is NOT here — that's a plain `fetch`-based SSE reader in `ai-mentor/useMentorChat.js`.
 - **`roleplay.js`** — `useRoleplayMessage`/`useGradeText`, the generic CMS-authored `ai_roleplay_chat`/`text_rubric` (LLM mode) task types.
 - **`profile.js`** — self-service Portfolio profile mutations (`useUpdateProfile`, photo/resume upload+delete via `uploadFile`, education CRUD, `useCompleteOnboarding`). No query hook for the profile itself — `user` (and its `education` array) comes from `AuthContext`'s own `/api/auth/me`, so every mutation here just needs to trigger `refreshUser()` afterwards rather than maintaining a separate cache.
 - **`admin.js`** — Admin-portal user/university/activity management (`useAdminStats`, `useAdminUniversities`, `useAdminUsers`, `useAdminActivity`, `useUserEnrollments`, suspend/activate/delete-user, `useDeleteEnrollment`). Despite the historical name, works for any `ADMIN` holding the matching permission, not superadmin-exclusive — every underlying endpoint is `require_permission`-gated server-side.
@@ -303,7 +332,7 @@ React Query hooks, one file per domain — every hook wraps a single backend end
 
 Cross-cutting, non-React helpers — the fetch client and small pure utility modules every feature draws from.
 
-- **`client.js`** — the whole app's HTTP layer: `api.{get,post,put,patch,del}` (JSON fetch wrapper, attaches the bearer token from `sessionStorage` — deliberately session-, not local-, storage, so each browser tab can hold a different role's session without one tab's login stomping another's), `setToken`/`clearToken`, a 401 handler that only force-redirects to `/login` when a token was actually attached (so a wrong-password login attempt surfaces as a normal inline error instead), `uploadImage`/`uploadFile` (multipart, no manual `Content-Type` so the browser sets the form boundary), `resolveMediaUrl` (backend-relative paths like `/static/uploads/...` need the API origin prepended; already-absolute URLs pass through), `downloadFile` (blob-based file-save for backend attachments), `streamChat` (the AI Mentor's SSE reader — parses `data: {...}` lines, supports `AbortController` cancellation, threads the final `message_id` through to `onDone`).
+- **`client.js`** — the whole app's HTTP layer: `api.{get,post,put,patch,del}` (JSON fetch wrapper, bearer token from `sessionStorage` — per-tab isolation), `setToken`/`clearToken`, 401 handler that only force-redirects when a token was attached, `uploadImage`/`uploadFile`, `resolveMediaUrl`, `downloadFile`, `streamChat` (AI Mentor SSE). **Does not currently send `X-WorkLearn-Host`** — partner subdomain multi-tenant resolution against `localhost:3001` needs that header (see `services/tenant.py` / `TEST_LOGINS.md`).
 - **`cn.js`** — `cn(...inputs)`, the standard `clsx` + `tailwind-merge` className combinator used throughout every component.
 - **`cn.test.js`** — unit tests for `cn()`'s merge/override behavior.
 - **`domainIcons.js`** — `resolveDomainIcon(label)`, substring-rule-based (not exact-match, since `Simulation.domain`/`.category` are free text) icon lookup for the domain filter bar/cards, with a generic fallback so a brand-new CMS-authored domain never renders with a missing icon.
@@ -339,6 +368,7 @@ Admin/SuperAdmin-portal-only components — their own dark-mode scope, never ren
 
 Shared primitives — hand-rolled utility components plus a handful of Aceternity UI components ported to plain JSX for the MIRA marketing sections.
 
+- **`Avatar.jsx`** / **`Avatar.test.jsx`** — small avatar primitive (initials / image).
 - **`IconField.jsx`** — a labeled-icon text input, shared by `EditProfileModal` and the onboarding wizard's contact step so both look identical.
 - **`RatingStars.jsx`** — read-only 5-star display (supports half-stars), reused by the simulation overview page, picker card, and admin preview tab.
 - **`RatingStars.test.jsx`** — component-rendering tests via Testing Library.
@@ -367,7 +397,7 @@ Placeholder — reserved for shared JSDoc typedefs if/when the codebase adopts t
 
 ### Root config files
 
-- **`vite.config.js`** — `@vitejs/plugin-react`, `assetsInclude: ['**/*.lottie']` (dotLottie animation files aren't in Vite's default asset list otherwise), dev server pinned to `127.0.0.1` with `strictPort: true`, and the `test` block (`environment: 'happy-dom'` — not `jsdom`, which currently has a broken ESM dependency chain that crashes every Vitest worker; `globals: true`; `setupFiles: './src/test/setup.js'`). No path aliases are configured anywhere — every import in the codebase is a relative path.
+- **`vite.config.js`** — `@vitejs/plugin-react`, `assetsInclude: ['**/*.lottie']`, dev server currently `host: '127.0.0.1'` with `strictPort: true` (partner hosts like `iitd.localhost` may need `host: true` — see `TEST_LOGINS.md`), and the `test` block (`environment: 'happy-dom'`, `globals: true`, `setupFiles: './src/test/setup.js'`). No path aliases — every import is relative.
 - **`tailwind.config.js`** — content globs over `index.html` + `src/**/*.{js,jsx}`; `darkMode: ['selector', '.wl-portal-dark']` (a custom selector, not the default `.dark` on `<html>`, scoped only to the Admin/SuperAdmin `PortalShell` root so dark-mode utilities can never activate in the student-facing app); the brand color palette (`primary`/`secondary`/`surface`/`on-surface`/`outline`/`tertiary`), a flattened `borderRadius` scale, `max-w-container` (1280px), and the `scroll` keyframe/animation used by `infinite-moving-cards.jsx`'s marquee.
 - **`package.json`** — key scripts: `dev` (Vite dev server), `build`, `preview`, `test`/`test:watch` (Vitest). Notable dependencies: `@tanstack/react-query` (server-state cache), `zustand` (client state), `react-router-dom` v6, `@dnd-kit/*` (Sim Builder drag-and-drop), `@monaco-editor/react` (code sandbox editor), `jspdf` (credential PDFs, lazy-loaded), `zod`/`react-hook-form`/`@hookform/resolvers` (form validation), `sonner` (toasts), `recharts`/`@tanstack/react-table` (admin analytics/tables), `motion` (a handful of Aceternity-derived components), Radix primitives + `class-variance-authority`/`cmdk` (shadcn's own dependencies). Dev-only: `vitest` + `@testing-library/*` + `happy-dom`, `tailwindcss` + `autoprefixer` + `postcss`.
 - **`index.html`** — the single HTML shell: loads the Inter webfont from Google Fonts, mounts `#root`, and loads `/src/main.jsx` as a module script. No other script tags.
@@ -378,12 +408,25 @@ One folder per feature area's real implementation. `AppRouter.jsx` imports each 
 
 #### `features/auth/`
 
-- **`AuthContext.jsx`** — the whole app's auth/session layer: `AuthProvider` restores a session from `sessionStorage` on mount (with a 5s timeout so an unreachable backend doesn't hang forever), exposes `register`/`loginDirect`/`loginSuperAdmin`/`loginAdmin`/`loginUniversity`/`loginMentor`/`logout`/`refreshUser`, plus `hasFeature(name)` (DB-backed feature flags + per-user unlocks) and `hasPermission(key)` (UI-nav convenience only — `SUPER_ADMIN` always true, otherwise checks `user.permissions`). `useAuth()` is the hook every other file in the app calls to read the current user/session.
-- **`global/Login.jsx`** — the main Direct User login/register page (toggle between `signin`/`signup` modes), split-screen layout with a Google-icon SSO button rendered but not wired to a real OAuth flow yet.
-- **`global/AdminPortalLogin.jsx`** — the Admin portal's own login (`loginAdmin` → `POST /api/auth/login/admin`), same split-screen shape as `Login.jsx`.
-- **`global/SuperAdminLogin.jsx`** — the SuperAdmin's own login (`loginSuperAdmin` → `POST /api/auth/login/superadmin`), same split-screen shape.
-- **`university/UniversityLogin.jsx`** — roll-number-based login for `UNIVERSITY_STUDENT`s, with institution/department pickers for context (the account itself is created by an admin, not self-registered here).
-- **`university/MentorLogin.jsx`** — Mentor-ID-based login for `CLASS_MENTOR`s.
+- **`AuthContext.jsx`** — session layer: restores token from `sessionStorage` on mount (5s timeout), exposes `register` / `loginDirect` / `loginSuperAdmin` / `loginAdmin` / `loginUniversity` / `loginMentor` / `logout` / `refreshUser`, plus `hasFeature` (DB feature flags + unlocks) and `hasPermission` (true for `super_admin` | `admin` | `university_admin`; key ignored — matches backend `require_permission` alias).
+- **`TenantContext.jsx`** — calls `GET /api/tenant`, exposes `{ tenant, isPartner }`. **Not mounted** in `AppProviders` today; for partner subdomains to work end-to-end, mount this provider and send `X-WorkLearn-Host: window.location.host` from `lib/client.js`.
+- **`global/Login.jsx`** — academy student sign-in / sign-up only (`loginDirect` / `register`). Split-screen layout; Google SSO button is UI-only (not wired).
+- **`global/AdminPortalLogin.jsx`** — platform admin login (`loginAdmin` → `/api/auth/login/admin`). Used when visiting `/admin` without an admin/super_admin session.
+- **`global/SuperAdminLogin.jsx`** — super admin login (`loginSuperAdmin` → `/api/auth/login/superadmin`).
+- **`university/UniversityLogin.jsx`** — partner **student** login UI only. **Client/server mismatch:** posts `{ roll_no, password }` while `auth.py` expects `{ email, password }` (student must still *have* a `roll_no` in the DB).
+- **`university/MentorLogin.jsx`** — partner **teacher** login UI only. Posts `{ mentor_id, password }` while backend expects `{ email, password }`.
+
+#### `features/marketing/`
+
+Public marketing site (no `MainLayout` / app Navbar).
+
+- **`LandingPage.jsx`** — `/` hero and sections (`HeroSection`, `HowItWorksSection`, `FeaturesBentoSection`, `AppShowcaseSection`, `SimulationsShowcase`, `TrustSection`, `PricingSection`, `FinalCtaSection`).
+- **`AboutPage.jsx`**, **`InstitutionsPage.jsx`**, **`ContactPage.jsx`**, **`BlogPage.jsx`** — secondary marketing pages (`/about`, `/institutions`, `/contact`, `/blog`).
+- **`useMarketingLinks.js`** — shared nav/CTA link helpers for marketing chrome.
+- **`components/MarketingNav.jsx`**, **`MarketingFooter.jsx`**, **`MarketingPageShell.jsx`** — marketing chrome.
+- **`components/screens/*`** — decorative in-browser “app window” mock screens used on the landing showcase (`DashboardScreen`, `SimulationScreen`, `MentorScreen`, `SkillGpsScreen`, `AnalyticsScreen`, `AppWindow`).
+- **`data/pricingTiers.js`**, **`data/trustPlaceholders.js`** — static marketing content.
+- **`sections/*`** — individual landing sections listed above.
 
 #### `features/analytics/`
 
@@ -395,7 +438,7 @@ One folder per feature area's real implementation. `AppRouter.jsx` imports each 
 
 #### `features/mentor/`
 
-- **`ClassMentor.jsx`** — the human Class Mentor's own portal: tabs for Overview/My Students/Assignments/Feature Access, a roster of their assigned students (`useMentorStudents`), and the ability to grant/revoke specific feature unlocks per student (`useUnlockFeature`/`useRevokeFeature`) from a fixed `GRANTABLE_FEATURES` list.
+- **`ClassMentor.jsx`** — the Teacher portal: Overview / My Students / Assignments / Feature Access; roster via `useMentorStudents`; grant/revoke unlocks from `GRANTABLE_FEATURES`.
 
 #### `features/skill-gps/`
 
@@ -407,7 +450,7 @@ One folder per feature area's real implementation. `AppRouter.jsx` imports each 
 
 #### `features/onboarding/`
 
-The first-login wizard — gated in `ProtectedRoute` (any `DIRECT_USER`/`UNIVERSITY_STUDENT` with `onboarding_completed: false` is redirected here on every route until they finish). Data is only persisted once, on the final step.
+The first-login wizard — gated in `ProtectedRoute` (any `student` with `onboarding_completed: false` is redirected here until they finish). Data is only persisted once, on the final step.
 
 - **`OnboardingWizard.jsx`** — orchestrates the 6-step flow (`welcome → profile → contact → domain → education → review`), holding all step state locally until `handleFinish` fires the actual mutations (`useUpdateProfile`, `useUploadPhoto`, `useAddEducation`, `useCompleteOnboarding`) in sequence. Domain choices come from `useSimulations()`'s real published-simulation domains, never a hardcoded list.
 - **`components/OnboardingLayout.jsx`** — the full-screen wizard shell (no Navbar/Footer) with a dot-strip step-progress indicator.
@@ -473,7 +516,7 @@ The Admin portal — Simulations, Sim Builder, Feature Flags, Universities, and 
 - **`AdminPortal.jsx`** — the portal shell: `PortalShell` + `Sidebar` (nav items filtered by `hasPermission` — an Admin's nav only ever shows what their assigned `AdminRole` actually grants; `SUPER_ADMIN` sees every item) + a `Routes` switch over the 8 pages below.
 - **`pages/OverviewPage.jsx`** — platform stats (`useAdminStats`), a mock total-billing tile (explicitly labeled — no payment provider integrated yet), a top-universities-by-students table, `ActivityFeed`, and a user-breakdown/platform-summary pair of small stat blocks.
 - **`pages/UsersPage.jsx`** — thin wrapper: `<UsersTable title="Users" />`.
-- **`pages/UniversitiesPage.jsx`** — `UniversitiesTable` plus a `UsersTable` filtered to `role="CLASS_MENTOR"` — since there's no separate "university admin" role in the schema, managing mentors here *is* what "manage university admins" means in practice.
+- **`pages/UniversitiesPage.jsx`** — `UniversitiesTable` plus a `UsersTable` filtered to teachers (`role="teacher"` / legacy filter strings may still appear in call sites — prefer `ROLES.TEACHER`).
 - **`pages/SimulationsPage.jsx`** — thin wrapper around `features/builder/cms/SimulationsListPanel`.
 - **`pages/AnalyticsPage.jsx`** — thin wrapper around `admin/shared/PlatformAnalytics`.
 - **`pages/FeatureFlagsPage.jsx`** — thin wrapper around `admin/shared/FeatureFlagsManager`.
@@ -484,8 +527,8 @@ The Admin portal — Simulations, Sim Builder, Feature Flags, Universities, and 
 
 Components reused by both the Admin and SuperAdmin portals.
 
-- **`UsersTable.jsx`** — generic user list+search, parameterized by `role` (filters which `User.role` the underlying query returns) — reused for "Users" (all non-admin roles), "Direct Users", and "Mentors" depending on caller.
-- **`UniversitiesTable.jsx`** — university list+search with student/mentor counts per institution.
+- **`UsersTable.jsx`** — generic user list+search, parameterized by `role` — reused for "Users", "Direct Users" (academy students), and teachers depending on caller. Prefer RoleSlug values (`student`, `teacher`); some pages may still pass legacy enum strings.
+- **`UniversitiesTable.jsx`** — university list+search with student/teacher counts per `University` row.
 - **`ManageUserModal.jsx`** — per-user management modal: view enrollments (with per-enrollment delete), suspend/activate, hard delete — shared by both portals' user tables.
 - **`PlatformAnalytics.jsx`** — platform-wide stat tiles + `GrowthChart`.
 - **`GrowthChart.jsx`** — a small hand-rolled (no charting library) single-series cumulative-user-growth SVG line chart, theme-aware via `useTheme`.
@@ -495,17 +538,17 @@ Components reused by both the Admin and SuperAdmin portals.
 
 #### `features/superadmin/`
 
-Platform-level concerns only — People, Admin Management, Roles & Permissions, Activity/Audit logs. Simulations/Sim Builder/Feature Flags/Universities/Config Center live in the Admin portal instead.
+Platform-level concerns — People, Admin Management, Activity/Audit logs. Simulations/Sim Builder/Feature Flags/Universities/Config Center live in the Admin portal instead (Super Admin can still open `/admin` via `RequireAdmin`).
 
-- **`SuperAdminPortal.jsx`** — the portal shell, same `PortalShell`/`Sidebar`/`Topbar` pattern as `AdminPortal.jsx`, routing to the 8 pages below.
-- **`pages/OverviewPage.jsx`** — platform stats, mock billing tile, top-universities table, `ActivityFeed` (reused from `admin/shared/`).
+- **`SuperAdminPortal.jsx`** — the portal shell, same `PortalShell`/`Sidebar`/`Topbar` pattern as `AdminPortal.jsx`.
+- **`pages/OverviewPage.jsx`** — platform stats, mock billing tile, top-universities table, `ActivityFeed`.
 - **`pages/AnalyticsPage.jsx`** — thin wrapper around `admin/shared/PlatformAnalytics`.
-- **`pages/DirectUsersPage.jsx`** — thin wrapper: `<UsersTable role="DIRECT_USER" title="Direct Users" />`.
-- **`pages/StudentsPage.jsx`** — university-student stats grouped by institution count.
-- **`pages/AdminManagementPage.jsx`** — full Admin lifecycle: create, edit role assignment, suspend/activate, reset password, delete — real, not scaffolding (per this project's own scoping decision that other admins already exist or are coming soon).
-- **`pages/RolesPermissionsPage.jsx`** — `AdminRole` editor — the built-in "Administrator" role (seeded with every permission) can't be renamed/re-permissioned/deleted; custom roles are fully editable against the real permission catalog.
+- **`pages/DirectUsersPage.jsx`** — academy / direct students table (call site may still pass legacy `DIRECT_USER`; backend role is `student` on the default university).
+- **`pages/StudentsPage.jsx`** — university-student stats grouped by institution.
+- **`pages/AdminManagementPage.jsx`** — platform Admin user lifecycle (create/suspend/activate/reset password/delete).
+- **`pages/RolesPermissionsPage.jsx`** — lists built-in platform roles from the `roles` table; custom AdminRole editing was removed with those tables.
 - **`pages/ActivityLogPage.jsx`** — thin wrapper around `admin/shared/ActivityFeed`.
-- **`pages/AuditLogPage.jsx`** — the full searchable admin-*action* audit trail (filterable by search/actor role/action/target type) — distinct from the XP-ledger "Activity Log," backed by `AuditLog` rows written on every mutating admin endpoint.
+- **`pages/AuditLogPage.jsx`** — searchable admin-action audit trail (`AuditLog`).
 
 #### `features/builder/cms/`
 
@@ -579,7 +622,12 @@ The data-driven runtime that renders ANY CMS-authored simulation from its `Simul
 - **`GenericSimShell.jsx`** — the full running-simulation page shell: header (exit/logo/task stepper/progress/elapsed time), enrollment-confirmation gating (re-validates against the server rather than trusting a possibly-stale persisted `enrollmentId`, re-enrolling if it 404s), the onboarding gate, the main `GenericStageRenderer`, the footer manager strip, and `SimManagerChat`. Renders `SimulationCompleteScreen` once `status === 'completed'`.
 - **`GenericStageRenderer.jsx`** — dispatches to the right `RendererComponent` for `task.type` (via `taskTypeRegistry`), wrapped in the shared `GenericTaskHeader`. Handles the optional `post_task_quiz` gate — shown once a task's own component signals completion, before the completion is actually finalized, matching the pattern originally built for sales-crm-sim's stage-quiz gate.
 - **`GenericStageChrome.jsx`** — `GenericTaskHeader` (title/objective/briefing/what-to-do/what-to-submit, no hardcoded stage count) and `GenericTaskFooterNav` — the shared chrome every task-type renderer sits inside.
-- **`GenericSimOverview.jsx`** — the pre-enrollment `/simulations/:slug/overview` marketing/detail page: big title + company/manager/rating, a week-grouped curriculum built from `groupByWeek()` (tasks arrive pre-ordered by `task_index`; grouping preserves that authored order rather than re-sorting).
+- **`GenericSimOverview.jsx`** — the pre-enrollment `/simulations/:slug/overview` marketing/detail page: big title + company/manager/rating, week-grouped curriculum, plus overview modules `WhatYoullLearn`, `SimExplainerVideo`, `SimPricing`, `SimReviews` (some still use placeholder data modules).
+- **`WhatYoullLearn.jsx`** / **`.test.jsx`** — learning outcomes section on the overview.
+- **`SimExplainerVideo.jsx`** / **`.test.jsx`** — explainer video block on the overview.
+- **`SimPricing.jsx`** / **`.test.jsx`** / **`placeholderPricing.js`** — pricing display (placeholder-backed until real billing).
+- **`SimReviews.jsx`** / **`.test.jsx`** / **`placeholderReviews.js`** — reviews display (placeholder-backed).
+- **`CodingEnvironmentPreview.jsx`** — preview chrome for coding environments in CMS preview paths.
 - **`SimulationCompleteScreen.jsx`** — the terminal screen shown when every task is done: fetches the student's certificates, finds the one matching this simulation, and shows the `CredentialShield` + stats + copyable certificate number + PDF download + a link into the Portfolio — replacing an earlier dead-end "Simulation Complete!" screen that never checked for or displayed the certificate the backend had already issued.
 - **`InteractiveSimPreview.jsx`** — the CMS admin's full-screen click-through preview of a DRAFT (or published) simulation. Deliberately NOT a reuse of `GenericSimShell` (which auto-enrolls on mount — would create a real `Enrollment` against a draft and block its deletion); keeps all progress in local component state only, nothing persists.
 - **`ReferenceDataPanel.jsx`** — renders `task.reference_data`'s read-only "case file" content (a paragraph or tag/bullet list per field) alongside the interactive task — a generalized version of the original hardcoded sales-crm-sim Stage 1 "Lead file" card.

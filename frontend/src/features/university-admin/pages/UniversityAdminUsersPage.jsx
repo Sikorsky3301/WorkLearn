@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { UserPlus, Upload } from 'lucide-react'
-import UsersTable from '../../shared/UsersTable'
-import ProvisionUserModal from '../../shared/ProvisionUserModal'
-import BulkProvisionModal from '../../shared/BulkProvisionModal'
+import UsersTable from '../../admin/shared/UsersTable'
+import ProvisionUserModal from '../../admin/shared/ProvisionUserModal'
+import BulkProvisionModal from '../../admin/shared/BulkProvisionModal'
 
-export default function UsersPage() {
+export default function UniversityAdminUsersPage() {
   const [showProvision, setShowProvision] = useState(false)
   const [showBulk, setShowBulk] = useState(false)
 
@@ -12,8 +12,8 @@ export default function UsersPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">Users</h3>
-          <p className="text-xs text-slate-500 mt-0.5">Provision or bulk-import into a partner university.</p>
+          <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">Students & teachers</h3>
+          <p className="text-xs text-slate-500 mt-0.5">Org-scoped list for your university only.</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -34,10 +34,10 @@ export default function UsersPage() {
       </div>
       <UsersTable title="Users" />
       {showProvision && (
-        <ProvisionUserModal mode="platform" onClose={() => setShowProvision(false)} />
+        <ProvisionUserModal mode="university_admin" onClose={() => setShowProvision(false)} />
       )}
       {showBulk && (
-        <BulkProvisionModal mode="platform" onClose={() => setShowBulk(false)} />
+        <BulkProvisionModal mode="university_admin" onClose={() => setShowBulk(false)} />
       )}
     </div>
   )

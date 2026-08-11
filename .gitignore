@@ -6,15 +6,19 @@ dist/
 
 # Environment / secrets
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+!.env.*.example
 
 # Python
 __pycache__/
 *.pyc
+.venv/
+venv/
 backend/wvenv/
 
 # Editor / OS noise
 .DS_Store
 *.log
 .claude
+.vscode/

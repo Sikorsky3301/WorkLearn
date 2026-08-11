@@ -10,6 +10,7 @@ import ScrollToHash from './ScrollToHash'
 import ProtectedRoute from './guards/ProtectedRoute'
 import RequireAdmin from './guards/RequireAdmin'
 import RequireSuperAdmin from './guards/RequireSuperAdmin'
+import RequireUniversityAdmin from './guards/RequireUniversityAdmin'
 import PublicOnlyRoute from './guards/PublicOnlyRoute'
 import PortalSpinner from './guards/PortalSpinner'
 
@@ -23,11 +24,10 @@ import BlogPage from '../../features/marketing/BlogPage'
 // ── (public) — reachable without being logged in, not part of the auth flow ──
 import NotFoundPage from '../../components/NotFound'
 
-// ── (auth) — the login flow itself, one page per portal's entry point ───────
-import LoginPage            from '../../features/auth/global/Login'
-import UniversityLoginPage  from '../../features/auth/university/UniversityLogin'
-import MentorLoginPage      from '../../features/auth/university/MentorLogin'
-import SuperAdminLoginPage  from '../../features/auth/global/SuperAdminLogin'
+// ── (auth) — unified /login (tenant from host, portal from role).
+// Legacy university/mentor paths redirect here. Super Admin stays on
+// /super-admin via RequireSuperAdmin → SuperAdminLogin. ─────────────────────
+import LoginPage from '../../features/auth/global/Login'
 
 // ── (dashboard) — everything behind authentication. SuperAdminPortal/
 // AdminPortal stay lazy — a regular student never downloads either portal's
@@ -37,6 +37,7 @@ import SuperAdminLoginPage  from '../../features/auth/global/SuperAdminLogin'
 // own code-split chunk. ──────────────────────────────────────────────────────
 const SuperAdminPortal = lazy(() => import('../../features/superadmin/SuperAdminPortal'))
 const AdminPortal       = lazy(() => import('../../features/admin/portal/AdminPortal'))
+const UniversityAdminPortal = lazy(() => import('../../features/university-admin/UniversityAdminPortal'))
 import SimulationBuilder    from '../../features/builder/cms/SimulationBuilder'
 import SimBuilderListPage   from '../../features/builder/sim-builder/SimBuilderListPage'
 import SimBuilderEditor     from '../../features/builder/sim-builder/SimBuilderEditor'
@@ -115,10 +116,10 @@ export default function AppRouter() {
       <Route path="/contact"      element={<ContactPage />} />
       <Route path="/blog"         element={<BlogPage />} />
 
-      {/* (auth) — no login required */}
+      {/* (auth) — single public entry; old role-specific URLs redirect */}
       <Route path="/login"            element={<LoginPage />} />
-      <Route path="/university/login" element={<UniversityLoginPage />} />
-      <Route path="/mentor/login"     element={<MentorLoginPage />} />
+      <Route path="/university/login" element={<Navigate to="/login" replace />} />
+      <Route path="/mentor/login"     element={<Navigate to="/login" replace />} />
 
       {/* (dashboard) — SuperAdmin: everything SuperAdmin-exclusive lives in
           its own portal shell. */}
@@ -151,6 +152,18 @@ export default function AppRouter() {
               <AdminPortal />
             </Suspense>
           </RequireAdmin>
+        }
+      />
+
+      {/* University Admin — partner-tenant org users only (not platform Admin). */}
+      <Route
+        path="/university-admin/*"
+        element={
+          <RequireUniversityAdmin>
+            <Suspense fallback={<PortalSpinner />}>
+              <UniversityAdminPortal />
+            </Suspense>
+          </RequireUniversityAdmin>
         }
       />
 

@@ -25,7 +25,8 @@ export default function AdminPortalLogin() {
     const result = await loginAdmin(email, password)
     setLoading(false)
     if (result.error) { setError(result.error); return }
-    navigate('/admin')
+    if (result.role === 'university_admin') navigate('/university-admin')
+    else navigate('/admin')
   }
 
   return (
@@ -41,8 +42,7 @@ export default function AdminPortalLogin() {
           </div>
           <h1 className="text-2xl font-bold text-on-surface mb-1">Admin sign in</h1>
           <p className="text-sm text-on-surface-variant mb-5">
-            Sign in with your admin account — your dashboard shows exactly what your assigned
-            role grants access to.
+            Platform Admin on the academy host, or University Admin on your university subdomain — you will land in the matching portal.
           </p>
 
           <form onSubmit={handleSubmit} noValidate className="space-y-3">

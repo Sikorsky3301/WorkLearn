@@ -89,11 +89,13 @@ export default function Login() {
     setLoading(false)
     if (result.error) { setError(result.error); return }
 
-    // Admins and super-admins land in their own portals, which share none of
-    // the student dashboard's queries — no point warming those.
+    // Role picks the portal; host already picked the tenant via the API.
+    // Admins / mentors share none of the student dashboard queries — skip warmUp.
     let to = '/dashboard'
     if (result.role === ROLES.SUPER_ADMIN) to = '/super-admin'
     else if (result.role === ROLES.ADMIN) to = '/admin'
+    else if (result.role === ROLES.UNIVERSITY_ADMIN) to = '/university-admin'
+    else if (result.role === ROLES.TEACHER) to = '/mentor'
     else warmUp()
 
     setDestination(to)

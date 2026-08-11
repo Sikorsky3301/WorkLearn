@@ -3,12 +3,14 @@ import { useAuth } from '../../../features/auth/AuthContext'
 import { ROLES } from '../../../rbac/roles'
 import PortalSpinner from './PortalSpinner'
 
-/** Platform Admin (+ Super Admin for shared tools). University Admin uses /university-admin. */
-export default function RequireAdmin({ children }) {
+/** University Admin only — partner-tenant org management portal. */
+export default function RequireUniversityAdmin({ children }) {
   const { user, loading } = useAuth()
   if (loading) return <PortalSpinner />
-  if (user?.role === ROLES.UNIVERSITY_ADMIN) return <Navigate to="/university-admin" replace />
-  if (!user || (user.role !== ROLES.ADMIN && user.role !== ROLES.SUPER_ADMIN)) {
+  if (user?.role === ROLES.ADMIN || user?.role === ROLES.SUPER_ADMIN) {
+    return <Navigate to="/admin" replace />
+  }
+  if (!user || user.role !== ROLES.UNIVERSITY_ADMIN) {
     return <Navigate to="/login" replace />
   }
   return children

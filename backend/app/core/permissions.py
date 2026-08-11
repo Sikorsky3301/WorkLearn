@@ -41,7 +41,9 @@ def require_roles(*allowed_slugs: str):
     return _check
 
 
-# Back-compat alias used by many admin routes — platform admin surface
+# Back-compat alias used by many admin routes — platform admin surface only.
+# University Admin is a different role and must use require_roles(..., UNIVERSITY_ADMIN)
+# on the few org-scoped endpoints (users list / provision / suspend).
 def require_permission(_key: str = ""):
-    """Former fine-grained permission gate. Now equivalent to platform admin roles."""
-    return require_roles(RoleSlug.SUPER_ADMIN, RoleSlug.ADMIN, RoleSlug.UNIVERSITY_ADMIN)
+    """Former fine-grained permission gate. Platform Admin (+ Super Admin for portal tools)."""
+    return require_roles(RoleSlug.SUPER_ADMIN, RoleSlug.ADMIN)

@@ -142,15 +142,20 @@ Frontend expects the backend on `http://localhost:3001` by default (`VITE_API_UR
 
 ### Demo accounts (from `backend/seed.py`)
 
+**Password for every seeded account:** `password`
+
+Full host / role matrix: [`docs/TEST_LOGINS.md`](docs/TEST_LOGINS.md).
+
 | Role | Login | Credentials |
 |---|---|---|
-| Direct User | `/login` | `demo@worklearn.ai` / `demo123` |
-| SuperAdmin | `/super-admin` | `admin@worklearn.ai` / `admin123` |
-| University Student | `/university/login` | `21CS001` / `student123` |
-| Class Mentor | `/mentor/login` | `MENTOR001` / `mentor123` |
+| Academy student | `/login` on `localhost:5173` | `demo@worklearn.ai` / `password` |
+| Super Admin | `/super-admin` | `admin@worklearn.ai` / `password` |
+| Platform Admin | `/admin` on `localhost:5173` | `platform@worklearn.ai` / `password` |
+| University Admin | `/admin` on `iitd.localhost:5173` → `/university-admin` | `uniadmin@worklearn.ai` / `password` |
+| University student | `/university/login` on `iitd.localhost:5173` | `rahul@iitd.ac.in` / `password` |
+| Teacher | `/mentor/login` on `iitd.localhost:5173` | `ananya@iitd.ac.in` / `password` |
 
-Admin accounts have no seeded default — create one from the SuperAdmin's Admin
-Management page after logging in as SuperAdmin.
+Platform Admin and University Admin are **different roles** — see [`docs/TEST_LOGINS.md`](docs/TEST_LOGINS.md).
 
 ## Testing
 

@@ -41,9 +41,13 @@ export function AuthProvider({ children }) {
     }
   }
 
-  const loginDirect = async (email, password) => {
+  // Unified tenant-aware sign-in (POST /api/auth/login). Host selects the
+  // university; account role selects the portal. Super Admin stays on
+  // loginSuperAdmin. Legacy loginAdmin / loginUniversity / loginMentor /
+  // loginDirect names remain as aliases so older call sites keep working.
+  const login = async (email, password) => {
     try {
-      const { token, user: u } = await api.post('/api/auth/login/direct', { email, password })
+      const { token, user: u } = await api.post('/api/auth/login', { email, password })
       setToken(token)
       setUser(u)
       return { success: true, role: u.role }
@@ -51,43 +55,15 @@ export function AuthProvider({ children }) {
       return { error: e.message }
     }
   }
+
+  const loginDirect = login
+  const loginAdmin = login
+  const loginUniversity = login
+  const loginMentor = login
 
   const loginSuperAdmin = async (email, password) => {
     try {
       const { token, user: u } = await api.post('/api/auth/login/superadmin', { email, password })
-      setToken(token)
-      setUser(u)
-      return { success: true, role: u.role }
-    } catch (e) {
-      return { error: e.message }
-    }
-  }
-
-  const loginAdmin = async (email, password) => {
-    try {
-      const { token, user: u } = await api.post('/api/auth/login/admin', { email, password })
-      setToken(token)
-      setUser(u)
-      return { success: true, role: u.role }
-    } catch (e) {
-      return { error: e.message }
-    }
-  }
-
-  const loginUniversity = async (rollNo, password) => {
-    try {
-      const { token, user: u } = await api.post('/api/auth/login/university', { roll_no: rollNo, password })
-      setToken(token)
-      setUser(u)
-      return { success: true, role: u.role }
-    } catch (e) {
-      return { error: e.message }
-    }
-  }
-
-  const loginMentor = async (mentorId, password) => {
-    try {
-      const { token, user: u } = await api.post('/api/auth/login/mentor', { mentor_id: mentorId, password })
       setToken(token)
       setUser(u)
       return { success: true, role: u.role }
@@ -134,21 +110,16 @@ export function AuthProvider({ children }) {
   }
 
   // UI-nav convenience only — never the actual authorization boundary. Every
-  // Admin-tier endpoint re-checks this server-side on every request (see
-  // backend's require_permission, app/core/permissions.py) — that function
-  // no longer does per-key checks at all, it's an alias for
-  // require_roles(SUPER_ADMIN, ADMIN, UNIVERSITY_ADMIN), so `key` is accepted
-  // for call-site readability but ignored here too, matching reality. If the
-  // backend ever reintroduces real per-key grants, this needs the /me
-  // response to send a `permissions` array again (it currently doesn't).
+  // Admin-tier endpoint re-checks this server-side. Platform Admin (+ Super Admin)
+  // only — University Admin has a separate portal and must not see platform nav.
   const hasPermission = (_key) => {
     if (!user) return false
-    return user.role === ROLES.SUPER_ADMIN || user.role === ROLES.ADMIN || user.role === ROLES.UNIVERSITY_ADMIN
+    return user.role === ROLES.SUPER_ADMIN || user.role === ROLES.ADMIN
   }
 
   return (
     <AuthContext.Provider value={{
-      user, loading, register, loginDirect, loginSuperAdmin, loginAdmin, loginUniversity, loginMentor,
+      user, loading, register, login, loginDirect, loginSuperAdmin, loginAdmin, loginUniversity, loginMentor,
       logout, hasFeature, unlockFeature, hasPermission, refreshUser,
     }}>
       {children}

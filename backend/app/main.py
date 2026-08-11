@@ -110,6 +110,9 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # Browsers hide Content-Disposition unless exposed — needed for Excel
+    # template downloads to keep the .xlsx filename (otherwise → .bin).
+    expose_headers=["Content-Disposition"],
 )
 # Added after CORS so it runs outermost on the request path (Starlette applies
 # middleware LIFO relative to add_middleware order) — the request ID is

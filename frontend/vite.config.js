@@ -8,7 +8,8 @@ export default defineConfig({
   // an `import x from './foo.lottie'` fails to resolve as a URL.
   assetsInclude: ['**/*.lottie'],
   server: {
-    host: '127.0.0.1',
+    // true so partner hosts like iitd.localhost:5173 resolve (not only 127.0.0.1).
+    host: true,
     strictPort: true,
   },
   test: {

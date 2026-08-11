@@ -104,7 +104,7 @@ export default function ClassMentor() {
           {tab === 'Assignments' && (
             <button onClick={() => setShowForm(true)} className="btn-primary text-xs px-3 py-1.5">+ Assign Task</button>
           )}
-          <button onClick={() => { logout(); navigate('/mentor/login') }} className="btn-secondary text-xs px-3 py-1.5">
+          <button onClick={() => { logout(); navigate('/login') }} className="btn-secondary text-xs px-3 py-1.5">
             Sign out
           </button>
         </div>

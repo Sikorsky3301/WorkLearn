@@ -109,6 +109,85 @@ def _require_partner(tenant: University) -> None:
         )
 
 
+def _user_allowed_on_tenant(user: User, tenant: University) -> bool:
+    """Host picks the tenant; account role must match that host's entry rules.
+
+    Academy (default): academy students (no roll_no) and platform admin.
+    Partner: students with roll_no, teachers, and university_admin for that org.
+    Super Admin stays on /login/superadmin only.
+    """
+    if user.role == RoleSlug.SUPER_ADMIN:
+        return False
+    if tenant.is_default:
+        if user.role == RoleSlug.ADMIN:
+            return True
+        if user.role == RoleSlug.STUDENT and not user.roll_no:
+            if user.university_id and user.university_id != tenant.id:
+                return False
+            return True
+        return False
+    if user.university_id != tenant.id:
+        return False
+    if user.role == RoleSlug.UNIVERSITY_ADMIN:
+        return True
+    if user.role == RoleSlug.TEACHER:
+        return True
+    if user.role == RoleSlug.STUDENT and user.roll_no:
+        return True
+    return False
+
+
+async def _issue_session(db: AsyncSession, user: User) -> dict:
+    await _touch(db, user.id)
+    flags = await resolve_feature_flags(db, user)
+    payload = {**_safe_user(user), "feature_flags": flags}
+    if user.role == RoleSlug.STUDENT:
+        unlocked = await db.execute(select(UnlockedFeature).where(UnlockedFeature.user_id == user.id))
+        payload["unlocked_features"] = [f.feature for f in unlocked.scalars().all()]
+    expire = (
+        settings.admin_jwt_expire_hours
+        if user.role in (RoleSlug.ADMIN, RoleSlug.UNIVERSITY_ADMIN, RoleSlug.SUPER_ADMIN)
+        else None
+    )
+    return {
+        "token": create_token(user.id, user.role, expire_hours=expire),
+        "user": payload,
+    }
+
+
+async def _authenticate(
+    db: AsyncSession,
+    tenant: University,
+    email: str,
+    password: str,
+) -> dict:
+    result = await db.execute(
+        select(User).where(User.email == email.lower().strip()).options(
+            selectinload(User.role_row), selectinload(User.university),
+        )
+    )
+    user = result.scalar_one_or_none()
+    if not user or not _user_allowed_on_tenant(user, tenant):
+        raise HTTPException(401, "Invalid email or password.")
+    if not verify_password(password, user.password_hash):
+        raise HTTPException(401, "Invalid email or password.")
+    if not user.is_active:
+        raise HTTPException(403, "This account has been suspended.")
+    return await _issue_session(db, user)
+
+
+@router.post("/login")
+async def login(
+    body: LoginDirectBody,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    x_worklearn_host: str | None = Header(None, alias=TENANT_HOST_HEADER),
+):
+    """Unified sign-in: tenant from host, portal from account role."""
+    tenant = await _tenant_for_request(request, db, x_worklearn_host)
+    return await _authenticate(db, tenant, body.email, body.password)
+
+
 @router.post("/register")
 async def register(
     body: RegisterBody,

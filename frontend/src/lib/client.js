@@ -28,6 +28,7 @@ async function request(path, options = {}) {
   const token = getToken()
   const headers = {
     'Content-Type': 'application/json',
+    'X-WorkLearn-Host': window.location.host,
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...options.headers,
   }
@@ -73,7 +74,10 @@ export async function uploadImage(file) {
   formData.append('file', file)
   const res = await fetch(`${BASE_URL}/api/admin/uploads/image`, {
     method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: {
+      'X-WorkLearn-Host': window.location.host,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: formData,
   })
   if (!res.ok) {
@@ -92,7 +96,10 @@ export async function uploadFile(path, file) {
   formData.append('file', file)
   const res = await fetch(`${BASE_URL}${path}`, {
     method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: {
+      'X-WorkLearn-Host': window.location.host,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: formData,
   })
   if (!res.ok) {
@@ -100,6 +107,52 @@ export async function uploadFile(path, file) {
     throw new Error(err.detail ?? err.error ?? 'Upload failed')
   }
   return res.json()
+}
+
+/** Multipart POST with optional extra form fields (e.g. bulk provision university_id). */
+export async function uploadForm(path, formData) {
+  const token = getToken()
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method: 'POST',
+    headers: {
+      'X-WorkLearn-Host': window.location.host,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    const detail = err.detail ?? err.error ?? 'Upload failed'
+    throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail))
+  }
+  return res.json()
+}
+
+/** Authenticated GET that returns a Blob (Excel template downloads). */
+export async function downloadBlob(path, { defaultFilename = 'download.xlsx' } = {}) {
+  const token = getToken()
+  const res = await fetch(`${BASE_URL}${path}`, {
+    headers: {
+      'X-WorkLearn-Host': window.location.host,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(err.detail ?? err.error ?? 'Download failed')
+  }
+  const raw = await res.blob()
+  // Force spreadsheet MIME so the OS doesn't treat it as a generic .bin
+  const blob = new Blob([raw], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  })
+  const disposition = res.headers.get('Content-Disposition') || ''
+  const match = disposition.match(/filename\*?=(?:UTF-8''|")?([^\";]+)"?/i)
+  let filename = match?.[1] ? decodeURIComponent(match[1].replace(/['"]/g, '')) : defaultFilename
+  if (!/\.xlsx$/i.test(filename)) {
+    filename = defaultFilename.endsWith('.xlsx') ? defaultFilename : `${filename.replace(/\.[^.]+$/, '') || 'template'}.xlsx`
+  }
+  return { blob, filename }
 }
 
 // Backend-uploaded images (logo_url/photo_url) are stored as paths relative

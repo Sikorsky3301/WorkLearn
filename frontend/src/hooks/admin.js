@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from '../lib/client'
+import { api, uploadForm, downloadBlob } from '../lib/client'
 
 // User/university/activity management — backend's app/routes/admin.py.
 // Each endpoint is permission-gated server-side (require_permission), so
@@ -14,12 +14,77 @@ export function useAdminStats() {
   })
 }
 
-export function useAdminUniversities() {
+export function useAdminUniversities(options = {}) {
   return useQuery({
     queryKey: ['admin-universities'],
     queryFn: () => api.get('/api/admin/universities'),
     staleTime: 30_000,
+    ...options,
   })
+}
+
+export function useOnboardUniversity() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body) => api.post('/api/admin/universities/onboard', body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-universities'] })
+      qc.invalidateQueries({ queryKey: ['admin-users'] })
+      qc.invalidateQueries({ queryKey: ['admin-stats'] })
+    },
+  })
+}
+
+export function useUpdateUniversity() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, name }) => api.patch(`/api/admin/universities/${id}`, { name }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-universities'] })
+    },
+  })
+}
+
+export function useProvisionUser() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body) => api.post('/api/admin/provision/users', body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-users'] })
+      qc.invalidateQueries({ queryKey: ['admin-universities'] })
+      qc.invalidateQueries({ queryKey: ['admin-stats'] })
+    },
+  })
+}
+
+export function useBulkProvisionUsers() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ file }) => {
+      const formData = new FormData()
+      formData.append('file', file)
+      return uploadForm('/api/admin/provision/users/bulk', formData)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-users'] })
+      qc.invalidateQueries({ queryKey: ['admin-universities'] })
+      qc.invalidateQueries({ queryKey: ['admin-stats'] })
+    },
+  })
+}
+
+export async function downloadProvisionTemplate() {
+  const { blob, filename } = await downloadBlob('/api/admin/provision/users/bulk/template', {
+    defaultFilename: 'worklearn_bulk_template.xlsx',
+  })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename.endsWith('.xlsx') ? filename : 'worklearn_bulk_template.xlsx'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
 }
 
 export function useAdminUsers(role = '', search = '') {
