@@ -14,10 +14,22 @@
 //      tile (icon + label) instead of a broken image, so the grid can be
 //      filled with real content rather than padded with repeats.
 //
+//   5. The header slot is layered above the rows. The rows open at
+//      `translateY(-700)`, which puts them straight over the header — and
+//      since they come later in the DOM with no z-index, they used to paint
+//      on top of it. A card's caption scrim is a `via-white/85` gradient, so
+//      an overlapping card washed the header's buttons out and swallowed
+//      their clicks. The rows are backdrop, so they go behind.
+//
 // NOTE on `overflow-hidden` at the root: it is required here to clip the rows
 // as they slide, and it is safe *only* because nothing inside is
 // `position: sticky` — an overflow other than `visible` on an ancestor
-// silently disables sticky.
+// silently disables sticky. It also computes the root's `transform-style`
+// down to `flat` (overflow is a grouping property), which is why plain
+// z-index sorts these layers at all — under a live `preserve-3d` it would be
+// ignored in favour of 3D position. `preserve-3d` was therefore inert and has
+// been dropped rather than left to imply otherwise; the rotations below still
+// project, since `perspective` applies to direct children regardless.
 import { useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, useScroll, useTransform, useSpring, useReducedMotion } from 'motion/react'
@@ -66,13 +78,13 @@ export const HeroParallax = ({ products, children, className }) => {
       ref={ref}
       className={cn(
         'relative flex h-[300vh] flex-col self-auto overflow-hidden bg-white pb-40 antialiased',
-        '[perspective:1000px] [transform-style:preserve-3d]',
+        '[perspective:1000px]',
         className
       )}
     >
-      {children}
+      <div className="relative z-10">{children}</div>
 
-      <motion.div style={{ rotateX, rotateZ, translateY, opacity }}>
+      <motion.div className="relative z-0" style={{ rotateX, rotateZ, translateY, opacity }}>
         <motion.div className="mb-16 flex flex-row-reverse space-x-16 space-x-reverse">
           {firstRow.map((product) => (
             <ProductCard product={product} translate={translateX} key={product.title} />
