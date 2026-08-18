@@ -45,11 +45,8 @@ export const EDUCATOR_QUOTES = [
   },
 ]
 
-export const PARTNER_INSTITUTIONS = [
-  'Northfield Institute of Technology',
-  'Brightwater University',
-  'Lakeside Polytechnic',
-  'Ravensbourne College',
-  'Halcyon State University',
-  'Meridian Institute',
-]
+// The invented partner names that used to sit in the hero's trust strip have
+// been replaced by the real institution crests in data/institutions.js. Kept
+// nothing behind: they had exactly one consumer (HeroSection) and a made-up
+// university list is not something to leave lying around for someone to
+// mistake for real data later.

@@ -233,6 +233,30 @@ async def download_file(
     )
 
 
+async def _run_or_explain(code, **kwargs):
+    """sandbox.run_submission, but surfacing WHY the runner failed.
+
+    Anything raised in here is an infrastructure fault — the Docker daemon
+    unreachable, the sandbox image missing, the workspace not writable — not
+    something the student's code did. Previously every one of those became a
+    bare 500 ("Internal server error"), which is indistinguishable from a real
+    bug in this app and tells whoever is debugging it nothing at all.
+
+    Raising HTTPException means FastAPI returns the detail verbatim instead of
+    the generic handler swallowing it, so both the student and the logs get the
+    actual reason.
+    """
+    try:
+        return await sandbox.run_submission(code, **kwargs)
+    except Exception as exc:
+        logger.exception("sandbox runner failed to start")
+        raise HTTPException(
+            503,
+            f"The code sandbox could not start ({type(exc).__name__}: {exc}). "
+            "This is a server-side problem, not your code.",
+        ) from exc
+
+
 async def _submit_da_job_sim_family(enrollment_id: int, task_id: int, body: SubmitBody, sim_task: SimulationTask):
     """The original pandas/CSV pipeline — unchanged behavior, just relocated
     and re-keyed off the task's own config instead of a hardcoded sim_id dict."""
@@ -277,7 +301,7 @@ async def _submit_da_job_sim_family(enrollment_id: int, task_id: int, body: Subm
     else:
         if not body.code or not body.code.strip():
             raise HTTPException(400, "code is required for this task")
-        result = await sandbox.run_submission(body.code, input_files={input_name: input_bytes})
+        result = await _run_or_explain(body.code, input_files={input_name: input_bytes})
         try:
             output_bytes = sandbox.read_output(result, output_name)
             stdout, stderr, timed_out = result.stdout, result.stderr, result.timed_out
@@ -308,7 +332,7 @@ async def _submit_frontend_dev_sim_family(enrollment_id: int, task_id: int, body
     if not body.code or not body.code.strip():
         raise HTTPException(400, "code is required for this task")
 
-    result = await sandbox.run_submission(
+    result = await _run_or_explain(
         body.code,
         input_files={"submission.test.js": FRONTEND_TEST_SPECS[task_id]},
         image=settings.sandbox_image_frontend,
@@ -341,7 +365,7 @@ async def _submit_declarative_rules(enrollment_id: int, task_id: int, body: Subm
         raise HTTPException(400, "code is required for this task")
 
     input_files = dict(config.get("static_input_files") or {})
-    result = await sandbox.run_submission(
+    result = await _run_or_explain(
         body.code, input_files=input_files, image=config.get("docker_image"), submission_filename=input_name,
     )
     try:

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import ReactMarkdown from 'react-markdown'
+import MarkdownMessage from '../../components/ui/MarkdownMessage'
 import { Copy, Check, ThumbsUp, ThumbsDown, RotateCcw } from 'lucide-react'
 import aiMentorIcon from '../../assets/ai-mentor-icon.png'
 import ThinkingIndicator from './ThinkingIndicator'
@@ -48,9 +48,7 @@ export default function ChatMessage({ msg, onRetry, onFeedback }) {
           ) : isUser || msg.error ? (
             msg.text
           ) : (
-            <div className="prose prose-sm max-w-none prose-p:my-1.5 prose-p:leading-relaxed prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0 prose-headings:text-on-surface prose-headings:mt-2 prose-headings:mb-1 prose-strong:text-on-surface prose-code:text-on-surface prose-code:bg-surface-high prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-pre:bg-surface-high prose-pre:text-on-surface prose-a:text-primary">
-              <ReactMarkdown>{msg.text || ' '}</ReactMarkdown>
-            </div>
+            <MarkdownMessage>{msg.text}</MarkdownMessage>
           )}
           {msg.live && msg.text && <span className="inline-block w-1.5 h-3.5 bg-primary ml-1 animate-pulse rounded-sm" />}
         </div>

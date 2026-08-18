@@ -1,7 +1,6 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
-import { SiCoursera, SiUdemy, SiEdx, SiKhanacademy } from 'react-icons/si'
 import { HeroParallax } from '../../../components/ui/hero-parallax'
 import { ThreeDGrid } from '../../../components/ui/three-d-grid'
 import { Reveal, RevealGroup, RevealItem } from '../../../components/ui/reveal'
@@ -9,10 +8,10 @@ import { TextGenerateEffect } from '../../../components/ui/text-generate-effect'
 import { useSimulations } from '../../../hooks'
 import { SIM_BRANDING } from '../../../lib/simBranding'
 import { CAREER_DOMAINS } from '../../../lib/careerDomains'
+import { InfiniteMovingCards } from '../../../components/ui/infinite-moving-cards'
 import { useMarketingLinks } from '../useMarketingLinks'
-import { PARTNER_INSTITUTIONS } from '../data/trustPlaceholders'
-
-const CREST_MARKS = [SiCoursera, SiUdemy, SiEdx, SiKhanacademy]
+import { INSTITUTIONS } from '../data/institutions'
+import { TECHNOLOGIES } from '../data/technologies'
 
 /** The parallax wants 15 tiles; only three simulations are published and only
  * those three have banner photographs. Rather than repeat those three five
@@ -33,15 +32,30 @@ function useParallaxProducts() {
       thumbnail: SIM_BRANDING[sim.slug]?.banner,
     }))
 
-    const domainTiles = CAREER_DOMAINS.map(({ key, label, Icon }) => ({
+    // `thumbnail` is undefined for the domains with no photograph yet — the
+    // card falls back to its designed icon tile, which is exactly what that
+    // fallback exists for.
+    const domainTiles = CAREER_DOMAINS.map(({ key, label, Icon, image }) => ({
       title: label,
       subtitle: 'Career area',
       link: '/simulations',
+      thumbnail: image,
       Icon,
       key,
     }))
 
-    return [...simTiles, ...domainTiles].slice(0, 15)
+    // Photographed domains first. The list is longer than the 15 slots, so
+    // whatever sits past the cut is never seen — and without this the order in
+    // the catalogue decides which tiles get photographs, meaning a newly shot
+    // domain low in the list would be added and still not appear. Sorting by
+    // "has an image" puts every photograph on screen and lets the remaining
+    // icon tiles fall off the end. Stable sort, so catalogue order is
+    // preserved within each group.
+    const photographedFirst = [...domainTiles].sort(
+      (a, b) => Number(Boolean(b.thumbnail)) - Number(Boolean(a.thumbnail)),
+    )
+
+    return [...simTiles, ...photographedFirst].slice(0, 15)
   }, [sims])
 }
 
@@ -102,24 +116,59 @@ export default function HeroSection() {
         </div>
       </HeroParallax>
 
-      {/* Trust strip. Names are placeholders; see data/trustPlaceholders.js. */}
+      {/* Technology strip.
+          Sits directly under the hero and above the institution crests: the
+          headline claims you do the real job, and this is the first concrete
+          answer to "with what?" — before the page asks anyone to take the
+          claim on trust from a list of universities.
+          Marks are monochrome so seventeen of them read as one texture rather
+          than seventeen competing brands; each comes up to full strength on
+          hover, so the strip is scenery until you actually look at it. */}
+      <section className="border-t border-border bg-white">
+        <div className="max-w-container mx-auto px-6 pb-14 pt-12">
+          <Reveal as="h2" className="mb-8 text-center font-display text-lg font-extrabold tracking-tight text-on-surface sm:text-xl">
+            Provides Job Simulations on Latest Technologies and Frameworks
+          </Reveal>
+        </div>
+        {/* Full-bleed, outside the container — the marquee's fade mask needs
+            the whole viewport width or the logos visibly appear and vanish at
+            the container's edges instead of dissolving past them. */}
+        <div className="pb-14">
+          <InfiniteMovingCards
+            items={TECHNOLOGIES.map(({ key, name, logo }) => ({ key, name, image: logo }))}
+            variant="bare"
+            direction="left"
+            speed="slow"
+          />
+        </div>
+      </section>
+
+      {/* Recognition strip. These are REAL institutions and their real marks —
+          see data/institutions.js before adding to the list. */}
       <section className="bg-white">
         <div className="max-w-container mx-auto px-6 pb-20 pt-10 border-t border-border">
-          <Reveal as="p" className="eyebrow mb-6">Used by career teams at</Reveal>
-          <RevealGroup className="flex flex-wrap items-center gap-x-12 gap-y-5" stagger={0.06}>
-            {PARTNER_INSTITUTIONS.slice(0, 4).map((name, i) => {
-              const Mark = CREST_MARKS[i % CREST_MARKS.length]
-              return (
-                <RevealItem key={name} className="flex items-center gap-2.5 text-on-surface-variant/60">
-                  <Mark className="h-5 w-5 shrink-0" />
-                  <span className="text-sm font-semibold">{name}</span>
-                </RevealItem>
-              )
-            })}
+          {/* Centred, unlike the left-aligned hero above it — the heading is
+              centred with the row so it doesn't sit orphaned off to one side. */}
+          <Reveal as="p" className="eyebrow mb-7 text-center">Recognized by top institutions</Reveal>
+          {/* Crests are line-art seals, so they sit dimmed and desaturated at
+              rest and come up to full strength on hover — the strip reads as
+              texture while you're on the headline, and as specific names once
+              you actually look at it. */}
+          <RevealGroup className="flex flex-wrap items-center justify-center gap-x-12 gap-y-8" stagger={0.06}>
+            {INSTITUTIONS.map(({ key, name, logo }) => (
+              <RevealItem key={key} className="group flex items-center gap-3">
+                <img
+                  src={logo}
+                  alt={name}
+                  loading="lazy"
+                  className="h-12 w-auto max-w-[7rem] object-contain opacity-50 grayscale transition-all duration-300 group-hover:opacity-100 group-hover:grayscale-0"
+                />
+                <span className="text-sm font-semibold text-on-surface-variant/70 transition-colors group-hover:text-on-surface">
+                  {name}
+                </span>
+              </RevealItem>
+            ))}
           </RevealGroup>
-          <Reveal as="p" className="text-[11px] text-on-surface-variant/50 mt-6">
-            Illustrative institutions — partner names shown here are placeholders.
-          </Reveal>
         </div>
       </section>
     </>

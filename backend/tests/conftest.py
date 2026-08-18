@@ -53,6 +53,31 @@ os.environ["LANGFUSE_SECRET_KEY"] = ""
 _asyncpg_url = lambda url: url.replace("postgresql+asyncpg://", "postgresql://")  # noqa: E731
 
 
+@pytest.fixture(scope="session")
+def event_loop():
+    """Session-scoped event loop.
+
+    pytest.ini sets `asyncio_default_fixture_loop_scope = session`, but that
+    option only exists in pytest-asyncio 0.24+. The installed version is
+    0.21.1, which ignores unknown ini keys entirely and keeps its
+    function-scoped `event_loop` — so the session-scoped `_test_database`
+    fixture below asked for a function-scoped dependency and every single test
+    errored at setup with ScopeMismatch. The whole backend suite was
+    uncollectable, which is exactly the kind of breakage nobody notices,
+    because a suite that cannot start also cannot fail loudly.
+
+    Overriding `event_loop` here is the documented 0.21 way to get a
+    session-scoped loop, and it makes the ini setting a no-op rather than a
+    contradiction. Delete this once pytest-asyncio is upgraded to >=0.24 and
+    the ini option starts being honoured.
+    """
+    import asyncio
+
+    loop = asyncio.new_event_loop()
+    yield loop
+    loop.close()
+
+
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def _test_database():
     import asyncpg

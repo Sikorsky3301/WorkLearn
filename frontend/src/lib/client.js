@@ -12,7 +12,10 @@ const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
 // would pick up that leftover token and bounce to whatever role it
 // belonged to. Reverted — the multi-tab isolation matters more here than
 // surviving a browser restart.)
-function getToken() {
+// Exported so the sandbox tab handoff can read it (see lib/tabHandoff.js).
+// Per-tab isolation is exactly why that handoff has to exist at all: a tab
+// opened from this one does not reliably inherit sessionStorage.
+export function getToken() {
   return sessionStorage.getItem('wl_token')
 }
 
@@ -33,7 +36,41 @@ async function request(path, options = {}) {
     ...options.headers,
   }
 
-  const res = await fetch(`${BASE_URL}${path}`, { ...options, headers })
+  let res
+  try {
+    res = await fetch(`${BASE_URL}${path}`, { ...options, headers })
+  } catch (cause) {
+    // fetch() only rejects when the request never completed at all — the
+    // server isn't running, DNS failed, the connection dropped, or CORS
+    // blocked it. Every HTTP status, including 500, resolves normally and is
+    // handled below.
+    //
+    // The browser's message for all of those is the same three words: "Failed
+    // to fetch", and it used to reach the login form verbatim — where it reads
+    // like a broken app and sends people off checking the one thing that
+    // wasn't wrong, their password.
+    //
+    // The message here is written for whoever is looking at the screen, who is
+    // usually a student and never the person who can restart a server. The
+    // diagnosis they can't act on goes to the console instead, where the
+    // person who CAN act on it will look.
+    console.error(
+      `[WorkLearn] Request to ${BASE_URL}${path} never reached a server. ` +
+      'Is the backend running, and does VITE_API_URL point at it?',
+      cause,
+    )
+
+    const error = new Error(
+      navigator.onLine === false
+        ? "You're not connected to the internet."
+        : "We can't reach WorkLearn right now."
+    )
+    // Lets callers tell "the server said no" apart from "there was no server",
+    // which need completely different advice.
+    error.isNetworkError = true
+    error.cause = cause
+    throw error
+  }
 
   // Only treat a 401 as "your session expired" when a token was actually
   // attached to this request — a login/register call is unauthenticated by
@@ -48,7 +85,13 @@ async function request(path, options = {}) {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
-    throw new Error(err.detail ?? err.error ?? 'Request failed')
+    const error = new Error(err.detail ?? err.error ?? 'Request failed')
+    // Carry the status through. Callers used to get a bare message, so a 500,
+    // a 404 and a dropped connection were indistinguishable downstream and
+    // every one of them had to be reported as "check your connection". The
+    // message is unchanged, so existing `error.message` handling still works.
+    error.status = res.status
+    throw error
   }
 
   // SSE responses — caller handles the stream directly

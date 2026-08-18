@@ -13,7 +13,7 @@ from app.db.database import engine, Base, AsyncSessionLocal
 from app.api.v1.auth import auth
 from app.api.v1.tenant import router as tenant_router
 from app.api.v1.users import profile, certificates
-from app.api.v1.simulations import enrollments, sandbox, agent_messages
+from app.api.v1.simulations import enrollments, sandbox, agent_messages, assessments
 from app.api.v1.builder import admin_sim_builder
 from app.api.v1.admin import admin, admin_simulations, admin_simulation_templates, admin_uploads, provisioning
 from app.api.v1.superadmin import admin_management, feature_flags, platform_analytics, platform_config
@@ -22,7 +22,7 @@ from app.api.v1.mentor import mentor
 from app.routes import health
 # AI-specific routes (LLM-backed: AI Mentor, generic sim-runtime AI
 # roleplay/grading) live in their own package — see app/ai/'s docstring.
-from app.ai.routes import ai_mentor, sim_runtime
+from app.ai.routes import ai_mentor, sim_runtime, sandbox_ai
 from app.models import roles as models_roles  # noqa: F401
 from app.models import university as models_university  # noqa: F401
 from app.models import cms as models_cms  # noqa: F401 — registers Simulation/SimulationTask on Base.metadata before create_all
@@ -138,6 +138,7 @@ app.include_router(tenant_router)
 app.include_router(enrollments.router)
 app.include_router(ai_mentor.router)
 app.include_router(agent_messages.router)
+app.include_router(assessments.router)
 app.include_router(analytics.router)
 app.include_router(admin.router)
 app.include_router(provisioning.router)
@@ -146,6 +147,7 @@ app.include_router(sandbox.router)
 app.include_router(admin_simulations.router)
 app.include_router(admin_simulation_templates.router)
 app.include_router(sim_runtime.router)
+app.include_router(sandbox_ai.router)
 app.include_router(admin_uploads.router)
 app.include_router(admin_sim_builder.router)
 app.include_router(admin_management.router)

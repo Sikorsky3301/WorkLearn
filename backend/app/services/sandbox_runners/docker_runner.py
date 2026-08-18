@@ -6,6 +6,7 @@ read back whatever artifact file the container wrote to the mounted
 workspace and grade THAT (see app/services/graders/).
 """
 import asyncio
+import functools
 import logging
 import shutil
 import subprocess
@@ -18,7 +19,54 @@ from app.services.sandbox_runners.base import SandboxResult
 logger = logging.getLogger(__name__)
 
 
+@functools.lru_cache(maxsize=1)
+def _docker_binary() -> str:
+    """Absolute path to the docker CLI, resolved once.
+
+    `subprocess.run(["docker", ...])` searches the PATH *of this process*, which
+    is inherited from whichever shell started the server — not from the machine.
+    A terminal opened before Docker Desktop was installed (or one with a
+    different profile) has no docker on PATH, and every submission then dies
+    with `FileNotFoundError: [WinError 2] The system cannot find the file
+    specified` — a message that names neither docker nor PATH, so it reads like
+    a bug in this app.
+
+    Resolving explicitly means the server works regardless of how it was
+    launched, and fails with something actionable when Docker genuinely isn't
+    installed. Cached because this cannot change within a process lifetime.
+    """
+    found = shutil.which("docker")
+    if found:
+        return found
+
+    # Docker Desktop's usual homes, for a process whose PATH predates the
+    # install. Per-user first (the default for recent installers).
+    candidates = [
+        Path.home() / "AppData/Local/Programs/DockerDesktop/resources/bin/docker.exe",
+        Path("C:/Program Files/Docker/Docker/resources/bin/docker.exe"),
+        Path("C:/ProgramData/DockerDesktop/version-bin/docker.exe"),
+        Path("/usr/bin/docker"),
+        Path("/usr/local/bin/docker"),
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            logger.warning(
+                "docker not on PATH; falling back to %s. Start the server from a "
+                "shell where `docker` resolves to avoid this lookup.", candidate,
+            )
+            return str(candidate)
+
+    raise FileNotFoundError(
+        "The docker CLI could not be found on PATH or in any standard install "
+        "location. Install Docker Desktop, or start the backend from a shell "
+        "where `docker --version` works."
+    )
+
+
 def _run_docker(docker_args: list[str], timeout: int) -> tuple[bytes, bytes, int | None, bool]:
+    # argv[0] is the literal "docker" placeholder the caller built; swap in the
+    # resolved absolute path.
+    docker_args = [_docker_binary(), *docker_args[1:]]
     try:
         proc = subprocess.run(docker_args, capture_output=True, timeout=timeout)
         return proc.stdout, proc.stderr, proc.returncode, False

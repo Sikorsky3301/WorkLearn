@@ -12,6 +12,11 @@ export function useSubmitSandbox(enrollmentId, taskId) {
       qc.invalidateQueries({ queryKey: ['skills'] })
       qc.invalidateQueries({ queryKey: ['my-assignment'] })
       qc.invalidateQueries({ queryKey: ['sandbox-files', enrollmentId, taskId] })
+      // Completing a task now posts a manager message to the bell
+      // (award_task_completion) — without this it wouldn't surface until the
+      // next 30s poll.
+      qc.invalidateQueries({ queryKey: ['agent-messages'] })
+      qc.invalidateQueries({ queryKey: ['task-result', enrollmentId, taskId] })
     },
   })
 }

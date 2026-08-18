@@ -9,6 +9,8 @@ from pydantic import BaseModel
 from app.db.database import get_db, AsyncSessionLocal
 from app.core.auth import get_current_user, token_user_id
 from app.models import User, Enrollment, MentorChatMessage
+from app.models.cms import SimulationTask
+from app.services.simulation_lookup import get_simulation
 from app.services.skill_engine import compute_skill_gps
 from app.ai.services.llm import stream_chat, generate, chat_with_tools
 from app.ai.services.langfuse_client import traced_observation, traced_context, get_current_trace_id, score_trace
@@ -19,6 +21,60 @@ from app.api.v1.simulations.enrollments import _build_assignment
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["ai-mentor"])
+
+
+async def _task_context_block(db: AsyncSession, context: dict) -> str:
+    """Extra system context when the student is asking from inside a task.
+
+    `context` carries only a POINTER — {"simulation_slug", "task_index"} — and
+    the task's actual text is read from the database here. Deliberately: the
+    body is client-supplied, so echoing client-sent prose straight into the
+    system prompt would let anyone rewrite the mentor's instructions. A slug
+    and an int can't carry an instruction, and looking the task up server-side
+    also guarantees the mentor is describing the real task rather than
+    whatever the page happened to have in memory.
+
+    Returns "" for anything unrecognised, so a malformed or absent context
+    simply falls back to the normal mentor behaviour.
+    """
+    slug = context.get("simulation_slug")
+    index = context.get("task_index")
+    if not slug or index is None:
+        return ""
+    try:
+        index = int(index)
+    except (TypeError, ValueError):
+        return ""
+
+    sim = await get_simulation(db, slug, published_only=True)
+    if not sim:
+        return ""
+    task = (await db.execute(
+        select(SimulationTask).where(
+            SimulationTask.simulation_id == sim.id,
+            SimulationTask.task_index == index,
+        )
+    )).scalar_one_or_none()
+    if not task:
+        return ""
+
+    steps = "\n".join(f"  {i}. {s}" for i, s in enumerate(task.what_to_do or [], 1))
+    criteria = "\n".join(f"  - {c}" for c in (task.success_criteria or []))
+    return f"""
+## The task this student is working on right now
+Simulation: {sim.title} ({sim.company})
+Task {task.task_index}: {task.title}
+Objective: {task.objective or "—"}
+Steps they were given:
+{steps or "  (none listed)"}
+How it is graded:
+{criteria or "  (not specified)"}
+
+They are asking from inside this task. Answer in the context of it. Help them
+UNDERSTAND and get unstuck — explain concepts, point at what to reconsider, ask
+what they have tried. Do NOT write the complete solution for them; the whole
+point is that they build it themselves.
+"""
 
 
 def _current_task_headline(assignment: dict | None) -> str:
@@ -90,7 +146,10 @@ Current task: {_current_task_headline(assignment)}
     # not a single hardcoded domain — see mentor_personas.py. Falls back to
     # a generic persona if not enrolled in anything yet.
     domain = assignment.get("domain") if assignment else None
-    system = build_system_prompt(domain) + "\n" + context_block
+    # `context` was declared on ChatBody but never read, so the task rail on
+    # the engineering task page had no way to tell the mentor what the student
+    # was looking at. It now carries a task pointer, resolved server-side.
+    system = build_system_prompt(domain) + "\n" + context_block + await _task_context_block(db, body.context or {})
 
     messages = [
         *[{"role": m["role"], "content": m["content"]} for m in body.conversation_history[-10:]],

@@ -30,6 +30,16 @@ export function AuthProvider({ children }) {
       .finally(() => { clearTimeout(timeout); setLoading(false) })
   }, [])
 
+  // Flattening the thrown error to a bare `{ error: message }` lost the two
+  // things the form needs to give useful advice: whether the server answered
+  // at all, and what it said if it did. "Couldn't reach the server" and
+  // "wrong password" call for completely different next steps.
+  const failure = (e) => ({
+    error: e.message,
+    isNetworkError: Boolean(e.isNetworkError),
+    status: e.status,
+  })
+
   const register = async (name, email, password) => {
     try {
       const { token, user: u } = await api.post('/api/auth/register', { name, email, password })
@@ -37,7 +47,7 @@ export function AuthProvider({ children }) {
       setUser(u)
       return { success: true, role: u.role }
     } catch (e) {
-      return { error: e.message }
+      return failure(e)
     }
   }
 
@@ -52,7 +62,7 @@ export function AuthProvider({ children }) {
       setUser(u)
       return { success: true, role: u.role }
     } catch (e) {
-      return { error: e.message }
+      return failure(e)
     }
   }
 
@@ -68,7 +78,7 @@ export function AuthProvider({ children }) {
       setUser(u)
       return { success: true, role: u.role }
     } catch (e) {
-      return { error: e.message }
+      return failure(e)
     }
   }
 

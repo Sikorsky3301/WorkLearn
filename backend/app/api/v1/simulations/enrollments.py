@@ -2,11 +2,14 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from pydantic import BaseModel
+from sqlalchemy import select, update
+from pydantic import BaseModel, Field
 from app.db.database import get_db
 from app.core.auth import get_current_user, token_user_id
-from app.models import Enrollment, TaskCompletion, AgentMessage, MessageType, UserBadge
+from app.core.config import QUIZ_BONUS_THRESHOLD, QUIZ_BONUS_XP
+from app.models import (
+    Enrollment, TaskCompletion, AgentMessage, MessageType, UserBadge, XpLedger, User,
+)
 from app.models.cms import Simulation, SimulationTask, SimulationStatus
 from app.services.skill_engine import award_task_completion
 from app.services.simulation_completion import finalize_if_complete
@@ -27,6 +30,10 @@ class CompleteTaskBody(BaseModel):
     score: int | None = None
     quiz_score: int | None = None
     rubric_rating: dict | None = None
+
+
+class QuizScoreBody(BaseModel):
+    quiz_score: int = Field(ge=0, le=100)
 
 
 async def _has_journey_badge(db: AsyncSession, user_id: int, sim_id: int) -> bool:
@@ -201,7 +208,23 @@ async def accept_onboarding(
     )
     enrollment = enroll_res.scalar_one_or_none()
     if not enrollment:
-        raise HTTPException(400, "Enroll in the simulation before accepting the offer.")
+        # Accepting the offer IS enrolling — so create the row rather than
+        # rejecting with "Enroll in the simulation before accepting the offer."
+        #
+        # That 400 made enrolment a hidden precondition of this endpoint, which
+        # the client had to satisfy first via a separate POST. Any path that got
+        # the ordering wrong — a slow enrol round trip, a stale cached
+        # enrollment, a student landing here from a link — dead-ended a new user
+        # on the offer letter with an error they had no way to act on. There is
+        # no sensible reading of "accept the offer" where refusing to enrol them
+        # is the right answer.
+        #
+        # Idempotent: POST /enroll already returns the existing row rather than
+        # duplicating, and this runs only when there is genuinely none.
+        enrollment = Enrollment(user_id=user_id, simulation_id=sim.id)
+        db.add(enrollment)
+        await db.commit()
+        await db.refresh(enrollment)
 
     if not await _has_journey_badge(db, user_id, sim.id):
         badge = UserBadge(
@@ -234,14 +257,103 @@ async def get_by_sim(sim_id: str, db: AsyncSession = Depends(get_db), token: dic
     enrollment = result.scalar_one_or_none()
     if not enrollment:
         raise HTTPException(404, "Not enrolled")
+    # NOTE: `task_id` here is the task_index, not SimulationTask.id — see
+    # award_task_completion, which looks the row up by `task_index == task_id`.
+    #
+    # `rubric_rating` is deliberately NOT returned. For a sandbox task it holds
+    # the whole grader result including stdout/stderr, which would bloat a
+    # response that fires on the overview page, the shell and every enrollment
+    # check. The roadmap fetches it per task, on demand, from
+    # /enrollments/{id}/tasks/{task_id}/result below.
     completions = await db.execute(
-        select(TaskCompletion.task_id, TaskCompletion.score, TaskCompletion.quiz_score)
+        select(
+            TaskCompletion.task_id, TaskCompletion.score,
+            TaskCompletion.quiz_score, TaskCompletion.completed_at,
+        )
         .where(TaskCompletion.enrollment_id == enrollment.id)
     )
     return {
         **_enroll_dict(enrollment, sim.slug),
-        "task_completions": [{"task_id": r[0], "score": r[1], "quiz_score": r[2]} for r in completions],
+        "task_completions": [
+            {"task_id": r[0], "score": r[1], "quiz_score": r[2], "completed_at": r[3]}
+            for r in completions
+        ],
     }
+
+
+@router.get("/enrollments/{enrollment_id}/tasks/{task_id}/result")
+async def get_task_result(
+    enrollment_id: int, task_id: int,
+    db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user),
+):
+    """Full grading detail for one completed task — the roadmap's score
+    breakdown drawer. Separate from by-sim precisely because `rubric_rating`
+    is large: for a code_sandbox task it carries every grader check plus
+    captured stdout/stderr."""
+    user_id = token_user_id(token)
+    enrollment = (await db.execute(
+        select(Enrollment).where(Enrollment.id == enrollment_id, Enrollment.user_id == user_id)
+    )).scalar_one_or_none()
+    if not enrollment:
+        raise HTTPException(404, "Enrollment not found")
+
+    tc = (await db.execute(
+        select(TaskCompletion).where(
+            TaskCompletion.enrollment_id == enrollment_id,
+            TaskCompletion.task_id == task_id,
+        )
+    )).scalar_one_or_none()
+    if not tc:
+        raise HTTPException(404, "Task not completed")
+
+    return {
+        "task_id": tc.task_id, "score": tc.score, "quiz_score": tc.quiz_score,
+        "rubric_rating": tc.rubric_rating, "completed_at": tc.completed_at,
+    }
+
+
+@router.post("/enrollments/{enrollment_id}/tasks/{task_id}/quiz-score")
+async def set_task_quiz_score(
+    enrollment_id: int, task_id: int, body: QuizScoreBody,
+    db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user),
+):
+    """Attach a post-task quiz score to an already-graded task.
+
+    Exists because code_sandbox tasks never recorded one: the sandbox awards
+    server-side with quiz_score=None, and the client then skips the generic
+    complete endpoint (skipServerAward) to avoid double-awarding XP — so the
+    quiz result had nowhere to land and Task 5's score was always NULL.
+
+    Deliberately does NOT call award_task_completion: that would re-award the
+    base XP and overwrite rubric_rating. It touches quiz_score and, at most,
+    one bonus ledger row."""
+    user_id = token_user_id(token)
+    enrollment = (await db.execute(
+        select(Enrollment).where(Enrollment.id == enrollment_id, Enrollment.user_id == user_id)
+    )).scalar_one_or_none()
+    if not enrollment:
+        raise HTTPException(404, "Enrollment not found")
+
+    tc = (await db.execute(
+        select(TaskCompletion).where(
+            TaskCompletion.enrollment_id == enrollment_id,
+            TaskCompletion.task_id == task_id,
+        )
+    )).scalar_one_or_none()
+    if not tc:
+        raise HTTPException(404, "Task not completed — grade the task before its quiz")
+
+    # Guard the bonus on the score having been absent, so a re-take can update
+    # the number without paying out the bonus twice.
+    award_bonus = tc.quiz_score is None and body.quiz_score >= QUIZ_BONUS_THRESHOLD
+    tc.quiz_score = body.quiz_score
+
+    if award_bonus:
+        db.add(XpLedger(user_id=user_id, amount=QUIZ_BONUS_XP, source=f"task_{task_id}_quiz_bonus"))
+        await db.execute(update(User).where(User.id == user_id).values(xp=User.xp + QUIZ_BONUS_XP))
+
+    await db.commit()
+    return {"quiz_score": tc.quiz_score, "bonus_xp": QUIZ_BONUS_XP if award_bonus else 0}
 
 
 @router.get("/enrollments/{enrollment_id}")

@@ -3,7 +3,7 @@ import enigmaLogoImg from '../assets/enigma-logo.png'
 import nimbusLogoImg from '../assets/nimbus-logo.png'
 import derekHoltPhoto from '../assets/derek-holt.jpg'
 import daJobSimBanner from '../assets/da-job-sim-banner.jpg'
-import frontendDevSimBanner from '../assets/frontend-dev-sim-banner.jpg'
+import frontendDevSimBanner from '../assets/frontend-dev-sim-banner.webp'
 import salesCrmSimBanner from '../assets/sales-crm-sim-banner.jpg'
 
 // Purely cosmetic per-simulation branding (logo + accent + manager photo +
@@ -13,10 +13,18 @@ import salesCrmSimBanner from '../assets/sales-crm-sim-banner.jpg'
 // without branding/a photo/banner. Shared across Dashboard and Portfolio
 // (case studies) so a branding entry is only ever defined once.
 //
-// `banner` is a real stock photo (Unsplash, free license), not a fabricated
-// or AI-generated image — picked to match each simulation's actual work
-// (a dashboard/charts screen for the data-analyst sim, a React code editor
-// for the frontend sim, a sales presentation for the CRM sim).
+// `banner` is picked to match each simulation's actual work. The data-analyst
+// and CRM sims use stock photography (Unsplash, free license) — a
+// dashboard/charts screen and a sales presentation respectively. The frontend
+// sim uses a supplied photograph of a real two-laptop coding setup (1880x1253
+// webp); check its licensing before this ships publicly, since the other two
+// ride on Unsplash's free license and this one does not.
+//
+// It is deliberately NOT run through any blur, scrim or backdrop-filter. Every
+// place a banner renders (overview card, showcase tile, workspace header,
+// hero parallax) shows it at 1:1 or downscaled, which stays sharp; the one
+// thing that would soften it is upscaling past its native size, so keep any
+// new surface below 1880px wide or supply a larger file.
 // Accents stay inside the brand's own cool palette (indigo primary, slate,
 // teal) — deliberately no orange/amber, which read as generic "template"
 // colors here and clash with the indigo primary everything else uses.

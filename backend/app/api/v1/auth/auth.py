@@ -168,9 +168,9 @@ async def _authenticate(
     )
     user = result.scalar_one_or_none()
     if not user or not _user_allowed_on_tenant(user, tenant):
-        raise HTTPException(401, "Invalid email or password.")
+        raise HTTPException(401, "That email and password don't match.")
     if not verify_password(password, user.password_hash):
-        raise HTTPException(401, "Invalid email or password.")
+        raise HTTPException(401, "That email and password don't match.")
     if not user.is_active:
         raise HTTPException(403, "This account has been suspended.")
     return await _issue_session(db, user)
@@ -240,11 +240,11 @@ async def login_direct(
     )
     user = result.scalar_one_or_none()
     if not user or user.role != RoleSlug.STUDENT or user.roll_no:
-        raise HTTPException(401, "Invalid email or password.")
+        raise HTTPException(401, "That email and password don't match.")
     if user.university_id and user.university_id != tenant.id:
-        raise HTTPException(401, "Invalid email or password.")
+        raise HTTPException(401, "That email and password don't match.")
     if not verify_password(body.password, user.password_hash):
-        raise HTTPException(401, "Invalid email or password.")
+        raise HTTPException(401, "That email and password don't match.")
     if not user.is_active:
         raise HTTPException(403, "This account has been suspended.")
     await _touch(db, user.id)
@@ -269,9 +269,9 @@ async def login_superadmin(
     )
     user = result.scalar_one_or_none()
     if not user or user.role != RoleSlug.SUPER_ADMIN:
-        raise HTTPException(401, "Invalid email or password.")
+        raise HTTPException(401, "That email and password don't match.")
     if not verify_password(body.password, user.password_hash):
-        raise HTTPException(401, "Invalid email or password.")
+        raise HTTPException(401, "That email and password don't match.")
     if not user.is_active:
         raise HTTPException(403, "This account has been suspended.")
     await _touch(db, user.id)
@@ -297,17 +297,17 @@ async def login_admin(
     )
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(401, "Invalid email or password.")
+        raise HTTPException(401, "That email and password don't match.")
 
     if tenant.is_default:
         if user.role != RoleSlug.ADMIN:
-            raise HTTPException(401, "Invalid email or password.")
+            raise HTTPException(401, "That email and password don't match.")
     else:
         if user.role != RoleSlug.UNIVERSITY_ADMIN or user.university_id != tenant.id:
-            raise HTTPException(401, "Invalid email or password.")
+            raise HTTPException(401, "That email and password don't match.")
 
     if not verify_password(body.password, user.password_hash):
-        raise HTTPException(401, "Invalid email or password.")
+        raise HTTPException(401, "That email and password don't match.")
     if not user.is_active:
         raise HTTPException(403, "This admin account has been suspended.")
     await _touch(db, user.id)
@@ -336,11 +336,11 @@ async def login_university(
     )
     user = result.scalar_one_or_none()
     if not user or user.role != RoleSlug.STUDENT or not user.roll_no:
-        raise HTTPException(401, "Invalid email or password.")
+        raise HTTPException(401, "That email and password don't match.")
     if user.university_id != tenant.id:
-        raise HTTPException(401, "Invalid email or password.")
+        raise HTTPException(401, "That email and password don't match.")
     if not verify_password(body.password, user.password_hash):
-        raise HTTPException(401, "Invalid email or password.")
+        raise HTTPException(401, "That email and password don't match.")
     if not user.is_active:
         raise HTTPException(403, "This account has been suspended.")
     await _touch(db, user.id)
@@ -371,11 +371,11 @@ async def login_mentor(
     )
     user = result.scalar_one_or_none()
     if not user or user.role != RoleSlug.TEACHER:
-        raise HTTPException(401, "Invalid email or password.")
+        raise HTTPException(401, "That email and password don't match.")
     if user.university_id != tenant.id:
-        raise HTTPException(401, "Invalid email or password.")
+        raise HTTPException(401, "That email and password don't match.")
     if not verify_password(body.password, user.password_hash):
-        raise HTTPException(401, "Invalid email or password.")
+        raise HTTPException(401, "That email and password don't match.")
     if not user.is_active:
         raise HTTPException(403, "This account has been suspended.")
     await _touch(db, user.id)

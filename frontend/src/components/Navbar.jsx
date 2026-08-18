@@ -10,6 +10,7 @@ import { resolveDomainIcon } from '../lib/domainIcons'
 import { domainDescription } from '../lib/domainMeta'
 import { resolveMediaUrl } from '../lib/client'
 import Avatar from './ui/Avatar'
+import NotificationBell from './NotificationBell'
 
 // Real, working destinations today. `to` is a route; `href` is used instead
 // for the one item (Help & Support) that isn't a page in this app.
@@ -303,6 +304,8 @@ export default function Navbar() {
 
         {/* Right */}
         <div className="ml-auto flex items-center gap-2.5">
+
+          <NotificationBell />
 
           {/* XP badge */}
           <button

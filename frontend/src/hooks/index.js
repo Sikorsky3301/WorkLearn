@@ -5,6 +5,7 @@
 export * from './simulations'
 export * from './sandbox'
 export * from './tasks'
+export * from './assessments'
 export * from './skills'
 export * from './messages'
 export * from './badges'

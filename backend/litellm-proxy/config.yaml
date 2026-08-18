@@ -6,16 +6,42 @@
 # references via LITELLM_PROXY_MODEL (see backend/.env.example) — so
 # swapping which real provider/model backs e.g. "claude-sonnet" only ever
 # means editing this file, never the backend's own code or its `.env`.
+#
+# That indirection is why `llama-groq` no longer points at a Llama model and
+# the name was NOT changed: it is an alias the backend's .env depends on, and
+# renaming it breaks every deployment that has the old value set. Read these
+# names as slots, not as descriptions — the `model:` line beneath each is the
+# only place that says what is really being called.
 model_list:
   - model_name: claude-sonnet
     litellm_params:
       model: anthropic/claude-sonnet-4-6
       api_key: os.environ/ANTHROPIC_API_KEY
 
+  # Groq's fast general model.
+  #
+  # WAS groq/llama-3.3-70b-versatile until Groq decommissioned it, at which
+  # point every AI feature in the app started returning "The assistant is
+  # unavailable right now" — the proxy was passing through a clean
+  # 404 model_not_found and the app's generic 503 hid it.
+  #
+  # Groq no longer serves ANY Llama chat model to this account (checked against
+  # /v1/models: the remaining chat-capable ids are the gpt-oss family, qwen3.6
+  # and the compound agents). gpt-oss-120b is the strongest of those.
+  #
+  # The alias stays `llama-groq` so backend/.env keeps working; see the note by
+  # `model_name` below.
   - model_name: llama-groq
     litellm_params:
-      model: groq/llama-3.3-70b-versatile
+      model: groq/openai/gpt-oss-120b
       api_key: os.environ/GROQ_API_KEY
+      # gpt-oss is a REASONING model. Its thinking is returned in a separate
+      # `reasoning` field, but it is billed against max_tokens — and the
+      # sandbox autocomplete asks for only 80. At the default effort the whole
+      # budget went to reasoning and the completion came back EMPTY, which the
+      # autocomplete path swallows silently, so ghost text would simply never
+      # appear again with nothing in any log to say why.
+      reasoning_effort: low
 
   - model_name: gemini-flash
     litellm_params:

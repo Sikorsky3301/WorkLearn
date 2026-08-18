@@ -11,7 +11,7 @@ const DEFAULT_PRICING = { price: 499, listPrice: 3199, subscriptionFrom: 375 }
 
 const PRICING_BY_SLUG = {
   'da-job-sim': { price: 499, listPrice: 3199, subscriptionFrom: 375 },
-  'frontend-dev-sim': { price: 549, listPrice: 3499, subscriptionFrom: 375 },
+  'frontend-dev-sim': { price: 499, listPrice: 3980, subscriptionFrom: 375 },
   'sales-crm-sim': { price: 449, listPrice: 2899, subscriptionFrom: 375 },
 }
 

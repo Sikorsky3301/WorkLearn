@@ -72,9 +72,23 @@ class Settings(BaseSettings):
     # pre-built — see backend/sandboxes/README.md
     sandbox_image: str = "worklearn-sandbox-python:latest"
     sandbox_image_frontend: str = "worklearn-sandbox-frontend:latest"
-    sandbox_timeout_seconds: int = 15
-    sandbox_memory_limit: str = "256m"
-    sandbox_cpu_limit: str = "0.5"
+    # Headroom, measured rather than guessed: a passing frontend submission
+    # (container start + Jest + jsdom) takes ~6s wall clock at 0.5 CPU, so the
+    # old 15s limit left barely 2.4x — one busy host or two students
+    # submitting at once and a perfectly good answer silently scores 0, since
+    # a timeout means no output.json and the grader can only report "no
+    # report produced". These are the safety limits for untrusted code, not a
+    # performance budget; there is no reason to run them this close to the
+    # edge. Raising CPU also cuts the wall clock, which shortens the window in
+    # which a browser tab can be backgrounded mid-request.
+    #
+    # 256m was tight for Jest+jsdom and for pandas over the ~9,600-row
+    # da-job-sim dataset; an OOM kill looks exactly like a timeout to the
+    # grader (no artifact), which is precisely the failure that is hardest to
+    # diagnose from the outside.
+    sandbox_timeout_seconds: int = 45
+    sandbox_memory_limit: str = "512m"
+    sandbox_cpu_limit: str = "1.0"
 
     # Sandbox runner: "docker" runs `docker run` on the host daemon (local
     # dev); "kubernetes" launches each submission as a Job in sandbox_namespace

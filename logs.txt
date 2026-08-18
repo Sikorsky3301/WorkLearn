@@ -1,0 +1,1553 @@
+================================================================================
+ WORKLEARN — ENGINEERING SIMULATION REBUILD
+ Implementation log
+ 2026-08-15
+================================================================================
+
+WHAT WAS ASKED
+--------------
+  1. Redesign each task's content — explained properly, for beginners AND
+     advanced readers, not just bullet points.
+  2. Remove three sections from the task page: "What you'll hand in",
+     "How your work is marked", "Why you're doing this" (the manager quote
+     and the Replay the briefing button).
+  3. Every week has 3 tasks.
+  4. A mini assessment after every completed task.
+  5. A 50-question final assessment after all weeks, beginner → advanced,
+     covering the domain and the implementations.
+  6. Fix grading so each task grades perfectly.
+  7. This log.
+
+  One ambiguity was raised before starting: the brief said both "3 tasks per
+  week" and "2 mini assessments per week", which cannot both hold if every
+  task has one. Confirmed: 3 per week, one after every task.
+
+FINAL STRUCTURE
+---------------
+  Week 1 — Structure & Style
+      1  Landing Hero Section          html   semantic landmarks, flex/grid
+      2  Responsive Feature Grid       html   auto-fit/minmax, alt text, @media
+      3  Interactive Navigation        html   DOM events, aria-expanded
+  Week 2 — Behaviour & Data
+      4  Accessible Signup Form        html   validation, role="alert"
+      5  Fetch and Render Live Data    js     loading / success / error
+      6  Search and Filter             js     pure function vs rendering
+  Week 3 — React & Shipping
+      7  Your First React Component    jsx    props, conditional rendering
+      8  Controlled Form Component     jsx    useState, controlled inputs
+      9  Task Manager App              jsx    persistence, immutable updates
+  Week 4
+     10  Final Assessment              quiz   50 questions
+
+  9 tasks · 9 mini assessments (5 questions each) · 1 final (50 questions)
+  Tasks 2, 4, 6 and 8 are new. The other five were rewritten and re-indexed.
+
+
+================================================================================
+ 1. GRADING  — "each task should grade perfectly"
+================================================================================
+
+THE BUG THAT WAS THERE
+  Each task's score came from a title → points map that lived in a separate
+  grader module from the Jest spec it described. Grading matches on the test's
+  TITLE STRING. Rename a title, or typo a key, and the test still runs, still
+  passes — and silently scores 0. A perfect submission caps below 100 and
+  nothing anywhere reports a problem.
+
+  All five existing maps happened to be correct. The arrangement was one edit
+  away from not being, and adding four more tasks would have quadrupled the
+  surface.
+
+WHAT CHANGED
+  app/services/frontend_specs.py        REWRITTEN
+      Spec and points now live together in one FrontendTaskSpec per task.
+      validate_specs() parses the titles back out of the spec source and
+      asserts: every test is scored, every score maps to a real test, no
+      duplicate titles, and the total is exactly 100.
+
+  app/services/graders/frontend_tasks.py    NEW
+      One make_grader(index) generating all nine graders from the specs, so a
+      task cannot exist without its grading also existing.
+      DELETED: frontend_task1.py … frontend_task5.py (five near-identical
+      copies of the same two lines).
+
+  app/services/graders/registry.py      grader keys now generated, not listed.
+
+VERIFICATION — three layers, all run
+
+  a) tests/unit/test_frontend_specs.py (NEW)
+     Every spec fully scored and totalling 100; a synthetic all-pass report
+     scores 100 and an all-fail scores 0, per task.
+
+  b) verify_frontend_grading.py (NEW) — the real Docker sandbox
+     Runs each task's worked solution AND its untouched starter through the
+     actual container. The starter check is the one that proves the suite
+     measures anything: a spec that passes on the stub asserts nothing.
+
+         task 1  OK  solution=100  starter= 45   Landing Hero Section
+         task 2  OK  solution=100  starter=  0   Responsive Feature Grid
+         task 3  OK  solution=100  starter= 40   Interactive Navigation
+         task 4  OK  solution=100  starter= 30   Accessible Signup Form
+         task 5  OK  solution=100  starter= 15   Fetch and Render Live Data
+         task 6  OK  solution=100  starter= 15   Search and Filter
+         task 7  OK  solution=100  starter=  0   Your First React Component
+         task 8  OK  solution=100  starter=  0   Controlled Form Component
+         task 9  OK  solution=100  starter=  0   Task Manager App
+
+     (Non-zero starter scores are checks the provided scaffolding already
+     satisfies — e.g. Task 1's starter ships the landmark tags.)
+
+  c) tests/unit/test_engineering_template.py (NEW)
+     Asserts grader_key matches task_index for every task — a mismatch there
+     grades submissions against another task's answer key, and every check
+     still "passes", just for the wrong exercise.
+
+THREE REAL GAPS FOUND BY THOSE TESTS, AND FIXED
+  A test asserts that every name promised to the student appears in the hidden
+  spec. It failed three times, and each failure was a genuine defect:
+
+  · Task 4 promised a password-length rule that NO test checked. Added
+    "a password under 8 characters is rejected" and rebalanced to 100.
+  · Task 9 promised data-testid="task-list" that NO test checked. Added
+    "renders the tasks inside a task-list container" and rebalanced to 100.
+  · Task 6's contract entry was too vague to verify; renamed to name the two
+    exported functions, which the spec does assert on.
+
+
+================================================================================
+ 2. TASK CONTENT  — beginner and advanced, in the same page
+================================================================================
+
+  A new config.explainer block per task, replacing the bullet list:
+
+      situation   why this work exists, in plain language
+      outcome     what "finished" looks like, concretely
+      preview     a monospace sketch of the finished result
+      concepts    new ideas DEFINED BEFORE they are used  ← the beginner layer
+      steps       each with `plain` and `deeper`
+      contract    the exact identifiers the hidden tests require
+      mistakes    the specific ways this task goes wrong
+      further     ungraded extensions                     ← the advanced layer
+
+  The two-track design, which is the point of the redesign:
+
+      plain   — written for someone who has never done this, using no
+                vocabulary that hasn't been defined on the page.
+      deeper  — the trade-off, failure mode, or reason it's done this way.
+                Collapsed behind a "Going deeper" toggle.
+
+  Neither summarises the other. A beginner can read only the plain text and
+  finish the task. An experienced developer can read only the deeper notes and
+  still learn something. The single middle-pitched explanation that a bullet
+  list forces bores one reader and loses the other.
+
+  Sample of the `deeper` layer, so the register is clear:
+    · "sort() and reverse() mutate in place — a function that silently
+       reorders its caller's array causes bugs a long way from the mistake."
+    · "Everything before the first await runs synchronously; after it, control
+       returns to the browser — which is why a loading state set afterwards
+       appears only once the data has already arrived."
+    · "Mutating task.completed leaves the same object in the same array, so
+       React sees nothing changed. Immutability isn't style here; it's the
+       mechanism by which change is detected."
+    · "alt='' and omitting alt are NOT the same — a missing alt makes many
+       screen readers read the filename aloud."
+
+  Content authored per task: situation, outcome, ASCII preview, 4–5 concepts,
+  3–5 two-layer steps with code samples, a contract table, 4–6 mistakes,
+  3 extensions, plus starter code, a fully commented worked solution, and a
+  5-question assessment.
+
+
+================================================================================
+ 3. TASK PAGE  — three sections removed
+================================================================================
+
+  REMOVED, as asked:
+    · "What you'll hand in"     — the sandbox submits the file for you, so the
+                                  section described something that never happens.
+    · "How your work is marked" — replaced by the contract block, which says
+                                  what the checks look for AT THE MOMENT you're
+                                  deciding what to name things.
+    · "Why you're doing this"   — the manager card, the briefing quote and the
+                                  Replay button. The briefing scene plays it and
+                                  the manager panel keeps every brief; three
+                                  copies of one paragraph was two too many.
+
+  The page is now: title → what this is about → new ideas → build it step by
+  step → exact names → sandbox → mini assessment → next.
+
+
+================================================================================
+ 4. ASSESSMENTS  — graded on the server, not in the browser
+================================================================================
+
+  The existing post_task_quiz path grades in the browser, which requires
+  shipping the correct answers to the browser to do it. Acceptable for a
+  low-stakes check. Not acceptable for something called an assessment, least
+  of all a 50-question final that gates a certificate.
+
+  So `config.assessment` is a SECRET config key for both code_sandbox and quiz
+  types — stripped from the public simulation payload entirely.
+
+      GET  /api/enrollments/{id}/tasks/{n}/assessment   questions, no answers
+      POST /api/enrollments/{id}/tasks/{n}/assessment   answers in, result out
+
+  `correct` and `explanation` are returned only by the POST, once the attempt
+  is committed and can no longer be changed.
+
+  Verified live against the real database:
+      GET /full           assessment leaked on: []   grader_key leaked on: []
+      GET assessment      q0 keys: ['index','options','question']
+      POST short          400  "Expected 5 answers, got 1"
+      POST all-blank      200  score 0, explanations returned
+      POST all-correct    200  score 100
+      GET final           200  50 questions, pass_mark 70
+
+  A BUG IN MY OWN ENDPOINT, FOUND BY THAT SMOKE TEST AND FIXED
+      Submitting the mini assessment for a sandbox task that had NOT been
+      graded fell through to award_task_completion — marking the coding task
+      complete, awarding its full XP, recording the quiz percentage as the code
+      score, and unlocking the next task, for a student who never opened the
+      editor. Now returns 409 "Submit the task before taking its assessment".
+      Only a standalone quiz task (the final) may complete itself.
+
+  WHERE THE ASSESSMENT APPEARS
+      · Automatically, in the sandbox tab, the moment a submit is graded —
+        that is what "conducted when the task is completed" means, and an
+        assessment you must navigate elsewhere to find is one nobody takes.
+      · Skippable on purpose. A check you can't decline is a gate; this is
+        meant to consolidate, not to block the next ticket.
+      · Also on the task page, and flagged on the roadmap when untaken.
+
+  QUESTION BANK
+      45 mini-assessment questions + 50 final. Every one carries an
+      explanation — the difference between a score and a lesson. The final
+      ramps from "which element wraps the primary content" to reviewing a PR
+      that adds 400KB to format one timestamp.
+
+
+================================================================================
+ 5. FILES
+================================================================================
+
+BACKEND — new
+  app/cms_templates/engineering/__init__.py    template assembly + content contract
+  app/cms_templates/engineering/week1.py       tasks 1-3, full explainer content
+  app/cms_templates/engineering/week2.py       tasks 4-6
+  app/cms_templates/engineering/week3.py       tasks 7-9
+  app/cms_templates/engineering/starters.py    starter code + worked solutions ×9
+  app/cms_templates/engineering/assessments.py 9 mini banks + the 50-question final
+  app/services/graders/frontend_tasks.py       all nine graders, generated
+  app/api/v1/simulations/assessments.py        server-side serving + grading
+  resync_engineering_sim.py                    push template changes to a live row
+  verify_frontend_grading.py                   end-to-end grading check via Docker
+  tests/unit/test_frontend_specs.py            grading cannot desync
+  tests/unit/test_engineering_template.py      structure, secrets, both audiences
+
+BACKEND — rewritten / changed
+  app/services/frontend_specs.py    REWRITTEN: 9 specs, points beside them,
+                                    validate_specs()
+  app/services/graders/registry.py  frontend graders generated from the specs
+  app/schemas/cms.py                TaskExplainer + AssessmentConfig schemas
+  app/services/task_types.py        `assessment` marked secret on both types
+  app/main.py                       assessments router registered
+  tests/conftest.py                 session-scoped event_loop (see below)
+
+BACKEND — deleted
+  app/services/graders/frontend_task1.py … frontend_task5.py
+
+FRONTEND — new
+  features/simulations/engineering/task/TaskExplainer.jsx        two-layer renderer
+  features/simulations/engineering/task/MiniAssessmentCard.jsx
+  features/simulations/engineering/assessment/AssessmentRunner.jsx
+  features/simulations/engineering/assessment/FinalAssessmentPage.jsx
+  features/simulations/engineering/sandbox/PostTaskAssessment.jsx
+  hooks/assessments.js
+
+FRONTEND — changed
+  features/simulations/engineering/task/EngineeringTaskPage.jsx  3 sections removed
+  features/simulations/engineering/sandbox/SandboxWorkbenchPage.jsx
+  features/simulations/engineering/roadmap/RoadmapTaskCard.jsx
+  hooks/index.js
+
+
+================================================================================
+ 6. TWO THINGS FIXED THAT WEREN'T ASKED FOR
+================================================================================
+
+  THE BACKEND TEST SUITE WAS ENTIRELY UNCOLLECTABLE.
+      pytest.ini sets asyncio_default_fixture_loop_scope = session, an option
+      that only exists in pytest-asyncio 0.24+. Installed: 0.21.1, which
+      ignores unknown ini keys — so the session-scoped _test_database fixture
+      depended on a function-scoped event_loop and EVERY test errored at setup
+      with ScopeMismatch. Not one backend test could run.
+
+      Fixed with a session-scoped event_loop override in conftest.py, the
+      documented 0.21 approach. Remove it when pytest-asyncio is upgraded.
+      Result: 115 passed. It had to be fixed — grading tests that cannot run
+      prove nothing.
+
+  A CONFIG KEY NOT IN A SCHEMA IS SILENTLY ERASED.
+      validate_task_config round-trips config through a pydantic model, and
+      pydantic DROPS unknown fields. `explainer` and `assessment` would have
+      been wiped the first time an admin opened a task in the CMS builder and
+      pressed save — no error, no warning, content simply gone. Both now have
+      real schemas, with a test asserting they survive the round trip.
+
+
+================================================================================
+ 7. STATE OF THE DATABASE
+================================================================================
+
+  Ran: python resync_engineering_sim.py --apply
+
+  frontend-dev-sim now holds 10 tasks (3/3/3/1 across weeks 1-4), all with
+  explainer content and assessments. Seeded assets preserved (enigma-logo.png,
+  maya-chen.jpg).
+
+  ⚠ PROGRESS WAS NOT RESET, DELIBERATELY.
+      TaskCompletion.task_id holds a task INDEX. The indices were re-cut — what
+      was Task 2 (Interactive Navigation) is now Task 3, and index 2 is a new
+      responsive-grid ticket. So the 12 existing completions now claim credit
+      for exercises that did not previously exist, with scores belonging to
+      different work.
+
+      There is no correct automatic remapping, because the new tasks were never
+      available to complete. Deleting someone's progress is your call, not
+      mine. For a clean slate:
+
+          python resync_engineering_sim.py --apply --reset-progress
+
+
+================================================================================
+ 8. VERIFICATION SUMMARY
+================================================================================
+
+  backend    python -m pytest -q                     115 passed
+  grading    python verify_frontend_grading.py       9/9 solution=100, starter<100
+  api        in-process ASGI against the real DB     no answer-key leakage
+  frontend   npm run build                           clean
+  frontend   npx vitest run                          57 passed
+
+  NOT DONE: no browser click-through of the new pages. Everything above is
+  build, unit, container and API-level verification. The task page, assessment
+  runner and final exam have not been looked at in a running browser.
+
+================================================================================
+
+
+================================================================================
+ SESSION 2 — LANDING PAGE, LOGIN, SANDBOX WORKBENCH
+ 2026-08-16
+================================================================================
+
+Appended after the Engineering rebuild above. Entries in the order the work was
+asked for. Mistakes of mine are called out as they occurred — six of the eleven
+items below exist because I got something wrong, and three of those were only
+visible in a real browser and were reported by the user rather than found by me.
+
+
+--------------------------------------------------------------------------------
+ 1. DOMAIN PHOTOGRAPHS FOR THE PARALLAX
+--------------------------------------------------------------------------------
+ASKED   Add 4 images to the vacant tiles on the landing page.
+
+DONE    Copied into public/images/domains/ and wired into careerDomains.js:
+          sales.jpg                       -> Sales
+          law.jpg              -> legal.jpg       -> Legal & Compliance
+          supply chain...jpg   -> operations.jpg  -> Operations & Supply Chain
+          education...webp     -> education.webp  -> Education & Training
+        Kept .webp rather than renaming to .jpg — the extension is part of the
+        URL, so a mislabelled file 404s.
+
+CAUGHT  Three of the four would never have been seen. The parallax renders
+        exactly 15 tiles (3 rows x 5, structural) and was taking the FIRST 15:
+        3 simulations then the first 12 domains in catalogue order. Legal,
+        Operations and Education all sit past that cut.
+        Fixed by sorting photographed domains ahead of un-photographed ones
+        before slicing. Every visible tile now has a photograph, and the
+        arrangement self-corrects as new photos are added.
+
+LEFT    Healthcare Administration and Research & Science still have no image;
+        they now fall off the end rather than showing as icon tiles.
+        Operations and Education sit past the 15-tile cut so do not appear in
+        the parallax, but are live everywhere else the catalogue feeds.
+
+NOTE    sales.jpg (444K) and legal.jpg (348K) are heavy for above-the-fold
+        imagery against ~100K for the existing set. Not resized — flagged only.
+
+FILES   frontend/public/images/domains/{sales.jpg,legal.jpg,operations.jpg,
+          education.webp}
+        frontend/src/lib/careerDomains.js
+        frontend/src/features/marketing/sections/HeroSection.jsx
+
+
+--------------------------------------------------------------------------------
+ 2. LOGIN — "Failed to fetch"
+--------------------------------------------------------------------------------
+ASKED   Try the given credentials; add a better error message on login failure.
+
+TWO REAL FAULTS
+
+  a) The email given was misspelled.
+       rishirajidenitty@gmail.com  -> 401
+       rishirajidentity@gmail.com  -> 200 OK (student, 860 XP)
+     't' and 'i' transposed. The password was correct all along.
+
+  b) IPv4/IPv6 mismatch — the actual cause of "Failed to fetch".
+       ping localhost         -> ::1       Windows resolves to IPv6 first
+       http://[::1]:3001      -> REFUSED   nothing listening there
+       http://127.0.0.1:3001  -> 200       uvicorn binds IPv4 only
+     The browser dialled ::1 and failed before reaching the server. curl kept
+     succeeding because curl falls back to IPv4 and browsers may not — which is
+     why every test I ran looked fine while the browser did not.
+     FIX: frontend/.env.local now targets http://127.0.0.1:3001.
+
+  MY ERROR #1 — WRONG DIAGNOSIS, STATED CONFIDENTLY
+     I first announced "your backend wasn't running". I had checked port 8000,
+     which was never this project's port (3001, per config.py). I never checked
+     3001. A working backend was probably up the whole time.
+
+  MY ERROR #2 — FIX NOT VERIFIED AS APPLIED
+     I edited .env.local at 19:20; Vite had been running since 18:34. Vite reads
+     .env once at startup, so the change sat on disk doing nothing through two
+     more failed attempts. I told the user to restart Vite instead of checking
+     whether it had been. Restarted it and confirmed the served module carried
+     VITE_API_URL: "http://127.0.0.1:3001".
+
+ERROR MESSAGES REWRITTEN (twice)
+     fetch() rejects BEFORE any existing error handling runs, so the browser's
+     raw "Failed to fetch" reached the form verbatim. Now caught and translated,
+     with error.cause preserved and an isNetworkError flag so callers can tell
+     "the server said no" from "there was no server".
+
+     Then rewritten again for the user's perspective rather than a developer's.
+     Rules: nothing they cannot act on (no hostnames, ports, status codes, or
+     the words backend/API/server); when it is not their fault say so first;
+     give them one thing to try.
+
+       server down  "We can't reach WorkLearn right now."
+                    + "Your details were never sent, so nothing is wrong with
+                       your password..."
+       offline      "You're not connected to the internet."
+       401          "That email and password don't match."
+                    + "Double-check <email> for a typo — a swapped or missing
+                       letter is the usual culprit..."
+       403          + "You typed everything correctly — this account just isn't
+                       active at the moment."
+       429          + "For security we pause sign-ins after several tries."
+       5xx          + "Something went wrong on our side — your email and
+                       password are fine."
+
+     The technical line now goes to console.error, where the person who can act
+     on it will look. role="alert" added so screen readers announce it.
+     The 401 wording was changed at SOURCE (17 occurrences in auth.py) rather
+     than string-mapped on the client, which would have drifted.
+
+FILES   frontend/src/lib/client.js
+        frontend/src/features/auth/AuthContext.jsx
+        frontend/src/features/auth/global/Login.jsx
+        frontend/src/features/auth/global/loginErrors.test.js  (new, 4 tests)
+        frontend/.env.local
+        backend/app/api/v1/auth/auth.py
+
+
+--------------------------------------------------------------------------------
+ 3. PROCESS CLEANUP
+--------------------------------------------------------------------------------
+ASKED   Kill my processes.
+DONE    Stopped both uvicorn backends (the stray 8000 and the 3001) and the Vite
+        dev server. TaskStop only killed the shell wrappers, so the children
+        needed a direct kill. Verified nothing left listening on 3001/5173/8000
+        and no node/python running. Docker Desktop deliberately left up.
+
+
+--------------------------------------------------------------------------------
+ 4. TECHNOLOGY STRIP ON THE HERO
+--------------------------------------------------------------------------------
+ASKED   Strip section showcasing 17 tech logos, headed "Provides Job Simulations
+        on Latest Technologies and Frameworks".
+
+DONE    17 SVGs into public/images/tech/. New data/technologies.js with display
+        names spelled as brands, not filenames (nodedotjs -> Node.js,
+        cplusplus -> C++, huggingface -> Hugging Face). Ordered
+        languages -> runtimes -> databases -> ML -> AI tooling -> platforms.
+        Placed under the hero, above the institution crests: the headline claims
+        you do the real job, and this is the first concrete answer to "with
+        what?".
+        Verified all 17 are genuinely monochrome single-path icons, so they read
+        as one texture rather than 17 competing brands.
+
+REUSED  Added variant="bare" to the existing InfiniteMovingCards rather than
+        writing a third marquee.
+
+FIXED ALONG THE WAY
+        That shared component never honoured prefers-reduced-motion. An infinite
+        marquee is exactly the continuous motion that triggers nausea for
+        vestibular disorders and it never stops on its own. It now renders a
+        static wrapped row, and skips the duplicated track that would otherwise
+        show every logo twice. The Mira marquee benefits too.
+
+FILES   frontend/public/images/tech/*.svg  (17)
+        frontend/src/features/marketing/data/technologies.js       (new)
+        frontend/src/features/marketing/data/technologies.test.js  (new, 3)
+        frontend/src/components/ui/infinite-moving-cards.jsx
+        frontend/src/features/marketing/sections/HeroSection.jsx
+
+
+--------------------------------------------------------------------------------
+ 5. SANDBOX — RESIZABLE PANES, HINT/SOLUTION, QUIZ GATE
+--------------------------------------------------------------------------------
+ASKED   Drag-resizable windows; remove the "Reveal model solution / open only
+        after your own attempt" card from the left panel and put solution and
+        hint behind a button; after a task is completed, Next prompts the
+        associated quiz and only >=80% unlocks the next task.
+
+RESIZABLE PANES
+        Two dividers (brief|editor, editor|console). Pointer events with
+        setPointerCapture so a fast drag does not outrun the handle. Keyboard
+        accessible: role="separator", arrows move 16px (64 with Shift),
+        Home/End. Double-click centres. Sizes persist in localStorage.
+
+HINT + SOLUTION
+        Removed ModelSolutionPanel and the hint stepper from ExerciseRail. New
+        HelpDrawer over the editor with both as tabs, opened from two toolbar
+        buttons. Hints still come one at a time; the solution keeps a reveal
+        step but is no longer parked permanently under the brief advertising the
+        answer. (ModelSolutionPanel itself untouched — two other sims use it.)
+
+QUIZ GATE AT 80%
+        Next now opens the assessment instead of advancing. Below 80% the footer
+        shows the score and a Try again that genuinely resets (remounts the
+        runner). At >=80% Next releases. Same rule on the task page's Next so it
+        cannot be side-stepped by leaving the sandbox.
+        A pass survives a reload (reads TaskCompletion.quiz_score); a live
+        attempt beats the stored score so the gate opens immediately.
+        Gate logic in lib/assessment.js, 6 tests — including that 0 is a real
+        score, not a missing one (?? not ||, which would let a zero fall through
+        to a stored pass).
+        Modal stays closable by design: a quiz you cannot pass yet should not
+        trap you.
+
+FILES   engineering/sandbox/{SplitHandle,HelpDrawer,PostTaskAssessment,
+          SandboxWorkbenchPage,ExerciseRail}.jsx
+        engineering/lib/assessment.js + assessment.test.js  (new)
+        engineering/task/{MiniAssessmentCard,EngineeringTaskPage}.jsx
+
+
+--------------------------------------------------------------------------------
+ 6. DIVIDERS TOO BULKY  +  A DRAGGER THAT NEVER WORKED
+--------------------------------------------------------------------------------
+ASKED   The drag feature is too bulky; add a dragger at the description panel.
+
+CAUSE   Not styling. The handle was a 6px bar sitting NEXT TO the panes' existing
+        1px borders — two lines a few pixels apart, which reads as a chunky grab
+        bar rather than an edge.
+
+MY ERROR #3 — THE DESCRIPTION DRAGGER WAS BROKEN, NOT MISSING
+        I had wrapped it in <div className="hidden lg:block">. A block wrapper
+        gave the handle no height to stretch into, so it collapsed to a
+        zero-height strip that could never be grabbed. That is why the user
+        reported it as absent. The handle is now the flex child itself with
+        self-stretch.
+
+DONE    The divider is now a 1px hairline that IS the border — removed border-r
+        from the brief and border-t from the console, so there is one line where
+        there were two. ~9px invisible hit area via an overflowing child, so the
+        visible line never changes width. Grip dots removed. Faint tint on
+        hover/focus for discoverability without weight at rest.
+
+
+--------------------------------------------------------------------------------
+ 7. EDITOR SETTINGS
+--------------------------------------------------------------------------------
+ASKED   A settings button to adjust font, theme, size etc.
+
+DONE    Gear button in the editor toolbar opening a panel. Theme (5), font stack
+        (5), font size 10-28, line spacing 1.2-2.4, tab size 2-8, and toggles
+        for word wrap, line numbers, minimap, bracket colours and AI
+        autocomplete. Reset to defaults. Everything applies instantly and
+        persists per browser.
+        Autocomplete moved INTO the settings object rather than separate state,
+        so the toolbar toggle and the panel cannot disagree.
+        Stored settings are merged OVER the defaults, not used as-is — an object
+        saved by an older build is missing whatever was added since, and
+        spreading it in directly would hand Monaco fontSize: undefined.
+        5 tests on the translation layer, which is where this breaks silently:
+        Monaco ignores an option of the wrong shape rather than throwing, so a
+        line-height ratio passed through raw would just be read as 1.5px.
+
+FILES   useEditorSettings.js, EditorSettingsPanel.jsx,
+        useEditorSettings.test.js  (all new)
+
+
+--------------------------------------------------------------------------------
+ 8. EDITOR PUSHED OFF THE WINDOW WHEN DRAGGING
+--------------------------------------------------------------------------------
+ASKED   Dragging the description moves the editor content off the window.
+
+MY ERROR #4 — MISSING min-w-0
+        A flex item defaults to min-width: auto and refuses to shrink below its
+        content's intrinsic width. The editor column had no min-w-0, so as the
+        brief grew the column held its width and the editor slid off the right
+        edge. Nothing about min-w-0 looks like a sizing rule, which is why it is
+        easy to omit and hard to spot afterwards.
+
+ALSO    The drag ceiling was a design-time guess (max=760). Now derived from the
+        container's live width via ResizeObserver, and clamps back down when the
+        window shrinks so a size stored on a big monitor does not strand you on
+        a laptop. Toolbar made to scroll and the filename to truncate so neither
+        sets the editor's minimum. overflow-hidden as a backstop.
+
+MY ERROR #5 — BUG IN THAT FIX, CAUGHT BEFORE SHIPPING
+        First version used useRef for the observed element. The container mounts
+        after several early returns, so the effect ran once against null and
+        never re-ran — a ref object's identity never changes, so the dependency
+        never fires again. splitWidth would have stayed 0 and the "dynamic"
+        ceiling silently fallen back to the old hardcoded 760 forever. Replaced
+        with a callback ref holding the node in state.
+
+
+--------------------------------------------------------------------------------
+ 9. MAXIMUM DRAG LIMIT ON THE CONSOLE
+--------------------------------------------------------------------------------
+ASKED   Add a maximum draggable limit.
+
+DONE    The console divider had the same design-time guess (max=640), so on a
+        short window it could be dragged up until the editor had nothing left.
+        Both ceilings now measured:
+          brief|editor    container width - 420   (editor keeps >=420 wide)
+          editor|console  column height   - 180   (editor keeps >=180 tall)
+        Console minimum stays 44px so it can collapse to its tab strip. Both
+        clamp down when the window shrinks.
+        useElementWidth generalised to useElementSize (both axes, guarded so a
+        one-axis resize does not re-render consumers of the other), and the
+        calculation extracted to a shared maxForPane().
+        Tested the degenerate case: on a container too small for both minimums a
+        naive available-minSibling goes NEGATIVE, making min > max in the clamp
+        and pinning the divider to the wrong edge. Math.max keeps it positive.
+
+
+--------------------------------------------------------------------------------
+ 10. TOOLBAR SLICED IN HALF AT MAXIMUM DRAG
+--------------------------------------------------------------------------------
+ASKED   [screenshot] At maximum drag the toolbar is cut off — limit it so the
+        buttons are not wiped out.
+
+MY ERROR #6 — 420px WAS ENOUGH FOR CODE, NOT FOR THE TOOLBAR
+        At the 420px floor only Hint, Solution and Autocomplete survived; Ask
+        AI, Settings, Reset, Run code and Submit answer were all past the edge
+        and the filename was crushed to "su". The two buttons that matter most
+        were the first to go.
+
+DONE    The editor's minimum width is now MEASURED from the toolbar:
+          minEditorWidth = max(420, toolbarWidth + 150)
+        The button group is shrink-0, so its measured width is its natural width
+        however narrow the pane gets. Works out around 950px for this toolbar.
+        Self-maintaining: add a tenth button and the limit moves on its own —
+        hardcoding ~950 would have broken again the next time the toolbar grew,
+        which is how it broke this time.
+
+
+--------------------------------------------------------------------------------
+ 11. SETTINGS PANEL WOULD NOT OPEN
+--------------------------------------------------------------------------------
+ASKED   The code editor settings is not opening.
+
+MY ERROR #7 — CLIPPED BY MY OWN OVERFLOW FIX
+        In item 8 I gave the toolbar overflow-x-auto so it could not set the
+        editor's minimum width. An overflow container CLIPS absolutely
+        positioned descendants, and the settings panel was anchored inside it.
+        It rendered correctly and was then cut away to nothing, so the button
+        looked dead.
+
+DONE    The panel now renders against the editor surface — the same container
+        the AI panel and help drawer float in — rather than anchored to its
+        button. The trigger is marked data-settings-trigger and excluded from
+        the click-outside handler: mousedown fires before click, so without that
+        a second press would close the panel and its own onClick would
+        immediately reopen it, making the button appear to do nothing.
+
+
+--------------------------------------------------------------------------------
+ 12. SETTINGS TOGGLE SWITCHES RENDERED WRONG
+--------------------------------------------------------------------------------
+ASKED   Fix the toggle button in the code editor settings.
+
+MY ERROR #8 — ABSOLUTE WITH NO left, INSIDE DEFAULT BUTTON PADDING
+        The knob was positioned `absolute top-0.5` with no `left`, so its
+        horizontal origin fell back to its static position — which sits inside
+        the <button>'s default user-agent padding. The knob started a few pixels
+        in, and its 16px of travel then pushed it past the end of the track.
+
+DONE    Added p-0 to remove UA padding and an explicit left-0.5, so travel is
+        exactly track - knob - insets = 36 - 16 - 4 = 16px (translate-x-4).
+        Added type="button" and a focus-visible ring.
+
+ALSO    Stepper now snaps to the step's own precision internally: 1.2 + 0.1 is
+        1.3000000000000003 in binary floating point, which would have been
+        stored and displayed in full. Rounding moved out of the caller so no
+        future caller has to remember it.
+
+FILES   EditorSettingsPanel.jsx
+
+
+================================================================================
+ VERIFICATION AT END OF SESSION 2
+================================================================================
+  frontend   npm run build      clean
+  frontend   npx vitest run     86 passed (16 files)
+  backend    115 passed (unchanged since the auth.py wording change)
+
+  NOT DONE: still no browser click-through by me. Everything above is build- and
+  unit-level, plus live API checks where noted. Several faults in this session —
+  the clipped settings panel, the collapsed dragger, the sliced toolbar, the
+  broken toggle knob — were visible only in a real browser and were reported by
+  the user rather than found by me. That is the gap this verification does not
+  cover, and four separate reports is the measure of it.
+
+================================================================================
+
+
+================================================================================
+ SESSION 3 — ASSESSMENT UI, WEEK CELEBRATION, TASK HEADER
+ 2026-08-16
+================================================================================
+
+
+--------------------------------------------------------------------------------
+ 13. MINI ASSESSMENT — THE UI BUG WAS A DATA BUG
+--------------------------------------------------------------------------------
+ASKED   Fix UI bugs in the mini assessments and make them more professional.
+
+ROOT CAUSE — TWO AUTHORITIES DISAGREEING ON ONE SCREEN
+        Mini assessment banks carried no pass_mark, so the API returned
+          pass_mark: 0
+          passed:    null        (score >= pass_mark IF pass_mark ELSE None)
+        AssessmentRunner judged the attempt on `outcome.passed`. null is not
+        false, so a 20% attempt rendered the GREEN "well done" banner — while
+        PostTaskAssessment, which enforces 80 itself, showed an amber "you need
+        80% to move on" directly beneath it. Same screen, opposite verdicts.
+        Had the fail branch ever been reached it would have read "You needed 0%
+        to pass".
+
+FIXED AT THE SOURCE, NOT ON THE CLIENT
+        MINI_PASS_MARK = 80 added to all 9 banks in assessments.py, so the
+        SERVER decides. AssessmentRunner now takes `passMark` (override) and
+        falls back to `data.pass_mark`. One authority.
+        Verified live: GET reports pass_mark 80; a 0% attempt returns
+        passed:false (was null); 100% returns passed:true.
+
+OTHER REAL BUGS FIXED IN THE SAME PASS
+        · `resultByIndex[q.index]` was dereferenced unguarded — a short results
+          array from the server would throw and take down the entire result
+          view AFTER a successful submission, losing the score visually while
+          it was already recorded. Now skips the row.
+        · `previous_score` was fetched and never rendered in compact mode,
+          which is the only mode the mini assessment uses.
+        · A disabled Back button showed on single-page assessments — dead
+          chrome on every 5-question check. Hidden rather than disabled.
+        · PostTaskAssessment's footer repeated the score the runner's own
+          banner already showed. Footer is now only the way forward.
+
+UI REBUILT
+        Score ring (SVG arc) rather than a coloured pill; A/B/C/D letter badges
+        that become tick/cross after grading; per-question header strip with
+        correct/wrong/skipped colouring; pip bar showing answered-vs-total and
+        then right-vs-wrong; explanation as an accented callout. Consistent
+        rounded-2xl cards throughout.
+
+FILES   backend/app/cms_templates/engineering/assessments.py
+        engineering/assessment/AssessmentRunner.jsx  (rewritten)
+        engineering/sandbox/PostTaskAssessment.jsx
+
+
+--------------------------------------------------------------------------------
+ 14. WEEK COMPLETION CELEBRATION
+--------------------------------------------------------------------------------
+ASKED   After finishing an entire week, show a creative/cartoonish animation
+        with a "move to next section" button.
+
+DONE    WeekCompleteScene — full-screen, deliberately the one loud moment in a
+        runtime that is otherwise quiet on purpose (it is meant to feel like a
+        job). Spring-in trophy badge, 18 pieces of falling confetti, stats for
+        tickets / XP / average score, then two explicit choices: move to the
+        named next section, or stop for the night and go to the roadmap.
+        It is also the only natural stopping point in the programme, which is
+        why it ends with a choice rather than dropping into the next brief.
+
+        Confetti is DETERMINISTIC, not random — a re-render mid-animation
+        would otherwise reshuffle every piece and make the whole thing twitch.
+        Fully honours prefers-reduced-motion: no confetti rendered at all and
+        the scene appears complete rather than animating in.
+
+TRIGGER LOGIC   weekCompletion() in lib/assessment.js
+        Fires only when the task just finished is the LAST of its section AND
+        every task in that section is complete and has passed its assessment.
+        Uses the live score so it fires on the attempt that earned it rather
+        than on the next page load.
+        Wired into BOTH the sandbox and the task page — the assessment can
+        legitimately be taken from either, and a week should be celebrated
+        wherever it was actually finished.
+        7 tests, including: does not fire on task 2 of 3 even when 1 and 3 are
+        already passed; does not fire when an earlier task's quiz failed; does
+        not fire when the live score is itself a fail.
+
+FILES   engineering/assessment/WeekCompleteScene.jsx  (new)
+        engineering/lib/assessment.js  (+ weekCompletion)
+        engineering/lib/assessment.test.js  (+7 tests)
+
+
+--------------------------------------------------------------------------------
+ 15. NEXT SKIPPED THE TASK DESCRIPTION PAGE
+--------------------------------------------------------------------------------
+ASKED   After the mini assessment it goes straight to the next code sandbox
+        instead of the task description page.
+
+CAUSE   advance() routed to /sandbox/... whenever the next task was a
+        code_sandbox — which is all nine of them.
+
+WHY IT MATTERED   That skipped the entire brief: the manager's briefing, the
+        concepts defined before they are used, the worked steps, and the
+        contract naming the exact ids the hidden tests look for. The student
+        arrived at a starter file for a task nobody had explained.
+
+DONE    advance() always goes to /simulations/:slug/task/:index. The sandbox is
+        one click from there. The workbench's prev/next arrows were doing the
+        same thing and now match — they navigate between TASKS, not editors.
+
+FILES   engineering/sandbox/SandboxWorkbenchPage.jsx
+
+
+--------------------------------------------------------------------------------
+ 16. TASK PAGE HEADER
+--------------------------------------------------------------------------------
+ASKED   The header is too simple and unattractive. Keep the black, no blueish
+        colours, solid professional colours, professional icons, DataCamp-ish.
+
+CONSTRAINT WORTH RECORDING
+        The app's own `primary` token is #312E81 — a blue-violet. Using it on a
+        near-black header is what made the old one flat: a cold accent on a
+        cold ground has nothing to separate it from the background. The new
+        header uses amber and emerald ONLY, and the Meta chip component
+        deliberately offers no indigo tone so it cannot creep back in.
+
+DONE    · 3px status edge along the top (amber in progress, emerald complete)
+          instead of tinting the whole panel
+        · Breadcrumb: section > task, with a Layers icon and chevron
+        · Large task-number badge, colour-matched to status
+        · Title at 2rem with the objective beneath at 60% opacity
+        · Metadata chips with real icons: language (HTML & CSS / React · JSX),
+          XP, step count, score, quiz score
+        · Week progress bar — one segment per task in the section, current in
+          amber, complete in emerald, with "2 of 3 done"
+        Ground darkened from #0d1b2a to #0f1720 (less blue), rounded-2xl with a
+        hairline ring rather than a flat rectangle.
+
+FILES   engineering/task/EngineeringTaskPage.jsx
+
+
+================================================================================
+ VERIFICATION — SESSION 3
+================================================================================
+  frontend   npm run build                        clean
+  frontend   npx vitest run                       93 passed (16 files)
+  backend    python -m pytest -q                  115 passed
+  backend    resync_engineering_sim.py --apply    10 tasks rewritten;
+                                                  9 mini banks pass_mark=80,
+                                                  final pass_mark=70
+  api        live smoke against the real DB:
+               GET  pass_mark 80, no answer key in the payload
+               POST 0%   -> passed:false  (was null — the bug)
+               POST 100% -> passed:true
+               POST on an ungraded task -> 409, gate holds
+
+  NOT DONE: still no browser click-through by me. The confetti timing, the
+  spring on the badge and the new header's spacing have been built and typed
+  but not watched.
+
+--------------------------------------------------------------------------------
+ 17. MINI ASSESSMENT — ONE QUESTION PER PAGE
+--------------------------------------------------------------------------------
+ASKED   Make the mini assessment question-by-question rather than one
+        scrollable page.
+
+DONE    perPage 5 -> 1 in both places the mini quiz is opened from (the sandbox
+        modal and the task page card), so the same five questions behave the
+        same way wherever they were started.
+
+        AssessmentRunner already paginated, so this was mostly chrome. What
+        changed with it:
+
+        · Header now reads "Question 2 of 5" with "3/5 answered" beside it,
+          instead of a running total that means little when only one question
+          is on screen.
+        · The pip bar became CLICKABLE and marks the current step. This is the
+          part that makes paging bearable — without a way back to question 2, a
+          paged quiz is a corridor with no doors and people answer defensively
+          because they cannot revise.
+        · Question text steps up to 1.05rem and the card gets more padding:
+          with one question on screen there is room for it to read as a
+          question rather than a row in a form.
+        · "Next" became "Next question" so it cannot be mistaken for the button
+          that moves on to the next TASK.
+        · On the last question, any gaps are listed by number as clickable
+          links — the pip bar shows that SOMETHING is missing but not what, and
+          hunting for it one page at a time is the cost paging introduces.
+
+LEFT    The 50-question final stays at 10 per page. One at a time would be 50
+        clicks through a corridor, which is the failure mode paging has in the
+        other direction.
+
+FILES   engineering/assessment/AssessmentRunner.jsx
+        engineering/sandbox/PostTaskAssessment.jsx
+        engineering/task/MiniAssessmentCard.jsx
+
+VERIFIED  npm run build clean; npx vitest run 93 passed.
+          Not click-tested in a browser.
+
+--------------------------------------------------------------------------------
+ 18. SIMULATION OVERVIEW — BLACK HERO, METADATA, TECHNOLOGY SECTION
+--------------------------------------------------------------------------------
+ASKED   Add "Last updated 1/2026", "English" and more small information; make
+        the background black instead of blue; add the tech you'll learn.
+
+BACKGROUND
+        bg-gradient from-[#151046] via-primary-dark to-[#0f0d2e]  (indigo)
+        ->  from-[#0b0f14] via-[#0f1720] to-[#0b0f14]             (near-black)
+        The page's own accents ARE indigo (`primary`), so an indigo hero gave
+        them nothing to sit against — the whole band read as one violet wash.
+        A neutral dark ground is what lets an accent read as an accent. Same
+        ground as the task-page header, so the two surfaces now match.
+
+"LAST UPDATED" MADE REAL, NOT HARDCODED
+        `updated_at` and `published_at` were not in the public payload, so the
+        date could only have been typed into the page — where it would start
+        lying the day after it shipped. Added both to
+        build_simulation_public_dict, and the page derives "1/2026" with
+        toLocaleDateString. Verified live: 2026-08-15T13:20:56Z.
+        This is also the signal a student uses to judge whether the content
+        predates the framework version they are on, so a fake one is worse
+        than none.
+
+SMALL PRINT ROW  (quieter than the stats above it — none of it is a selling
+        point, it is just what you would want to know before committing)
+          Last updated <date>  ·  English  ·  Self-paced
+          ·  Certificate on completion  ·  N sections
+        Total XP added to the main stat row.
+        "English" is static, with a comment saying so: the platform ships in
+        English only, and when that stops being true it needs a real field on
+        Simulation rather than a second hardcoded string elsewhere.
+
+TECHNOLOGY YOU'LL USE
+        New TechYouWillUse component, REPLACING the old "Skills you'll build"
+        block rather than sitting beside it — that block rendered the same
+        `simulation.skills` array as unlabelled pills, so a second section
+        would have been the same data twice.
+        Named technologies now carry their mark, reusing the logo set already
+        in public/images/tech/ for the landing-page strip. Practices
+        ("Accessibility", "State Management") get a plain chip and NO logo:
+        inventing a generic icon for half the row would look like broken
+        images rather than a deliberate distinction.
+
+        Matching is on a normalised name with an alias table, so "React",
+        "react" and "React.js" all resolve. 7 tests, the important one being
+        that it does NOT substring-match — "Reacting to feedback" must not
+        get the React mark. A missed match costs a logo; a wrong match puts
+        the wrong logo in front of someone deciding whether to enrol.
+
+FIXED IN PASSING
+        lucide-react exports an icon literally named `Infinity`, which as a
+        bare import shadows the JavaScript global for the entire module.
+        Aliased to InfinityIcon.
+
+FILES   backend/app/services/sim_view.py
+        frontend/src/features/simulations/generic/GenericSimOverview.jsx
+        frontend/src/features/simulations/generic/TechYouWillUse.jsx      (new)
+        frontend/src/features/simulations/generic/TechYouWillUse.test.js  (new, 7)
+
+VERIFIED  npm run build clean; npx vitest run 100 passed (17 files);
+          backend pytest 115 passed; live payload carries updated_at.
+          Not click-tested in a browser.
+
+--------------------------------------------------------------------------------
+ 19. COLLAPSIBLE CURRICULUM ON THE OVERVIEW PAGE
+--------------------------------------------------------------------------------
+ASKED   Add a collapsible section for the curriculum view on the overview page.
+
+DONE    New CurriculumSection component. Each week is now a card with a
+        clickable header carrying the label, the task count and the section's
+        total XP, so a CLOSED section still says something useful. Chevron
+        rotates; aria-expanded set.
+
+        Section header row gained "N sections · M tasks" and an
+        Expand all / Collapse all control (only when there is more than one
+        section — a single toggle for a single section is noise).
+
+        Each task row now also shows its TYPE — Code / Quiz / Roleplay /
+        Written / Form / CRM — which the flat list never did. On a mixed
+        simulation that is the difference between "ten tasks" and "seven
+        coding tickets and three quizzes".
+
+DECISIONS WORTH RECORDING
+        · The FIRST section starts open. A curriculum that is entirely closed
+          on arrival looks empty and gives no sample of the detail underneath,
+          so nobody learns there is anything worth opening.
+        · Rows are UNMOUNTED when collapsed, not hidden with CSS. A
+          ten-section curriculum would otherwise put every task in the DOM for
+          a page most visitors only skim, and there is no state inside those
+          rows worth preserving.
+        · Expand all keys each section on the toggle value, forcing a remount.
+          Without that, a section the student had opened or closed by hand
+          keeps its own state and the button appears to do nothing — the
+          classic bug with a "defaultOpen"-style prop.
+
+FILES   frontend/src/features/simulations/generic/CurriculumSection.jsx  (new)
+        frontend/src/features/simulations/generic/GenericSimOverview.jsx
+
+VERIFIED  npm run build clean; npx vitest run 100 passed.
+          Not click-tested in a browser.
+
+--------------------------------------------------------------------------------
+ 20. OVERVIEW PAGE — "HOW THIS WORKS"
+--------------------------------------------------------------------------------
+ASKED   Add something more informative alongside the simulation description.
+
+GAP     The page said WHAT a simulation covers — skills, technology, a
+        curriculum — and never what DOING one is like. That loop is the
+        distinctive thing about the product and the question a prospective
+        student actually has: does a person mark my work, can I retry, what
+        happens when I get it wrong.
+
+DONE    New HowItWorks component, placed directly under "What you'll learn".
+        A numbered vertical timeline:
+          1  Get the brief from <manager>
+          2  Build it in the browser        (only if the sim has a sandbox)
+          3  Graded by running it, not reading it
+          4  Check what actually stuck      (only if assessments exist)
+          5  Sit the N-question final       (only if a final exists)
+          6  Finish with proof
+
+        EVERY step is derived from the real tasks, never written into the
+        page. A sim with no code sandbox does not claim an editor; one with no
+        assessments does not claim a quiz. Prose describing a different
+        product than the one you enrol in is worse than no prose.
+
+BACKEND — A COUNT WITHOUT THE ANSWERS
+        `config.assessment` is stripped wholesale as secret, which left the
+        client unable to tell that assessments exist AT ALL. So the page could
+        not honestly say a ticket is followed by a check, and the roadmap was
+        guessing.
+        Added `assessment_summary` to build_task_public_dict: question_count
+        and pass_mark only. Both are things the student is told before they
+        start; the questions, correct indices and explanations stay behind the
+        assessment endpoints.
+        Verified live: all 9 tasks report {question_count: 5, pass_mark: 80},
+        the final reports {50, 70}, and `assessment` still appears on no task.
+
+USED THE NEW FIELD TO FIX A GUESS
+        RoadmapTaskCard flagged "mini assessment not taken yet" for ANY
+        completed code_sandbox task. True of this template, false of a sim an
+        admin builds without assessments — those would have shown a permanent
+        warning for a quiz that does not exist. Now keyed on
+        assessment_summary being present.
+        CurriculumSection also shows "5-question check after this" per task:
+        "10 tasks" and "10 tasks each followed by a check" are different
+        commitments and the page should say which.
+
+A TEST OF MINE THAT WAS WRONG, CAUGHT AND FIXED
+        The new leak test asserted `"correct" not in str(payload)`. It failed
+        immediately — on PROSE. Eight tasks legitimately contain the word:
+        "make the nav announce itself correctly", "a loose email check is fine
+        and correct", "Correcting an invalid address clears the error".
+        Rewritten to walk the structure and report only real dict KEYS. A test
+        that cries wolf on ordinary English gets deleted the third time it
+        fires, which would have left the actual leak unguarded.
+
+FILES   backend/app/services/sim_view.py
+        backend/tests/unit/test_engineering_template.py  (+1 test)
+        frontend/src/features/simulations/generic/HowItWorks.jsx  (new)
+        frontend/src/features/simulations/generic/GenericSimOverview.jsx
+        frontend/src/features/simulations/generic/CurriculumSection.jsx
+        frontend/src/features/simulations/engineering/roadmap/RoadmapTaskCard.jsx
+
+VERIFIED  backend pytest 116 passed; npm run build clean;
+          npx vitest run 100 passed; live payload checked for leakage.
+          Not click-tested in a browser.
+
+--------------------------------------------------------------------------------
+ 21. STICKY CONDENSED HEADER ON THE OVERVIEW PAGE
+--------------------------------------------------------------------------------
+ASKED   [screenshot of Udemy's course page] Add this type of effect when
+        scrolling down the job simulation overview page.
+
+DONE    StickyOverviewBar — a condensed dark bar that slides in once the hero
+        has scrolled away, carrying the title, rating and rating count, task
+        count, duration, company, and the enrol CTA.
+
+WHY IT EARNS ITS PLACE
+        The overview page is long — outcomes, how it works, technology, a
+        collapsible curriculum, reviews. By the time someone is reading the
+        curriculum, both the title and the enrol button are far off-screen.
+        The bar keeps the two things they need to ACT on within reach without
+        following them down the page the entire time.
+
+IMPLEMENTATION DECISIONS
+        · IntersectionObserver on a 1px sentinel at the end of the hero, not a
+          scroll listener. A scroll handler fires on every frame of every
+          scroll and needs throttling to stay cheap; the observer fires
+          exactly twice — once when the hero leaves, once when it returns.
+        · The visibility test is `!isIntersecting AND boundingClientRect.top <
+          0`, not just `!isIntersecting`. On first paint the sentinel is BELOW
+          the fold and also not intersecting — testing only intersection would
+          show the condensed bar immediately, stacked on top of the full hero
+          it exists to replace.
+        · Navbar height is MEASURED (ResizeObserver on header.sticky), not
+          hardcoded. The Navbar's height moves with the XP strip and with
+          viewport width, and a fixed guess leaves either a visible gap or an
+          overlap hiding half of one bar.
+        · z-40, below the Navbar's z-50, so it slides out from behind the nav
+          rather than across it.
+        · Callback ref for the sentinel, not useRef — it renders past several
+          early returns, so an effect keyed on a ref object would run once
+          against null and never re-run. Same trap as the workbench splitter.
+        · Context items (tasks, duration, company) drop off progressively at
+          sm/md/lg. A condensed bar that wraps to two lines is not condensed.
+        · Honours prefers-reduced-motion: fades instead of sliding.
+
+TESTS   5, on the visibility rule specifically — including the below-the-fold
+        case that a naive `!isIntersecting` gets wrong, and that it goes false
+        again on scrolling back up. IntersectionObserver is stubbed, so this
+        runs without a real viewport.
+
+FILES   frontend/src/features/simulations/generic/StickyOverviewBar.jsx   (new)
+        frontend/src/features/simulations/generic/StickyOverviewBar.test.js (new, 5)
+        frontend/src/features/simulations/generic/GenericSimOverview.jsx
+
+VERIFIED  npm run build clean; npx vitest run 105 passed (18 files).
+          Not click-tested in a browser — the slide timing and the exact point
+          it triggers have not been watched.
+
+--------------------------------------------------------------------------------
+ 22. ENROLLMENT CARD CUT OFF BEHIND THE STICKY BARS
+--------------------------------------------------------------------------------
+ASKED   The small inner image and price section get cut off when scrolling
+        down. (Explicitly: do not test — the user is verifying this one.)
+
+CAUSE — MY OWN, FROM ITEM 21
+        The enrollment card was `lg:sticky lg:top-6`, i.e. 24px from the
+        VIEWPORT top. Two things already live above that:
+          · the app Navbar          sticky top-0 z-50, ~66px
+          · the condensed overview bar I added in item 21, ~64px
+        Once stuck, both sat on top of the card and sliced off its banner
+        image and the price beneath it. The bar I added made an existing
+        near-miss into a visible bug — `top-6` only ever cleared the Navbar by
+        accident, and not even that once the card actually stuck.
+
+FIXED   The card's sticky offset is now navbarHeight + STICKY_BAR_HEIGHT + 24.
+        · Navbar height is MEASURED (it moves with the XP strip and viewport).
+        · The bar's height is a CONSTANT, exported from StickyOverviewBar,
+          because the bar is unmounted while hidden — there is nothing to
+          measure at the moment the card needs to reserve room for it, and a
+          value that only became correct after the first scroll would make the
+          card jump.
+        · Space for the bar is reserved even before it appears, for the same
+          reason.
+        Passed as a CSS custom property so both `top` and the max-height
+        calc() read one value.
+
+ALSO    Added lg:max-h-[calc(100vh - offset - 1.5rem)] with lg:overflow-y-auto,
+        so a card taller than the remaining viewport scrolls internally rather
+        than putting its CTA somewhere unreachable on a short window.
+
+        TRADE-OFF WORTH FLAGGING: that max-height applies whenever the card is
+        sticky, not only once stuck. On a short viewport the card may show an
+        internal scrollbar from the start. An internal scrollbar is the lesser
+        evil against an unreachable button, but it is a visible change and
+        trivially removed if unwanted.
+
+TAILWIND DETAIL
+        The calc() uses underscores — `calc(100vh_-_var(--sticky-top)_-_1.5rem)`.
+        Tailwind turns `_` into a space inside an arbitrary value, and calc()
+        is invalid without whitespace around its operators: `100vh-var(...)`
+        parses as one malformed token and the whole rule is dropped silently.
+
+FILES   frontend/src/features/simulations/generic/StickyOverviewBar.jsx
+          (exported useNavbarHeight and STICKY_BAR_HEIGHT)
+        frontend/src/features/simulations/generic/GenericSimOverview.jsx
+
+VERIFIED  NOT RUN — the user asked to verify this one themselves. No build, no
+          test run. The change is unexercised.
+
+--------------------------------------------------------------------------------
+ 23. ROADMAP COLLAPSIBLE WEEKS · SANDBOX BUTTON IN THE HEADER · HEADER RESTYLE
+--------------------------------------------------------------------------------
+ASKED   (a) Collapsible week structure on the roadmap.
+        (b) Open-sandbox button at the top, sticky on scroll, with a buffering
+            state when clicked.
+        (c) Rename "What this is about" to a description heading.
+        (d) The task header looks AI-generated — fix the style.
+        Then: do NOT give the sandbox button its own section — put it inside
+        the title section on the right.
+
+(a) ROADMAP — COLLAPSIBLE SECTIONS
+        Section header is now the toggle, with a chevron and, when collapsed, a
+        summary of what is hidden ("2 left" / "All done").
+        The real design decision is WHICH sections open by default. Not "the
+        first" and not "all": the one containing the CURRENT task, plus any
+        section not yet finished. A finished week folds itself away, so the
+        page opens on the work in front of you rather than on Week 1 forever.
+        An effect keyed on the section's own state re-folds a week as it is
+        completed and opens the next as it becomes current.
+        The spine is not drawn beside a collapsed section — there are no cards
+        for it to run alongside.
+
+(b) SANDBOX LAUNCH — BUTTON, NOT A PANEL
+        First pass moved OpenSandboxCard above the brief. Corrected on request:
+        the card is GONE and the button now sits on the right of the title row
+        inside the header.
+        That is the better call and the card was the wrong shape from the
+        start — its body text ("opens in a new tab so the editor and console
+        each get real room") explained a mechanism nobody needed explained,
+        and the panel pushed the actual task description a full screen down.
+        DELETED  task/OpenSandboxCard.jsx
+        ADDED    task/SandboxLaunch.jsx — useSandboxLauncher, SandboxButton,
+                 useLiveTaskResult. Named for what it does now; keeping the old
+                 filename for a module that no longer exports a card is how
+                 files start lying about themselves.
+
+        BUFFERING: clicking shows "Opening…" with a spinner for 1.4s and
+        disables the button. The new tab has to boot the app, adopt the
+        handoff token, fetch the simulation and mount Monaco; without a
+        visible state the button looks dead for that window and people click
+        again, opening a second tab.
+        CONSTRAINT: openAuthedTab must be called SYNCHRONOUSLY inside the click
+        handler or the popup blocker eats the window — so the buffering state
+        is set around the call, never before it.
+
+        STICKY: once the header scrolls away, a slim bar below the navbar
+        carries the task number, title and the same button. ONE shared
+        launcher drives both, so they cannot disagree about whether a launch
+        is in flight.
+
+        The card also owned the BroadcastChannel listener that learns a grade
+        happened in another tab. That moved into useLiveTaskResult and feeds
+        the header's facts line, so a submission still updates this page
+        without a reload — deleting the card would otherwise have silently
+        removed the only cross-tab update on the page.
+
+(c) "What this is about" -> "Description".
+
+(d) HEADER RESTYLE
+        The old one stacked a breadcrumb, a big number tile, a title, a
+        subtitle, five bordered chips and a fenced progress panel — every fact
+        given equal weight and its own decoration, which is precisely what
+        makes a layout read as machine-assembled.
+        Now: one context line (section / task number / completed), the title,
+        the objective, and a single quiet facts line separated by dots
+        ("HTML & CSS · 70 XP · 3 steps"). The task number is text beside the
+        section label rather than a tile. Week progress is a hairline across
+        the full width instead of a boxed panel.
+        Dropped the Meta chip component and four icon imports with it.
+
+FILES   engineering/roadmap/RoadmapSection.jsx
+        engineering/task/SandboxLaunch.jsx        (new, replaces OpenSandboxCard)
+        engineering/task/EngineeringTaskPage.jsx
+        engineering/task/TaskExplainer.jsx
+
+VERIFIED  npm run build clean; npx vitest run 105 passed; no dangling
+          references to the deleted module; all hooks confirmed above the
+          component's early returns.
+          Not click-tested in a browser.
+
+--------------------------------------------------------------------------------
+ 24. SANDBOX BUFFERING · TEST-RESULTS UI · THE "ERRORS" WALL OF TEXT
+--------------------------------------------------------------------------------
+ASKED   (a) ~5 seconds of buffering when starting the sandbox.
+        (b) The test-cases UI in the sandbox is small and unattractive.
+        (c) Errors shows far too much content — only the error message. The
+            pasted example was a PASSING run's output.
+
+(c) THE ERRORS TAB — A REAL BUG, NOT A STYLING PREFERENCE
+        Jest writes its ENTIRE reporter output to stderr, including on a
+        completely successful run. So after four passing tests the tab labelled
+        "Errors" was showing:
+
+            PASS ./submission.test.js
+            Test Suites: 1 passed, 1 total
+            Tests:       4 passed, 4 total
+            Snapshots:   0 total
+            Time:        1.725 s
+            Ran all test suites within paths "/workspace/submission.test.js".
+            Test results written to: output.json
+
+        Not one line is an error. Three of them (the workspace path, the report
+        filename) are grader internals a student has no use for. And when
+        something DID break, the stack trace was buried in the same block.
+
+        New sandboxOutput.js — extractErrors() strips the reporter's own
+        chrome: suite headers, the summary block, per-test tick lines, ANSI
+        colour codes, and stack frames inside the harness or jest's own
+        node_modules. Runs of blank lines left by the removals are collapsed.
+
+        It is a DENYLIST on purpose. Anything unrecognised survives, because
+        hiding a real error costs far more than showing one extra line of
+        noise. 8 tests, including the exact passing-run output above (must
+        yield an empty string) and a syntax error (must keep the SyntaxError
+        and the code frame while dropping the summary).
+
+(b) TEST RESULTS — REDESIGNED
+        Was a flat list of 4x4 icons and xs text with no summary.
+        Now: a sticky header with the score, "3 of 5 checks passed", and a
+        segmented bar of one segment per check — a student's first question
+        after a run is "how did I do", and reading that off a list of ticks
+        means counting.
+        Each check is a row with a coloured left border, a tinted background,
+        a larger status chip and its points as a badge. Failing rows carry a
+        "Not passing yet" line so a failure is legible without decoding
+        colour alone.
+        Tab badges show counts, tinted green or red, so the pane says
+        something before it is opened.
+        All three empty states rewritten from bare monospace text to an icon,
+        a title and a hint — including "No errors" explaining that failing
+        CHECKS live in the Tests tab, which is the confusion the old wall of
+        stderr created.
+
+(a) BUFFERING — MADE REAL RATHER THAN TIMED
+        Asked for ~5 seconds. Implemented as a 5s CEILING, not a 5s wait: the
+        workbench now posts a SANDBOX_READY event over the existing
+        BroadcastChannel once it has a session, the task and the editor about
+        to mount, and the launcher clears its spinner on that. The timeout only
+        covers the cases where the signal never arrives — BroadcastChannel
+        unsupported, popup blocked, load failed.
+        A flat 5s timer would make a warm 1s load feel three times slower than
+        it is, and still be wrong on a cold one. Matched on slug+taskIndex so a
+        second sandbox opened elsewhere cannot clear this one's spinner.
+
+FILES   frontend/src/lib/simChannel.js                  (+SANDBOX_READY)
+        engineering/sandbox/sandboxOutput.js            (new)
+        engineering/sandbox/sandboxOutput.test.js       (new, 8 tests)
+        engineering/sandbox/ConsolePane.jsx             (rewritten)
+        engineering/sandbox/SandboxWorkbenchPage.jsx    (posts ready)
+        engineering/task/SandboxLaunch.jsx              (waits on ready)
+
+VERIFIED  npm run build clean; npx vitest run 113 passed (19 files).
+          Not click-tested in a browser.
+
+--------------------------------------------------------------------------------
+ 25. AI PANEL CLOSE BUTTON · AI SOLUTIONS THAT ACTUALLY PASS
+--------------------------------------------------------------------------------
+ASKED   (a) Add a cross button to the Ask AI panel when open.
+        (b) Asking the AI for a solution does not pass the test cases — fix.
+
+(a) THE CLOSE BUTTON EXISTED — IT JUST DID NOT LOOK LIKE ONE
+        A bare 24px X sat in the header at the same size, weight and colour as
+        the Undo beside it, with no hover surface. Nothing marked it as the way
+        out, which is why it read as absent.
+        Now: 28px, its own hover surface (fills emerald on hover), a divider
+        separating it from the actions so it reads as chrome rather than a
+        third action, and an aria-label. Escape also closes the panel — a
+        floating panel over the editor that can only be dismissed by hitting
+        one small target is one people leave open and type around.
+
+(b) AI SOLUTIONS — THE PROMPT NEVER SAW WHAT THE TESTS CHECK
+        _task_summary() sent the model the title, the objective and
+        `what_to_do`. Nothing else. Meanwhile the hidden suite asserts on exact
+        identifiers — data-testid="team-list", #nav-toggle,
+        aria-expanded="false", an export named renderDirectory — and none of
+        them were in the prompt. The model invented reasonable names and every
+        check failed.
+
+        Everything added is ALREADY SHOWN TO THE STUDENT on the task page. The
+        hidden spec is still never sent: the assistant now gets the same brief
+        a student gets, not the answer key.
+
+        Added to the prompt:
+          · explainer.contract — the exact names, flagged as matched LITERALLY
+          · success_criteria — what it is marked on
+          · the submission filename AND its module format. This one is fatal
+            and invisible: a .js task whose file lacks module.exports fails
+            every check with no error at all, because the spec's require()
+            just returns an empty object.
+          · explainer.mistakes — the known traps for that specific task
+          · CODE_TEMPERATURE = 0.15 for the chat endpoint
+
+        MEASURED AT EVERY STEP, not reasoned about. New verify_ai_solutions.py
+        asks the real model and runs its answer through the real Docker grader:
+
+          baseline (title/objective/steps only)   reported as broken
+          + contract + criteria + file format     7/9 at 100, average 94
+          + mistakes                              8/9 at 100, average 96
+          + low temperature                       8/9 (task 8 now consistent,
+                                                   so not variance after all)
+          + the task-content fix below            9/9 at 100, average 100
+
+        WHY MISTAKES MATTERED: on Task 9 the model wrote `useState([])` plus a
+        save-effect that fires on mount and wipes localStorage before the load
+        lands — which is the first bullet in that task's own mistakes list. It
+        was falling into a trap the page already warns students about.
+
+A REAL GAP IN THE TASK ITSELF, FOUND BY DOING THIS
+        Task 8 kept failing on two checks with code that is CORRECT React. The
+        cause: it used `type="email"`, and jsdom's constraint validation then
+        refuses to fire the submit event for an invalid address — so the
+        handler never runs, no error renders, and the form looks completely
+        dead. Task 4 (the HTML form) uses `novalidate` and explains why; Task 8
+        never mentioned it.
+
+        A student writing the same perfectly sensible code would have hit the
+        same wall with nothing to tell them why. Fixed in the TEMPLATE, not the
+        prompt — a new hint and a new mistakes entry, so the student and the
+        assistant are both told. That is the honest fix; special-casing it in
+        the AI prompt would have left the trap in place for humans.
+
+FILES   backend/app/ai/routes/sandbox_ai.py
+        backend/app/cms_templates/engineering/week3.py   (task 8 hint+mistake)
+        backend/verify_ai_solutions.py                   (new)
+        engineering/sandbox/SandboxAiPanel.jsx
+
+VERIFIED  verify_ai_solutions.py  9/9 scored 100, average 100 (real model,
+            real Docker grader)
+          verify_frontend_grading.py 8  worked solution still 100, starter 0
+          backend pytest 116 passed
+          npm run build clean; npx vitest run 113 passed
+          resync_engineering_sim.py --apply — task 8's new hint is live
+          Not click-tested in a browser.
+
+--------------------------------------------------------------------------------
+ 26. "THE ASSISTANT IS UNAVAILABLE" — GROQ DECOMMISSIONED THE MODEL
+--------------------------------------------------------------------------------
+REPORTED  Every AI feature returning "The assistant is unavailable right now."
+
+FOUND     backend/logs/backend.log had the real cause, three frames deep:
+
+            litellm.NotFoundError: GroqException -
+            {"error":{"message":"The model `llama-3.3-70b-versatile` does not
+            exist or you do not have access to it.","code":"model_not_found"}}
+            Received Model Group=llama-groq
+
+          Groq retired the model. The proxy passed through a clean 404 and the
+          app's generic 503 hid it completely. It broke MID-SESSION: the AI
+          verification run at 14:10 scored 9/9, the first failure is logged at
+          14:13.
+
+          (The file log added back in session 1 is the only reason this took
+          one grep instead of an afternoon.)
+
+TWO WRONG TURNS ON THE WAY, BOTH WORTH RECORDING
+  1. Probing Groq's /v1/models returned 403 Forbidden — from backend/.env's
+     key, from inside the proxy container, for every model id tried. It looked
+     like a dead key. It was CLOUDFLARE blocking the default
+     `Python-urllib/3.x` User-Agent. Adding `User-Agent: curl/8.4.0` returned
+     the full model list immediately. Nearly diagnosed a key problem that did
+     not exist.
+  2. The first replacement check used max_tokens=60 and gpt-oss returned EMPTY
+     content, which read as "model does not work". It is a reasoning model:
+     the thinking is billed against max_tokens. At a realistic budget it
+     answers fine.
+
+WHAT GROQ ACTUALLY SERVES THIS KEY NOW (13 ids)
+     chat:   openai/gpt-oss-120b, openai/gpt-oss-20b,
+             openai/gpt-oss-safeguard-20b, qwen/qwen3.6-27b,
+             groq/compound, groq/compound-mini, allam-2-7b
+     other:  whisper x2, orpheus TTS x2, llama-prompt-guard x2
+     NOT ONE Llama chat model remains — hence the decommission.
+
+CHOSE   groq/openai/gpt-oss-120b
+        · strongest of the remaining chat models
+        · its reasoning comes back in a SEPARATE `reasoning` field, so it
+          cannot leak into a student-visible reply
+        · qwen3.6-27b was rejected for exactly that: it emits <think> blocks
+          INLINE in content, which would have appeared in the chat panel
+
+        Added `reasoning_effort: low`. Without it the autocomplete endpoint —
+        which asks for 80 tokens — spent the entire budget on reasoning and
+        returned EMPTY. That path swallows failures by design, so ghost text
+        would simply have stopped appearing with nothing in any log.
+
+        The alias `llama-groq` was deliberately NOT renamed: backend/.env
+        depends on it, and renaming breaks any deployment carrying the old
+        value. Header comment now says to read these names as slots, not
+        descriptions.
+
+STILL BROKEN, AND NOT MINE TO FIX SILENTLY
+        claude-sonnet -> AuthenticationError, no ANTHROPIC_API_KEY in the
+                         proxy's environment
+        gemini-flash  -> "Missing Gemini API key"
+        Both are configured but unusable, so there is no working fallback if
+        Groq goes down again. Flagged to the user rather than fixed, since it
+        needs their keys.
+
+VERIFIED  proxy /chat/completions on llama-groq        -> OK
+          app generate() at 80 tokens                  -> real completion
+          POST /api/sandbox-ai/chat                    -> 200, 594-char reply,
+                                                          no spurious code block
+          POST /api/sandbox-ai/complete  x4            -> 20 chars each, stable
+          verify_ai_solutions.py ON THE NEW MODEL      -> 9/9 at 100, avg 100
+          backend pytest                               -> 116 passed
+
+          The AI-solution rerun mattered: the 9/9 from the previous entry was
+          measured on a model that no longer exists.
+
+FILES     backend/litellm-proxy/config.yaml
+
+--------------------------------------------------------------------------------
+ 27. MENTOR REPLIES RENDERING AS RAW MARKDOWN TABLES
+--------------------------------------------------------------------------------
+REPORTED  The AI mentor answered with unformatted output — pipe tables printed
+          as literal text, emoji-numbered headings, one unreadable wall.
+
+CAUSE — LATENT SINCE BEFORE THE MODEL CHANGE
+        ChatMessage.jsx already rendered markdown through react-markdown. But
+        react-markdown only implements CommonMark, which HAS NO TABLES. Tables
+        come from `remark-gfm`, which was never installed — not in
+        package.json, not in node_modules.
+
+        So a pipe table always fell through as literal text. It was invisible
+        while the old model answered in prose, and became obvious the moment
+        the provider model changed to gpt-oss-120b, which formats with tables
+        by preference. The model change exposed it; it did not cause it.
+
+        Two of the three AI panels were worse still: TaskMentorPanel and
+        SandboxAiPanel rendered replies with `whitespace-pre-wrap`, so even
+        bold and lists came through as raw ** and -.
+
+FIXED — RENDERER
+        npm install remark-gfm
+        New components/ui/MarkdownMessage.jsx — one renderer for all three
+        panels (global mentor, task rail, sandbox assistant) so they cannot
+        drift apart again. Tables get their OWN overflow-x-auto container: a
+        table that cannot shrink below its content pushes a chat bubble wider
+        than its column and breaks the layout.
+        User messages and error text stay literal — rendering a student's own
+        input as markdown would mangle any code or asterisks they typed.
+
+FIXED — PROMPT
+        Rendering a 6-column table correctly still leaves it unreadable in a
+        22rem panel. Added a Formatting section to build_system_prompt():
+        prefer bullets, NO tables, headings no larger than ###, no decorative
+        emoji, fenced code with a language tag.
+
+VERIFIED
+        live mentor call after the change:
+          reply chars 2526 | pipe tables: none | bullets: yes
+          emoji headings: none | headings are ### / ####
+        4 new tests on MarkdownMessage, including that a GFM table becomes a
+        real <table> with columnheader/cell roles and that `|---` never
+        survives as text — the exact symptom reported.
+        npm run build clean; vitest 117 passed (20 files); pytest 116 passed.
+
+NOTE    A restart of the litellm proxy mid-verification produced one
+        InternalServerError ("Connection error"). It was the container
+        booting, not a regression — retried clean once it was up.
+
+FILES   frontend/package.json                              (+remark-gfm)
+        frontend/src/components/ui/MarkdownMessage.jsx     (new)
+        frontend/src/components/ui/MarkdownMessage.test.jsx (new, 4)
+        frontend/src/features/ai-mentor/ChatMessage.jsx
+        engineering/task/TaskMentorPanel.jsx
+        engineering/sandbox/SandboxAiPanel.jsx
+        backend/app/ai/services/mentor_personas.py
+
+================================================================================

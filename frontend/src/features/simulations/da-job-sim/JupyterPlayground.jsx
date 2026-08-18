@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import Editor from '@monaco-editor/react'
 import { useSubmitSandbox, useSandboxFiles, useSandboxFileRows } from '../../../hooks'
 import { downloadFile } from '../../../lib/client'
+import { defineWorkLearnTheme } from '../shared/monacoThemes'
 
 const FILE_ROWS_PAGE_SIZE = 50
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024 // 20MB — matches the backend's cap
@@ -103,41 +104,6 @@ function ChevronDownIcon(props) {
       <path d="m6 9 6 6 6-6" />
     </svg>
   )
-}
-
-// Registers a Monaco theme that matches the site's own light design tokens
-// (primary indigo #312E81, surface white, on-surface text) instead of the
-// stock VS Code dark theme.
-function defineWorkLearnTheme(monaco) {
-  monaco.editor.defineTheme('worklearn-light', {
-    base: 'vs',
-    inherit: true,
-    rules: [
-      { token: 'comment', foreground: '8a8794', fontStyle: 'italic' },
-      { token: 'keyword', foreground: '312E81', fontStyle: 'bold' },
-      { token: 'string', foreground: '2f7d4f' },
-      { token: 'number', foreground: 'b45309' },
-      { token: 'identifier', foreground: '1b1b21' },
-      { token: 'type', foreground: '4b41e1' },
-    ],
-    colors: {
-      'editor.background': '#ffffff',
-      'editor.foreground': '#1b1b21',
-      'editor.lineHighlightBackground': '#f6f2fa',
-      'editor.lineHighlightBorder': '#00000000',
-      'editorLineNumber.foreground': '#c8c5d3',
-      'editorLineNumber.activeForeground': '#645efb',
-      'editorCursor.foreground': '#312E81',
-      'editor.selectionBackground': '#e5e1f5',
-      'editorIndentGuide.background': '#eae7ef',
-      'editorIndentGuide.activeBackground': '#c8c5d3',
-      'editorGutter.background': '#fcfbff',
-      'editorWidget.background': '#ffffff',
-      'editorWidget.border': '#e5e7eb',
-      'scrollbarSlider.background': '#e5e7eb80',
-      'scrollbarSlider.hoverBackground': '#c8c5d380',
-    },
-  })
 }
 
 function fileIcon(kind) {

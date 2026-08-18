@@ -1,7 +1,10 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
-from app.models import TaskCompletion, UserSkill, XpLedger, User, Enrollment, EnrollmentStatus
-from app.models.cms import SimulationTask
+from app.models import (
+    TaskCompletion, UserSkill, XpLedger, User, Enrollment, EnrollmentStatus,
+    AgentMessage, MessageType,
+)
+from app.models.cms import Simulation, SimulationTask
 from app.core.config import (
     TARGET_ROLE_REQUIREMENTS, SKILL_LABELS, QUIZ_BONUS_THRESHOLD, QUIZ_BONUS_XP
 )
@@ -25,9 +28,15 @@ async def award_task_completion(
         )
     )
     tc = existing.scalar_one_or_none()
+    first_completion = tc is None
     if tc:
         tc.score = score
-        tc.quiz_score = quiz_score
+        # A code_sandbox re-submit always passes quiz_score=None (sandbox.py
+        # never carries one), so assigning it unconditionally wiped a quiz
+        # score the student had already earned on this task. Only overwrite
+        # when the caller actually supplies one.
+        if quiz_score is not None:
+            tc.quiz_score = quiz_score
         tc.rubric_rating = rubric_rating
         tc.completed_at = datetime.now(timezone.utc)
     else:
@@ -77,8 +86,69 @@ async def award_task_completion(
         )
     )
 
+    # Manager congratulations, delivered to the notification bell. This sits
+    # here rather than in either API route because both completion paths —
+    # POST /enrollments/../complete and the sandbox's own submit — already
+    # funnel through this function, so one insert covers both and neither
+    # caller has to remember.
+    #
+    # Only on the FIRST completion: re-submitting to improve a score should
+    # not re-congratulate you each time.
+    if first_completion:
+        db.add(AgentMessage(
+            user_id=user_id,
+            enrollment_id=enrollment_id,
+            # Reusing REVIEW rather than adding a PRAISE member — MessageType
+            # is a SAEnum, so a new member means a real enum ALTER on Postgres.
+            type=MessageType.REVIEW,
+            content=await _completion_message(db, simulation_id, task_id, sim_task, score),
+        ))
+
     await db.commit()
     return {"xp_awarded": total_xp, "skills_awarded": skill_awards}
+
+
+async def _completion_message(
+    db: AsyncSession,
+    simulation_id: int,
+    task_id: int,
+    sim_task: SimulationTask | None,
+    score: int | None,
+) -> str:
+    """The manager's "nice work" line for the notification bell.
+
+    Prefers an author-written `config.completion_message` so a CMS template can
+    put the line in the manager's own voice, and otherwise assembles one from
+    data already on the row. Written to degrade rather than fail — a missing
+    simulation, task or score just yields a shorter sentence."""
+    sim = (await db.execute(
+        select(Simulation).where(Simulation.id == simulation_id)
+    )).scalar_one_or_none()
+
+    authored = (sim_task.config or {}).get("completion_message") if sim_task else None
+    if authored:
+        return authored
+
+    manager = (sim.manager or {}).get("name") if sim else None
+    task_title = sim_task.title if sim_task else f"Task {task_id}"
+
+    parts = [f'Good work — you finished "{task_title}".']
+    if score is not None:
+        parts.append(f"You scored {score}/100.")
+
+    next_task = (await db.execute(
+        select(SimulationTask).where(
+            SimulationTask.simulation_id == simulation_id,
+            SimulationTask.task_index == task_id + 1,
+        )
+    )).scalar_one_or_none()
+    if next_task:
+        parts.append(f'Next up: "{next_task.title}".')
+    else:
+        parts.append("That's the last one — nice finish.")
+
+    body = " ".join(parts)
+    return f"{body} — {manager}" if manager else body
 
 
 async def get_user_skills(db: AsyncSession, user_id: int) -> dict[str, int]:

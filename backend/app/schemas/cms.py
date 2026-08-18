@@ -21,8 +21,73 @@ class PostTaskQuizConfig(BaseModel):
     questions: list[QuizQuestion] = Field(default_factory=list)
 
 
+# ── Server-graded assessments ────────────────────────────────────────────────
+#
+# Distinct from `post_task_quiz`, which is graded in the browser and therefore
+# has to ship its answers there. An `assessment` is stripped from the public
+# payload entirely (see `assessment` in task_types.py's secret_config_keys) and
+# graded by app/api/v1/simulations/assessments.py, so `correct` and
+# `explanation` never leave the server until the attempt has been submitted.
+
+class AssessmentQuestion(QuizQuestion):
+    # Shown only after grading — it's the difference between a score and a
+    # lesson, and it's also an answer key, so it travels with `correct`.
+    explanation: str = ""
+
+
+class AssessmentConfig(BaseModel):
+    title: str = ""
+    description: str = ""
+    pass_mark: int = Field(0, ge=0, le=100)
+    questions: list[AssessmentQuestion] = Field(default_factory=list)
+
+
+# ── Task explainer ───────────────────────────────────────────────────────────
+#
+# The redesigned engineering task page renders this instead of a bare bullet
+# list. Two reading levels throughout: `plain` assumes nothing, `deeper` is the
+# trade-off a senior engineer would name. See app/cms_templates/engineering/
+# for the authoring contract.
+
+class ExplainerConcept(BaseModel):
+    term: str
+    plain: str = ""
+    why: str = ""
+
+
+class ExplainerStep(BaseModel):
+    title: str
+    plain: str = ""
+    code: str | None = None
+    deeper: str | None = None
+
+
+class ExplainerContractItem(BaseModel):
+    name: str
+    must: str = ""
+
+
+class TaskExplainer(BaseModel):
+    situation: str = ""
+    outcome: str = ""
+    preview: str | None = None
+    concepts: list[ExplainerConcept] = Field(default_factory=list)
+    steps: list[ExplainerStep] = Field(default_factory=list)
+    contract: list[ExplainerContractItem] = Field(default_factory=list)
+    mistakes: list[str] = Field(default_factory=list)
+    further: list[str] = Field(default_factory=list)
+
+
 class TaskConfigBase(BaseModel):
     post_task_quiz: PostTaskQuizConfig | None = None
+    # Declared here rather than only on CodeSandboxConfig because
+    # validate_task_config round-trips config through this model and pydantic
+    # DROPS fields it doesn't know about — an admin opening a task in the CMS
+    # builder and pressing save would silently erase every explainer and
+    # assessment on it. Any config key that must survive an edit belongs in a
+    # schema, not just in the template.
+    explainer: TaskExplainer | None = None
+    assessment: AssessmentConfig | None = None
 
 
 # ── Per-type config shapes ───────────────────────────────────────────────────
@@ -60,6 +125,12 @@ class StructuredFormConfig(TaskConfigBase):
 
 class QuizConfig(TaskConfigBase):
     questions: list[QuizQuestion] = Field(default_factory=list)
+    # Set on a quiz task that is the simulation's closing exam — it is served
+    # and graded through the assessment endpoints rather than rendered as an
+    # ordinary stage, and the roadmap gives it its own section.
+    is_final_assessment: bool = False
+    question_count: int = 0
+    pass_mark: int = Field(0, ge=0, le=100)
 
 
 class RoleplayPersona(BaseModel):

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { X, Clock } from 'lucide-react'
 import { useEnrollment, useEnroll, useOnboarding, useCompleteTask, useSimulationFull } from '../../../hooks'
 import { resolveMediaUrl } from '../../../lib/client'
@@ -10,6 +10,7 @@ import SimManagerChat from '../SimManagerChat'
 import GenericStageRenderer from './GenericStageRenderer'
 import SimulationCompleteScreen from './SimulationCompleteScreen'
 import { useGenericSimStore } from '../../../app/store/useGenericSimStore'
+import { isEngineeringSim } from '../engineering/lib/isEngineeringSim'
 
 // SimManagerChat/genericManagerChatKnowledge.js operate on task.message/
 // whatToDo/whatToSubmit/hints/skills/subject/title — this maps the backend's
@@ -202,6 +203,28 @@ export default function GenericSimShell() {
 
   if (status === 'completed') {
     return <SimulationCompleteScreen simulation={simulation} taskCount={tasks.length} slug={slug} />
+  }
+
+  // ── Engineering handoff ──────────────────────────────────────────────────
+  // This shell stays the single owner of auto-enrolment and the offer-letter
+  // gate for EVERY simulation — both have already run by this point, so a
+  // brand-new student who clicked "Start Simulation" arrives here properly
+  // enrolled and onboarded exactly as before.
+  //
+  // What changes is what comes next: engineering simulations hand off to
+  // their own runtime (roadmap → task page → sandbox workbench) instead of
+  // the stepper-and-inline-sandbox UI below. Without this the old runtime
+  // stayed live for a first-timer's entire session — the overview CTA only
+  // redirects students who are ALREADY enrolled, so new starters fell
+  // straight through into it.
+  //
+  // Deliberately placed AFTER the completed check so a student who finished
+  // under the old flow can still reach their completion screen and
+  // certificate rather than being bounced past it.
+  //
+  // Everything below this line now serves da-job-sim and sales-crm-sim only.
+  if (isEngineeringSim(simulation)) {
+    return <Navigate to={`/simulations/${slug}/roadmap`} replace />
   }
 
   return (

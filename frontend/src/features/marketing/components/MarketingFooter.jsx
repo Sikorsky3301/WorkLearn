@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 // so it comes from Font Awesome instead — same visual weight.
 import { SiGithub, SiX } from 'react-icons/si'
 import { FaLinkedin } from 'react-icons/fa6'
+import { CAREER_DOMAINS } from '../../../lib/careerDomains'
 import { useMarketingLinks } from '../useMarketingLinks'
 import logo from '../../../assets/logo.png'
 
@@ -18,6 +19,8 @@ const columns = (homePath) => [
       { label: 'Skill GPS', to: '/skill-gps' },
       { label: 'AI Mentor', to: '/ai-mentor' },
       { label: 'MIRA Interviews', to: '/mira' },
+      { label: 'Work Portfolio', to: '/portfolio' },
+      { label: 'Progress Analytics', to: '/analytics' },
     ],
   },
   {
@@ -27,6 +30,8 @@ const columns = (homePath) => [
       { label: 'Pricing', to: `${homePath}#pricing` },
       { label: 'Contact', to: '/contact' },
       { label: 'Blog', to: '/blog' },
+      { label: 'Community', to: '/community' },
+      { label: 'How It Works', to: `${homePath}#how-it-works` },
     ],
   },
   {
@@ -36,6 +41,8 @@ const columns = (homePath) => [
       { label: 'Campus plans', to: `${homePath}#pricing` },
       { label: 'Mentor login', to: '/mentor/login' },
       { label: 'University login', to: '/university/login' },
+      { label: 'Talk to us', to: '/contact' },
+      { label: 'The catalogue', to: `${homePath}#simulations` },
     ],
   },
 ]
@@ -93,7 +100,32 @@ export default function MarketingFooter() {
           ))}
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-12 pt-6 border-t border-border">
+        {/* Career-track keyword band. Drawn from the shared catalogue rather
+            than a hand-typed keyword list, so the terms here can never drift
+            from the domains the product actually offers — the same source the
+            onboarding picker and the landing page's chips read from.
+            Every term points at /simulations: these are browse entry points,
+            not sixteen separate pages, and inventing per-domain URLs that
+            404 would break this file's one rule. */}
+        <div className="mt-12 pt-8 border-t border-border">
+          <p className="text-xs font-bold uppercase tracking-wide text-on-surface mb-3">
+            Explore career tracks
+          </p>
+          <ul className="flex flex-wrap gap-x-4 gap-y-2">
+            {CAREER_DOMAINS.map(({ key, label }) => (
+              <li key={key}>
+                <Link
+                  to="/simulations"
+                  className="text-xs text-on-surface-variant hover:text-primary transition-colors"
+                >
+                  {label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-8 pt-6 border-t border-border">
           <p className="text-xs text-on-surface-variant">© 2026 WorkLearn AI. All rights reserved.</p>
           <p className="text-xs text-on-surface-variant">Learn. Practice. Get hired.</p>
         </div>

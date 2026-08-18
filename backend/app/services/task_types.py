@@ -34,10 +34,16 @@ TASK_TYPES: dict[str, TaskTypeSpec] = {
     "quiz": TaskTypeSpec(
         label="Quiz",
         grades_via="score",
-        # `correct` (the answer index) is intentionally NOT stripped here —
-        # today's client-side quiz grading already requires it be visible to
-        # the browser (StageQuiz.jsx computes the score itself); this matches
+        # `correct` inside `questions` is intentionally NOT stripped — today's
+        # client-side quiz grading already requires it be visible to the
+        # browser (StageQuiz.jsx computes the score itself); this matches
         # existing behavior, not a new information leak.
+        #
+        # `assessment` is different and IS stripped: it is graded server-side
+        # (app/api/v1/simulations/assessments.py), so its answers and
+        # explanations have no reason to reach the client before the attempt is
+        # submitted. Questions are served separately, without them.
+        secret_config_keys=("assessment",),
     ),
     "ai_roleplay_chat": TaskTypeSpec(
         label="AI Roleplay Chat",
@@ -57,7 +63,7 @@ TASK_TYPES: dict[str, TaskTypeSpec] = {
         label="Code Sandbox",
         grades_via="sandbox",
         requires_sandbox=True,
-        secret_config_keys=("grader_key", "dataset_key", "rules", "static_input_files"),
+        secret_config_keys=("grader_key", "dataset_key", "rules", "static_input_files", "assessment"),
     ),
 }
 

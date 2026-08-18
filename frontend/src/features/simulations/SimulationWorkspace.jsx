@@ -4,7 +4,7 @@ import { useQueries } from '@tanstack/react-query'
 import { Clock, ListChecks } from 'lucide-react'
 import { useSimulations, useEnrollment } from '../../hooks'
 import { api, resolveMediaUrl } from '../../lib/client'
-import { resolveDomainIcon } from '../../lib/domainIcons'
+import { resolveDomainIcon, resolveDomainImage } from '../../lib/domainIcons'
 import { cn } from '../../lib/cn'
 import { SIM_BRANDING } from '../../lib/simBranding'
 import DomainFilterBar from './DomainFilterBar'
@@ -140,16 +140,18 @@ export default function SimulationWorkspace() {
 function SimBanner({ sim }) {
   const DomainIcon = resolveDomainIcon(sim.domain || sim.category)
   const initials = (sim.company || sim.title).split(' ').map((w) => w[0]).slice(0, 2).join('')
-  const banner = SIM_BRANDING[sim.slug]?.banner
+  // Curated art first, then the career-domain photograph, then the designed
+  // accent treatment below for domains that have neither.
+  const banner = SIM_BRANDING[sim.slug]?.banner ?? resolveDomainImage(sim.domain || sim.category)
 
   return (
     <div className={`relative h-36 overflow-hidden ${sim.accent_color || 'bg-primary'}`}>
       {banner ? (
         <>
-          {/* Real stock photo (Unsplash, free license) picked to match this
-              simulation's actual work — not a fabricated/AI image. Falls
-              back to the accent-color treatment below for any simulation
-              without a curated banner (e.g. a future CMS-authored one). */}
+          {/* Curated per-sim artwork picked to match that simulation's actual
+              work — see lib/simBranding.js. Falls back to the
+              accent-color treatment below for any simulation without a
+              curated banner (e.g. a future CMS-authored one). */}
           <img src={banner} alt="" className="absolute inset-0 h-full w-full object-cover" />
           {/* Bottom scrim so the floating badges stay legible over any photo. */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/0 to-black/10" aria-hidden="true" />

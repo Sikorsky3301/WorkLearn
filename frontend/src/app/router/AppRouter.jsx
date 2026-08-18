@@ -47,6 +47,8 @@ import Dashboard            from '../../features/dashboard/Dashboard'
 import SimulationWorkspace  from '../../features/simulations/SimulationWorkspace'
 import GenericSimOverview   from '../../features/simulations/generic/GenericSimOverview'
 import GenericSimShell      from '../../features/simulations/generic/GenericSimShell'
+import { EngineeringRoadmapRoute, EngineeringTaskRoute } from '../../features/simulations/engineering/EngineeringRoutes'
+import SandboxWorkbenchPage from '../../features/simulations/engineering/sandbox/SandboxWorkbenchPage'
 import Portfolio            from '../../features/users/portfolio/Portfolio'
 import CareerTwin           from '../../features/ai-mentor/CareerTwin'
 import SkillGPS             from '../../features/skill-gps/SkillGPS'
@@ -69,8 +71,12 @@ import MiraResults from '../../features/mira/MiraResults'
 // `/simulations/<slug>` with no further path segment is a running
 // simulation; `/simulations` (the picker) and `/simulations/<slug>/overview`
 // still show the normal footer.
+// The engineering runtime adds two more work surfaces under the same slug —
+// `/roadmap` and `/task/:n` — which are just as much "in the simulation" as
+// the shell itself. Without them in the pattern the marketing footer renders
+// underneath both.
 const FOOTERLESS_ROUTES = ['/mira/session']
-const FOOTERLESS_PATTERN = /^\/simulations\/[^/]+$/
+const FOOTERLESS_PATTERN = /^\/simulations\/[^/]+(\/(roadmap|task\/\d+))?$/
 
 function MainLayout() {
   const location = useLocation()
@@ -172,11 +178,19 @@ export default function AppRouter() {
         <Route path="/mentor"     element={<ClassMentor />} />
         {/* Full-screen — no Navbar/Footer, see OnboardingLayout */}
         <Route path="/onboarding" element={<OnboardingWizard />} />
+        {/* Opened in its own browser tab from a task page. Declared out here,
+            NOT inside MainLayout, because MainLayout always renders the
+            Navbar — the workbench owns its whole viewport. */}
+        <Route path="/sandbox/:slug/:taskIndex" element={<SandboxWorkbenchPage />} />
 
         <Route element={<MainLayout />}>
           <Route path="/dashboard"               element={<Dashboard />} />
           <Route path="/simulations"                element={<SimulationWorkspace />} />
           <Route path="/simulations/:slug/overview" element={<GenericSimOverview />} />
+          {/* Engineering-only surfaces (see engineering/lib/isEngineeringSim).
+              Both redirect to the shell for any other simulation. */}
+          <Route path="/simulations/:slug/roadmap"  element={<EngineeringRoadmapRoute />} />
+          <Route path="/simulations/:slug/task/:taskIndex" element={<EngineeringTaskRoute />} />
           <Route path="/simulations/:slug"          element={<GenericSimShell />} />
           <Route path="/portfolio"               element={<Portfolio />} />
           <Route path="/ai-mentor"               element={<CareerTwin />} />

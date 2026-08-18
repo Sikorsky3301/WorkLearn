@@ -27,6 +27,48 @@ const SIGN_UP_STATES = [
   { text: 'Getting you started' },
 ]
 
+/** The line under the error telling you what to actually do about it.
+ *
+ * Written for the person looking at the screen — a student trying to get into
+ * their course — not for whoever maintains the server. Three rules:
+ *
+ *   • Say what happened in words they'd use themselves. No status codes, no
+ *     hostnames, nothing about backends or APIs; none of it is something they
+ *     can act on, and all of it makes a routine typo feel like a system fault.
+ *   • When it isn't their fault, say so immediately. "Your password is fine"
+ *     is the most useful sentence we can offer someone who is about to start
+ *     doubting a password that was always correct.
+ *   • Give them one thing to try.
+ *
+ * The 401 advice leads with spelling on purpose. The server cannot tell us
+ * whether the email or the password was wrong — saying so would confirm to a
+ * stranger which accounts exist — so naming the likeliest cause is more honest
+ * than implying we know which field failed. */
+function helpFor(result, email) {
+  if (result.isNetworkError) {
+    return navigator.onLine === false
+      ? 'Your details were never sent, so nothing is wrong with your password. Reconnect and try again.'
+      : "Your details were never sent, so nothing is wrong with your password. Check your connection and try again in a moment — if it keeps happening, WorkLearn may be briefly down."
+  }
+  switch (result.status) {
+    case 401:
+      return email
+        ? `Double-check ${email} for a typo — a swapped or missing letter is the usual culprit — and make sure Caps Lock is off. Passwords are case-sensitive.`
+        : 'Double-check your email for a typo, and make sure Caps Lock is off. Passwords are case-sensitive.'
+    case 403:
+      return 'You typed everything correctly — this account just isn’t active at the moment. Your administrator can reopen it for you.'
+    case 429:
+      return 'For security we pause sign-ins after several tries. Wait a minute, then have another go.'
+    case 400:
+    case 422:
+      return null // the server's own message already says what's wrong with the input
+    default:
+      return result.status >= 500
+        ? 'Something went wrong on our side — your email and password are fine. Please try again in a moment.'
+        : null
+  }
+}
+
 function GoogleIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 48 48">
@@ -49,7 +91,11 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [confirm,  setConfirm]  = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  // `error` is the sentence; `errorHelp` is the line telling you what to do
+  // about it. Kept apart so the advice can differ from the message without
+  // the API having to phrase both.
   const [error,    setError]    = useState('')
+  const [errorHelp, setErrorHelp] = useState('')
   const [loading,  setLoading]  = useState(false)
   const [notice,   setNotice]   = useState('')
   // Where to go once the loader finishes. Non-null means "authenticated,
@@ -57,7 +103,7 @@ export default function Login() {
   const [destination, setDestination] = useState(null)
 
   const switchMode = (m) => {
-    setMode(m); setError(''); setNotice('')
+    setMode(m); setError(''); setErrorHelp(''); setNotice('')
     setName(''); setEmail(''); setPassword(''); setConfirm('')
   }
 
@@ -78,7 +124,7 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setError('')
+    setError(''); setErrorHelp('')
     if (mode === 'signup' && password !== confirm) {
       setError('Passwords do not match.'); return
     }
@@ -87,7 +133,11 @@ export default function Login() {
       ? await loginDirect(email, password)
       : await register(name, email, password)
     setLoading(false)
-    if (result.error) { setError(result.error); return }
+    if (result.error) {
+      setError(result.error)
+      setErrorHelp(helpFor(result, email))
+      return
+    }
 
     // Role picks the portal; host already picked the tenant via the API.
     // Admins / mentors share none of the student dashboard queries — skip warmUp.
@@ -200,7 +250,16 @@ export default function Login() {
             )}
 
             {error && (
-              <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
+              // role="alert" so a screen reader announces the failure the
+              // moment it appears — otherwise the form simply seems not to
+              // respond to the button.
+              <div
+                role="alert"
+                className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-600"
+              >
+                <p className="text-xs font-semibold">{error}</p>
+                {errorHelp && <p className="mt-1 text-xs leading-relaxed text-red-600/80">{errorHelp}</p>}
+              </div>
             )}
             {notice && (
               <p className="text-xs text-primary bg-primary/5 border border-primary/20 rounded-lg px-3 py-2">{notice}</p>

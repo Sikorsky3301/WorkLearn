@@ -39,8 +39,11 @@ prompts and is gated behind LITELLM_LOG, set from this app's own log_level
 below, rather than litellm's separate `_turn_on_debug()` — that one also
 logs raw API keys, which this app's LOG_LEVEL=DEBUG should not do).
 """
+import asyncio
 import logging
 import os
+
+import openai  # litellm re-raises openai's error types — see _is_transient_connection_error
 
 from app.core.config import settings
 
@@ -123,13 +126,72 @@ def _log_and_reraise(exc: Exception, *, model: str, trace_name: str):
     raise exc
 
 
+# How long to keep trying to OPEN a connection before giving up. The openai
+# SDK underneath already retries twice, but on its own schedule — ~0.4s then
+# ~1.0s, so all three attempts land inside 1.5 seconds. That is too fast to
+# ride out either of the two things that actually cause this in practice:
+#
+#   1. a stale pooled keep-alive connection (the upstream closed it while it
+#      sat idle; the first read gets ServerDisconnectedError), where the pool
+#      can hand out more than one dead connection in quick succession, and
+#   2. the LiteLLM proxy briefly restarting or its own upstream blipping,
+#      which takes seconds, not milliseconds, to come back.
+#
+# Both present identically: APIConnectionError before a single token has been
+# produced. Backing off past the SDK's window turns a user-visible failure
+# into a slightly slower first token.
+_CONNECT_RETRY_DELAYS = (1.0, 3.0)
+
+
+def _is_transient_connection_error(exc: Exception) -> bool:
+    """True for "never reached the model" failures, which are safe to retry.
+
+    Deliberately narrow: an auth failure, a bad model name or a rate limit
+    must surface immediately rather than being retried into a longer wait for
+    the same error. litellm re-raises openai's error types, and
+    InternalServerError is what a transport-level disconnect is mapped to."""
+    return isinstance(exc, (
+        openai.APIConnectionError,
+        openai.APITimeoutError,
+        litellm.exceptions.APIConnectionError,
+        litellm.exceptions.Timeout,
+        litellm.exceptions.ServiceUnavailableError,
+        litellm.exceptions.InternalServerError,
+    ))
+
+
+async def _acompletion_with_retry(*, model: str, trace_name: str, **kwargs):
+    """litellm.acompletion, retried while the connection is still being made.
+
+    Safe for streaming precisely because it only wraps the initial call: this
+    returns before any chunk has been consumed, so a retry cannot replay
+    tokens the caller has already been handed."""
+    last_exc: Exception | None = None
+    for attempt, delay in enumerate((0.0, *_CONNECT_RETRY_DELAYS)):
+        if delay:
+            await asyncio.sleep(delay)
+        try:
+            return await litellm.acompletion(model=model, **kwargs)
+        except Exception as exc:
+            if not _is_transient_connection_error(exc):
+                raise
+            last_exc = exc
+            logger.warning(
+                "LLM connection failed (attempt %d/%d) — provider=%s model=%s trace=%s: %s",
+                attempt + 1, len(_CONNECT_RETRY_DELAYS) + 1,
+                settings.ai_provider, model, trace_name, exc,
+            )
+    raise last_exc
+
+
 async def generate(prompt: str, max_tokens: int = 200, trace_name: str = "llm-generate", temperature: float | None = None) -> str:
     model = _model_for(streaming=False)
     with traced_observation("generation", trace_name, model=model, input={"prompt": prompt}) as gen:
         kwargs = {"temperature": temperature} if temperature is not None else {}
         try:
-            response = await litellm.acompletion(
+            response = await _acompletion_with_retry(
                 model=model,
+                trace_name=trace_name,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=max_tokens,
                 **_provider_kwargs(),
@@ -149,8 +211,9 @@ async def stream_chat(system: str, messages: list[dict], max_tokens: int = 800, 
         msgs = [{"role": "system", "content": system}] + list(messages)
         kwargs = {"temperature": temperature} if temperature is not None else {}
         try:
-            stream = await litellm.acompletion(
+            stream = await _acompletion_with_retry(
                 model=model,
+                trace_name=trace_name,
                 messages=msgs,
                 max_tokens=max_tokens,
                 stream=True,

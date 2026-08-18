@@ -6,7 +6,7 @@ only the dispatch that decides which one to call moved from an `if sim_id ==`
 branch to this DB-config-driven lookup.
 """
 from app.services.graders import task1_cleaning, task2_report, task3_segmentation, task4_ab_test, task5_brief
-from app.services.graders import frontend_task1, frontend_task2, frontend_task3, frontend_task4, frontend_task5
+from app.services.graders.frontend_tasks import GRADERS as FRONTEND_GRADERS
 
 GRADER_REGISTRY = {
     "da_job_sim.task1_cleaning": task1_cleaning.grade,
@@ -14,11 +14,9 @@ GRADER_REGISTRY = {
     "da_job_sim.task3_segmentation": task3_segmentation.grade,
     "da_job_sim.task4_ab_test": task4_ab_test.grade,
     "da_job_sim.task5_brief": task5_brief.grade,
-    "frontend_dev_sim.task1": frontend_task1.grade,
-    "frontend_dev_sim.task2": frontend_task2.grade,
-    "frontend_dev_sim.task3": frontend_task3.grade,
-    "frontend_dev_sim.task4": frontend_task4.grade,
-    "frontend_dev_sim.task5": frontend_task5.grade,
+    # frontend_dev_sim.task1 … task9, generated from the specs themselves so a
+    # new task cannot be added without its grading also existing.
+    **FRONTEND_GRADERS,
 }
 
 # The one dataset generator/reference-solution pair that exists today. Keyed

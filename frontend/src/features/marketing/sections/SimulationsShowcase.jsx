@@ -4,7 +4,7 @@ import { Highlight } from '../../../components/ui/hero-highlight'
 import { Reveal, RevealGroup, RevealItem } from '../../../components/ui/reveal'
 import { useSimulations } from '../../../hooks'
 import { SIM_BRANDING } from '../../../lib/simBranding'
-import { resolveDomainIcon } from '../../../lib/domainIcons'
+import { resolveDomainIcon, resolveDomainImage } from '../../../lib/domainIcons'
 import RatingStars from '../../../components/ui/RatingStars'
 import { CAREER_DOMAINS } from '../../../lib/careerDomains'
 import { useMarketingLinks } from '../useMarketingLinks'
@@ -43,7 +43,7 @@ export default function SimulationsShowcase() {
           <RevealGroup className="grid md:grid-cols-3 gap-5">
             {sims.slice(0, 6).map((sim) => {
               const DomainIcon = resolveDomainIcon(sim.domain)
-              const banner = SIM_BRANDING[sim.slug]?.banner
+              const banner = SIM_BRANDING[sim.slug]?.banner ?? resolveDomainImage(sim.domain)
               return (
                 <RevealItem
                   as="button"

@@ -7,6 +7,7 @@ instantiated into a real DRAFT simulation."""
 from app.cms_templates import (
     customer_support, marketing_content, finance_accounting,
     hr_recruiting, product_management, healthcare_admin, it_engineering,
+    engineering,
 )
 
 TEMPLATES: dict[str, dict] = {
@@ -14,5 +15,6 @@ TEMPLATES: dict[str, dict] = {
     for m in (
         customer_support, marketing_content, finance_accounting,
         hr_recruiting, product_management, healthcare_admin, it_engineering,
+        engineering,
     )
 }

@@ -21,6 +21,19 @@
 //      an overlapping card washed the header's buttons out and swallowed
 //      their clicks. The rows are backdrop, so they go behind.
 //
+//   6. Height is content-driven, not `h-[300vh]`. The fixed height existed
+//      only to buy scroll range, but the rows are ~2000px of content, so on
+//      anything but a short viewport it left hundreds of pixels of empty
+//      white between the last row and whatever section came next — and the
+//      taller the display, the worse the gap. `useScroll` measures whatever
+//      the element actually is, so the range survives the change; it just
+//      tracks the content instead of the window.
+//
+//      `pb-[22rem]` is not decoration: `translateY` settles at +300px, so the
+//      rows come to rest that far below their layout box. The padding absorbs
+//      it (leaving ~96px of real breathing room) and keeps `overflow-hidden`
+//      from clipping the bottom row. Shrink it and the last row gets cut off.
+//
 // NOTE on `overflow-hidden` at the root: it is required here to clip the rows
 // as they slide, and it is safe *only* because nothing inside is
 // `position: sticky` — an overflow other than `visible` on an ancestor
@@ -77,7 +90,7 @@ export const HeroParallax = ({ products, children, className }) => {
     <section
       ref={ref}
       className={cn(
-        'relative flex h-[300vh] flex-col self-auto overflow-hidden bg-white pb-40 antialiased',
+        'relative flex flex-col self-auto overflow-hidden bg-white pb-[22rem] antialiased',
         '[perspective:1000px]',
         className
       )}

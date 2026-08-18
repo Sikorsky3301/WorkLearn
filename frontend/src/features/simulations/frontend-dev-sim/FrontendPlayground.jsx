@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import Editor from '@monaco-editor/react'
 import { useSubmitSandbox } from '../../../hooks'
+import { defineWorkLearnTheme } from '../shared/monacoThemes'
 
 const MIN_HEIGHT = 280
 const MAX_HEIGHT = 900
@@ -43,39 +44,6 @@ function EyeIcon(props) {
       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z" /><circle cx="12" cy="12" r="3" />
     </svg>
   )
-}
-
-// Same Monaco theme as JupyterPlayground — matches the site's light design tokens.
-function defineWorkLearnTheme(monaco) {
-  monaco.editor.defineTheme('worklearn-light', {
-    base: 'vs',
-    inherit: true,
-    rules: [
-      { token: 'comment', foreground: '8a8794', fontStyle: 'italic' },
-      { token: 'keyword', foreground: '312E81', fontStyle: 'bold' },
-      { token: 'string', foreground: '2f7d4f' },
-      { token: 'number', foreground: 'b45309' },
-      { token: 'identifier', foreground: '1b1b21' },
-      { token: 'type', foreground: '4b41e1' },
-    ],
-    colors: {
-      'editor.background': '#ffffff',
-      'editor.foreground': '#1b1b21',
-      'editor.lineHighlightBackground': '#f6f2fa',
-      'editor.lineHighlightBorder': '#00000000',
-      'editorLineNumber.foreground': '#c8c5d3',
-      'editorLineNumber.activeForeground': '#645efb',
-      'editorCursor.foreground': '#312E81',
-      'editor.selectionBackground': '#e5e1f5',
-      'editorIndentGuide.background': '#eae7ef',
-      'editorIndentGuide.activeBackground': '#c8c5d3',
-      'editorGutter.background': '#fcfbff',
-      'editorWidget.background': '#ffffff',
-      'editorWidget.border': '#e5e7eb',
-      'scrollbarSlider.background': '#e5e7eb80',
-      'scrollbarSlider.hoverBackground': '#c8c5d380',
-    },
-  })
 }
 
 export default function FrontendPlayground({
