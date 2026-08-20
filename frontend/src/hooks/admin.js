@@ -38,7 +38,11 @@ export function useOnboardUniversity() {
 export function useUpdateUniversity() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, name }) => api.patch(`/api/admin/universities/${id}`, { name }),
+    mutationFn: ({ id, name, logo_url }) => {
+      const body = { name }
+      if (logo_url !== undefined) body.logo_url = logo_url || null
+      return api.patch(`/api/admin/universities/${id}`, body)
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-universities'] })
     },

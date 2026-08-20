@@ -25,10 +25,18 @@ class UniversityAdminSeed(BaseModel):
     password: str = Field(min_length=6)
 
 
+def _normalize_logo_url(v: str | None) -> str | None:
+    if v is None:
+        return None
+    url = v.strip()
+    return url or None
+
+
 class UniversityOnboardBody(BaseModel):
     name: str = Field(min_length=1)
     code: str
     admin: UniversityAdminSeed
+    logo_url: str | None = None
 
     @field_validator("code")
     @classmethod
@@ -43,9 +51,15 @@ class UniversityOnboardBody(BaseModel):
             raise ValueError("name is required")
         return name
 
+    @field_validator("logo_url")
+    @classmethod
+    def _logo(cls, v: str | None) -> str | None:
+        return _normalize_logo_url(v)
+
 
 class UniversityUpdateBody(BaseModel):
     name: str = Field(min_length=1)
+    logo_url: str | None = None
 
     @field_validator("name")
     @classmethod
@@ -55,11 +69,17 @@ class UniversityUpdateBody(BaseModel):
             raise ValueError("name is required")
         return name
 
+    @field_validator("logo_url")
+    @classmethod
+    def _logo(cls, v: str | None) -> str | None:
+        return _normalize_logo_url(v)
+
 
 class UniversityOut(BaseModel):
     id: int
     code: str
     name: str
+    logo_url: str | None = None
     students: int = 0
     mentors: int = 0
     status: str = "active"

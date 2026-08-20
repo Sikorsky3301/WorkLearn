@@ -127,6 +127,7 @@ async def admin_universities(
             "id": uni.id,
             "code": uni.code,
             "name": uni.name,
+            "logo_url": uni.logo_url,
             "students": student_res.scalar() or 0,
             "mentors": mentor_res.scalar() or 0,
             "status": "active",
@@ -153,7 +154,12 @@ async def onboard_university(
     if existing_user.scalar_one_or_none():
         raise HTTPException(400, "Admin email already in use")
 
-    uni = University(code=body.code, name=body.name, is_default=False)
+    uni = University(
+        code=body.code,
+        name=body.name,
+        logo_url=body.logo_url,
+        is_default=False,
+    )
     db.add(uni)
     await db.flush()
 
@@ -174,7 +180,7 @@ async def onboard_university(
         db, actor_id=actor_id, actor_role=actor_role, actor_name=actor_name,
         action="university.onboard", target_type="university", target_id=str(uni.id),
         meta={
-            "code": uni.code, "name": uni.name,
+            "code": uni.code, "name": uni.name, "logo_url": uni.logo_url,
             "university_admin_id": admin_user.id, "university_admin_email": email,
         },
     )
@@ -185,6 +191,7 @@ async def onboard_university(
     return {
         "university": {
             "id": uni.id, "code": uni.code, "name": uni.name,
+            "logo_url": uni.logo_url,
             "is_default": uni.is_default, "students": 0, "mentors": 0, "status": "active",
         },
         "admin": {
@@ -202,7 +209,7 @@ async def update_university(
     db: AsyncSession = Depends(get_db),
     token: dict = Depends(require_roles(RoleSlug.ADMIN)),
 ):
-    """Platform Admin only — rename university (code is immutable)."""
+    """Platform Admin only — rename university / update logo (code is immutable)."""
     result = await db.execute(select(University).where(University.id == university_id))
     uni = result.scalar_one_or_none()
     if not uni:
@@ -211,11 +218,13 @@ async def update_university(
         raise HTTPException(400, "Cannot rename the default academy university via this endpoint")
 
     uni.name = body.name
+    if "logo_url" in body.model_fields_set:
+        uni.logo_url = body.logo_url
     actor_id, actor_role, actor_name = await resolve_actor_info(token, db)
     await log_action(
         db, actor_id=actor_id, actor_role=actor_role, actor_name=actor_name,
         action="university.update", target_type="university", target_id=str(uni.id),
-        meta={"name": uni.name, "code": uni.code},
+        meta={"name": uni.name, "code": uni.code, "logo_url": uni.logo_url},
     )
     await db.commit()
     await db.refresh(uni)
@@ -232,6 +241,7 @@ async def update_university(
     )
     return {
         "id": uni.id, "code": uni.code, "name": uni.name,
+        "logo_url": uni.logo_url,
         "students": student_res.scalar() or 0,
         "mentors": mentor_res.scalar() or 0,
         "status": "active", "is_default": uni.is_default,

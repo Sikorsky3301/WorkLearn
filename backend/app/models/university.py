@@ -14,5 +14,6 @@ class University(Base):
     id:         Mapped[int]      = mapped_column(Integer, primary_key=True, autoincrement=True)
     code:       Mapped[str]      = mapped_column(String, unique=True, nullable=False)
     name:       Mapped[str]      = mapped_column(String, nullable=False)
+    logo_url:   Mapped[str | None] = mapped_column(String, nullable=True)
     is_default: Mapped[bool]     = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

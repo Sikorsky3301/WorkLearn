@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { Navigate, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../AuthContext'
-import { ROLES } from '../../../rbac/roles'
+import { portalPathForRole } from '../../../rbac/roles'
+import PortalSpinner from '../../../app/router/guards/PortalSpinner'
 
 export default function UniversityLogin() {
   const navigate = useNavigate()
-  const { loginUniversity } = useAuth()
+  const { user, loading: authLoading, loginUniversity } = useAuth()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -19,9 +20,11 @@ export default function UniversityLogin() {
     const result = await loginUniversity(email, password)
     setLoading(false)
     if (result.error) { setError(result.error); return }
-    if (result.role === ROLES.TEACHER) navigate('/mentor')
-    else navigate('/dashboard')
+    navigate(portalPathForRole(result.role), { replace: true })
   }
+
+  if (authLoading) return <PortalSpinner />
+  if (user) return <Navigate to={portalPathForRole(user.role)} replace />
 
   const fillStudent = () => {
     setEmail('rahul@iitd.ac.in')

@@ -3,13 +3,13 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   User, GraduationCap, SlidersHorizontal, CreditCard, Receipt, Globe, LifeBuoy, LogOut,
 } from 'lucide-react'
-import logo from '../assets/logo.png'
 import { useAuth } from '../features/auth/AuthContext'
 import { useSimulations, useMyAssignments } from '../hooks'
 import { resolveDomainIcon } from '../lib/domainIcons'
 import { domainDescription } from '../lib/domainMeta'
 import { resolveMediaUrl } from '../lib/client'
 import Avatar from './ui/Avatar'
+import TenantBrandMark from './TenantBrandMark'
 
 // Real, working destinations today. `to` is a route; `href` is used instead
 // for the one item (Help & Support) that isn't a page in this app.
@@ -147,15 +147,11 @@ export default function Navbar() {
           cluster sits flush against the right edge, instead of both being
           stranded inside a centered 1280px column with dead space on either
           side on wide screens. */}
-      <div className="w-full px-6 flex items-center gap-1" style={{ height: 52 }}>
+      <div className="w-full px-6 flex items-center gap-1 min-h-[52px] py-2">
 
-        {/* Logo — goes back out to the marketing site. `/home` rather than
-            `/`, which PublicOnlyRoute bounces straight back to /dashboard for
-            a signed-in user (see app/router/AppRouter.jsx). Dashboard is one
-            click away in the nav immediately to the right. */}
-        <button onClick={() => navigate('/home')} className="flex items-center gap-2 shrink-0 mr-4" aria-label="WorkLearn home">
-          <img src={logo} alt="WorkLearn" className="w-8 h-8 rounded object-cover" />
-          <span className="font-bold text-on-surface text-sm tracking-tight">WorkLearn</span>
+        {/* Logo — signed-in app chrome goes to the dashboard, not marketing `/home`. */}
+        <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 shrink-0 mr-4" aria-label="Dashboard">
+          <TenantBrandMark size="sm" />
         </button>
 
         {/* Nav */}
