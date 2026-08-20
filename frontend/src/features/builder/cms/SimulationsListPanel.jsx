@@ -6,6 +6,7 @@ import { useCmsBasePath } from '../../../hooks/useCmsBasePath'
 import { useAdminSimulations, usePublishSimulation, useUnpublishSimulation, useDeleteSimulation, useDuplicateSimulation, useUnenrollAllStudents, usePatchPublishScope } from '../../../hooks'
 import NewSimulationDialog from './NewSimulationDialog'
 import PublishScopeModal from '../shared/PublishScopeModal'
+import TablePagination, { useClientPagination } from '../../../components/design-system/TablePagination'
 
 /** Simulations page inside the Admin portal — list/search/publish/delete.
  * The builder itself is a dedicated route (/admin/simulations/:id), not
@@ -21,6 +22,7 @@ export default function SimulationsListPanel() {
   const sims = (data?.simulations ?? []).filter((s) =>
     s.title.toLowerCase().includes(search.toLowerCase()) || s.domain?.toLowerCase().includes(search.toLowerCase())
   )
+  const { page, setPage, pageSize, setPageSize, pageRows, total } = useClientPagination(sims, { resetKey: search })
 
   return (
     <div className="space-y-4">
@@ -61,7 +63,7 @@ export default function SimulationsListPanel() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
-              {sims.map((s) => (
+              {pageRows.map((s) => (
                 <SimRow
                   key={s.id} sim={s}
                   onEdit={() => navigate(`${cmsBase}/simulations/${s.id}`)}
@@ -71,6 +73,13 @@ export default function SimulationsListPanel() {
               ))}
             </tbody>
           </table>
+          <TablePagination
+            total={total}
+            page={page}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       )}
     </div>

@@ -152,6 +152,7 @@ export default function UniversitiesTable({ onProvision }) {
         emptyIcon={Building2}
         emptyTitle="No universities found"
         emptyDescription="Use Onboard University to create a partner org."
+        resetKey={search}
       />
     </div>
   )
