@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Wand2, Plus, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import TablePagination, { useClientPagination } from '../../../components/design-system/TablePagination'
 import {
   useSimBuilderProjects, useCreateSimBuilderProject, useDeleteSimBuilderProject,
 } from '../../../hooks'
@@ -19,6 +20,7 @@ export default function SimBuilderListPage() {
   const [newOpen, setNewOpen] = useState(false)
 
   const projects = data?.projects ?? []
+  const { page, setPage, pageSize, setPageSize, pageRows, total } = useClientPagination(projects)
 
   return (
     <div className="min-h-screen bg-surface-low">
@@ -69,11 +71,18 @@ export default function SimBuilderListPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
-                {projects.map((p) => (
+                {pageRows.map((p) => (
                   <ProjectRow key={p.id} project={p} onOpen={() => navigate(`${cmsBase}/sim-builder/${p.id}`)} />
                 ))}
               </tbody>
             </table>
+            <TablePagination
+              total={total}
+              page={page}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
           </div>
         )}
       </div>

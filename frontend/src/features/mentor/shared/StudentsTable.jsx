@@ -14,7 +14,7 @@ function ProgressBar({ pct }) {
   )
 }
 
-export default function StudentsTable({ rows, loading, onManageFeatures }) {
+export default function StudentsTable({ rows, loading, onManageFeatures, resetKey }) {
   const columns = [
     {
       key: 'name',
@@ -86,6 +86,7 @@ export default function StudentsTable({ rows, loading, onManageFeatures }) {
       emptyIcon={UserCircle2}
       emptyTitle="No students found"
       emptyDescription="Students in your university will appear here once provisioned."
+      resetKey={resetKey}
     />
   )
 }

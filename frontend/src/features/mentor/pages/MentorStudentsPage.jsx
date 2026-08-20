@@ -66,6 +66,7 @@ export default function MentorStudentsPage() {
         rows={filtered}
         loading={isLoading}
         onManageFeatures={setManageStudent}
+        resetKey={`${secFilter}|${attentionOnly}`}
       />
 
       {liveManaged && (

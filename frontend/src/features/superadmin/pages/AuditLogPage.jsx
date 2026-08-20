@@ -70,7 +70,7 @@ export default function AuditLogPage() {
         />
       </div>
 
-      <DataTable columns={columns} rows={logs} loading={isLoading} emptyIcon={ClipboardList} emptyTitle="No matching audit events" />
+      <DataTable columns={columns} rows={logs} loading={isLoading} emptyIcon={ClipboardList} emptyTitle="No matching audit events" resetKey={`${search}|${actorRole}|${action}|${targetType}`} />
     </div>
   )
 }
