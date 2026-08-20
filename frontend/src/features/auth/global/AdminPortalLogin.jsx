@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { Mail, Lock, Eye, EyeOff, AlertCircle, Loader2, ShieldCheck } from 'lucide-react'
 import { useAuth } from '../AuthContext'
-import logo from '../../../assets/logo.png'
+import { ROLES, portalPathForRole } from '../../../rbac/roles'
+import PortalSpinner from '../../../app/router/guards/PortalSpinner'
+import TenantBrandMark from '../../../components/TenantBrandMark'
 
 /** Admin portal's own login, separate from Super Admin's (see
  * SuperAdminLogin.jsx) — hits POST /api/auth/login/admin, a distinct
@@ -11,7 +13,7 @@ import logo from '../../../assets/logo.png'
  * panel on the right. */
 export default function AdminPortalLogin() {
   const navigate = useNavigate()
-  const { loginAdmin } = useAuth()
+  const { user, loading: authLoading, loginAdmin } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -25,8 +27,12 @@ export default function AdminPortalLogin() {
     const result = await loginAdmin(email, password)
     setLoading(false)
     if (result.error) { setError(result.error); return }
-    if (result.role === 'university_admin') navigate('/university-admin')
-    else navigate('/admin')
+    navigate(portalPathForRole(result.role), { replace: true })
+  }
+
+  if (authLoading) return <PortalSpinner />
+  if (user && [ROLES.ADMIN, ROLES.UNIVERSITY_ADMIN, ROLES.SUPER_ADMIN].includes(user.role)) {
+    return <Navigate to={portalPathForRole(user.role)} replace />
   }
 
   return (
@@ -35,7 +41,7 @@ export default function AdminPortalLogin() {
       {/* ── Left: form — its own scroll container, same pattern as Login.jsx ── */}
       <div className="flex-1 overflow-y-auto flex items-center justify-center px-8 py-6 bg-white">
         <div className="w-full max-w-sm">
-          <img src={logo} alt="WorkLearn AI" className="w-10 h-10 rounded-xl object-cover mb-5" />
+          <TenantBrandMark size="md" className="mb-5" />
 
           <div className="inline-flex items-center gap-1.5 chip bg-primary/10 text-primary mb-4 normal-case tracking-normal">
             <ShieldCheck className="h-3 w-3" /> Restricted access

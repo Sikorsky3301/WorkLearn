@@ -15,6 +15,7 @@ import RequireTeacher from './guards/RequireTeacher'
 import RequireCmsAccess from './guards/RequireCmsAccess'
 import RedirectTeacherAwayFromAdminCms from './guards/RedirectTeacherAwayFromAdminCms'
 import PublicOnlyRoute from './guards/PublicOnlyRoute'
+import GuestOnlyRoute from './guards/GuestOnlyRoute'
 import PortalSpinner from './guards/PortalSpinner'
 
 // ── (public) — the marketing site ───────────────────────────────────────────
@@ -111,8 +112,7 @@ export default function AppRouter() {
             had before this page existed.
           - `/home` is the landing page's own unguarded route. Without it a
             signed-in user has no way *back* to the marketing site — every link
-            to `/` would bounce straight to /dashboard. This is where the app
-            Navbar's logo points (see components/Navbar.jsx). */}
+            to `/` would bounce straight to /dashboard. */}
       <Route path="/"        element={<PublicOnlyRoute><LandingPage /></PublicOnlyRoute>} />
       <Route path="/home"    element={<LandingPage />} />
       <Route path="/about"        element={<AboutPage />} />
@@ -121,7 +121,7 @@ export default function AppRouter() {
       <Route path="/blog"         element={<BlogPage />} />
 
       {/* (auth) — single public entry; old role-specific URLs redirect */}
-      <Route path="/login"            element={<LoginPage />} />
+      <Route path="/login" element={<GuestOnlyRoute><LoginPage /></GuestOnlyRoute>} />
       <Route path="/university/login" element={<Navigate to="/login" replace />} />
       <Route path="/mentor/login"     element={<Navigate to="/login" replace />} />
 

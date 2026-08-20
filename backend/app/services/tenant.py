@@ -53,6 +53,7 @@ def tenant_public_dict(uni: University) -> dict:
         "id": uni.id,
         "code": uni.code,
         "name": uni.name,
+        "logo_url": uni.logo_url,
         "is_default": bool(uni.is_default),
         "subdomain": None if uni.is_default else uni.code.lower(),
     }

@@ -35,7 +35,13 @@ class RegisterBody(BaseModel):
 def _university_dict(uni: University | None) -> dict | None:
     if not uni:
         return None
-    return {"id": uni.id, "code": uni.code, "name": uni.name, "is_default": uni.is_default}
+    return {
+        "id": uni.id,
+        "code": uni.code,
+        "name": uni.name,
+        "logo_url": uni.logo_url,
+        "is_default": uni.is_default,
+    }
 
 
 def _safe_user(user: User) -> dict:

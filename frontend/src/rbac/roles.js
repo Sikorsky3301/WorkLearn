@@ -14,3 +14,14 @@ export const ROLES = {
   // (require_permission); permission checks below are a UI-nav convenience only.
   ADMIN:            'admin',
 }
+
+/** Default authenticated landing path per role — mirrors ProtectedRoute redirects. */
+export function portalPathForRole(role) {
+  switch (role) {
+    case ROLES.SUPER_ADMIN: return '/super-admin'
+    case ROLES.ADMIN: return '/admin'
+    case ROLES.UNIVERSITY_ADMIN: return '/university-admin'
+    case ROLES.TEACHER: return '/mentor'
+    default: return '/dashboard'
+  }
+}

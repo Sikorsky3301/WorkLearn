@@ -5,6 +5,7 @@ import PortalShell from '../../components/design-system/PortalShell'
 import Sidebar from '../../components/design-system/Sidebar'
 import Topbar from '../../components/design-system/Topbar'
 import ThemeToggle from '../../components/design-system/ThemeToggle'
+import TenantBrandMark from '../../components/TenantBrandMark'
 import UniversityAdminUsersPage from './pages/UniversityAdminUsersPage'
 import UniversityAdminOverviewPage from './pages/UniversityAdminOverviewPage'
 
@@ -39,6 +40,12 @@ export default function UniversityAdminPortal() {
       <Sidebar
         title="WorkLearn AI"
         subtitle="University Admin"
+        brand={
+          <div>
+            <TenantBrandMark size="sm" />
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">University Admin</p>
+          </div>
+        }
         sections={SECTIONS}
         footer={
           <div>

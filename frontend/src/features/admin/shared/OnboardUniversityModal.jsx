@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { X, Loader2, AlertCircle } from 'lucide-react'
 import { useOnboardUniversity } from '../../../hooks'
+import LogoUploadField from '../../builder/cms/shared/LogoUploadField'
 
 const empty = {
   name: '',
   code: '',
+  logo_url: '',
   adminName: '',
   adminEmail: '',
   adminPassword: '',
@@ -37,9 +39,11 @@ export default function OnboardUniversityModal({ onClose }) {
     e.preventDefault()
     setError('')
     try {
+      const logo = (form.logo_url || '').trim()
       const result = await onboard.mutateAsync({
         name: form.name.trim(),
         code: form.code.trim().toLowerCase(),
+        ...(logo ? { logo_url: logo } : {}),
         admin: {
           name: form.adminName.trim(),
           email: form.adminEmail.trim(),
@@ -101,6 +105,12 @@ export default function OnboardUniversityModal({ onClose }) {
               />
               <p className="text-[11px] text-slate-500 mt-1">Partner host: <span className="font-mono text-primary">{hostPreview}</span> (code is immutable after create)</p>
             </div>
+            <LogoUploadField
+              label="University logo (optional)"
+              value={form.logo_url}
+              onChange={(v) => setForm((f) => ({ ...f, logo_url: v }))}
+            />
+            <p className="text-[11px] text-slate-500 -mt-2">Shown on the partner subdomain. If omitted, WorkLearn logo is used.</p>
             <div className="border-t border-slate-100 dark:border-slate-800 pt-4">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">First University Admin</p>
               <div className="space-y-3">

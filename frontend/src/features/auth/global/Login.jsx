@@ -5,8 +5,8 @@ import { Eye, EyeOff } from 'lucide-react'
 import { MultiStepLoader } from '../../../components/ui/multi-step-loader'
 import { api } from '../../../lib/client'
 import { useAuth } from '../AuthContext'
+import TenantBrandMark from '../../../components/TenantBrandMark'
 import { ROLES } from '../../../rbac/roles'
-import logo from '../../../assets/logo.png'
 
 // Shown between a successful sign-in and the first authenticated screen. The
 // steps are not decoration: the same window is used to prefetch the queries
@@ -107,7 +107,7 @@ export default function Login() {
         loadingStates={mode === 'signin' ? SIGN_IN_STATES : SIGN_UP_STATES}
         loading={destination !== null}
         duration={620}
-        onComplete={() => navigate(destination)}
+        onComplete={() => navigate(destination, { replace: true })}
       />
 
       {/* ── Left: form — its own scroll container, so a tall signup form
@@ -116,7 +116,7 @@ export default function Login() {
       <div className="flex-1 overflow-y-auto flex items-center justify-center px-8 py-6 bg-white">
         <div className="w-full max-w-sm">
 
-          <img src={logo} alt="WorkLearn" className="w-10 h-10 rounded-xl object-cover mb-5" />
+          <TenantBrandMark size="md" className="mb-5" />
 
           <h1 className="text-2xl font-bold text-on-surface mb-1">
             {mode === 'signin' ? 'Welcome back!' : 'Get started free!'}
