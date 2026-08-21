@@ -11,21 +11,22 @@ export default function Toolbar({
   const cmsBase = useCmsBasePath()
 
   return (
-    <header className="h-16 border-b border-border bg-white flex items-center gap-3 px-4 shrink-0">
+    <header className="h-16 border-b border-border dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center gap-3 px-4 shrink-0">
       <button
+        type="button"
         onClick={() => navigate(`${cmsBase}/sim-builder`)}
         title="Back to Sim Builder projects"
         className="flex items-center gap-2 shrink-0 cursor-pointer group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-lg px-1 -mx-1"
       >
         <SimBuilderLogo className="w-8 h-8" />
         <ChevronDown className="h-3.5 w-3.5 text-outline group-hover:text-on-surface-variant transition-colors" />
-        <span className="text-sm font-bold text-on-surface whitespace-nowrap">Sim Builder</span>
+        <span className="text-sm font-bold text-on-surface dark:text-slate-100 whitespace-nowrap">Sim Builder</span>
       </button>
 
-      <div className="h-6 w-px bg-border shrink-0" />
+      <div className="h-6 w-px bg-border dark:bg-slate-700 shrink-0" />
 
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold text-on-surface truncate">{project?.title}</p>
+        <p className="text-sm font-bold text-on-surface dark:text-slate-100 truncate">{project?.title}</p>
       </div>
 
       <div className="flex items-center gap-1 shrink-0">
@@ -51,7 +52,7 @@ export default function Toolbar({
         {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Save
       </button>
 
-      <span className={`chip text-[10px] shrink-0 ${project?.status === 'PUBLISHED' ? 'bg-emerald-100 text-emerald-700' : 'bg-surface-high text-on-surface-variant'}`}>
+      <span className={`chip text-[10px] shrink-0 ${project?.status === 'PUBLISHED' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-surface-high text-on-surface-variant dark:bg-slate-800 dark:text-slate-300'}`}>
         {project?.status}
       </span>
 

@@ -28,7 +28,7 @@ export default function MetadataTab({ draft, setDraft, isNew }) {
               placeholder="e.g. it-support-sim"
               onChange={(e) => set(draft, setDraft, 'id', e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
             />
-            {!isNew && <p className="text-xs text-on-surface-variant mt-1">Immutable after creation.</p>}
+            {!isNew && <p className="text-xs text-on-surface-variant dark:text-slate-400 mt-1">Immutable after creation.</p>}
           </div>
           <div>
             <Label className="mb-1.5 block">Title</Label>
@@ -71,7 +71,7 @@ export default function MetadataTab({ draft, setDraft, isNew }) {
                   key={d}
                   type="button"
                   onClick={() => set(draft, setDraft, 'difficulty', d)}
-                  className={`flex-1 rounded-md border px-2 py-2 text-xs font-medium transition-colors ${draft.difficulty === d ? 'border-primary bg-primary/10 text-primary' : 'border-border text-on-surface-variant'}`}
+                  className={`flex-1 rounded-md border px-2 py-2 text-xs font-medium transition-colors ${draft.difficulty === d ? 'border-primary bg-primary/10 text-primary' : 'border-border dark:border-slate-700 text-on-surface-variant dark:text-slate-400'}`}
                 >
                   {d}
                 </button>
@@ -90,7 +90,7 @@ export default function MetadataTab({ draft, setDraft, isNew }) {
                   key={c}
                   type="button"
                   onClick={() => set(draft, setDraft, 'accent_color', c)}
-                  className={`h-8 w-8 rounded-full ${c} ${draft.accent_color === c ? 'ring-2 ring-offset-2 ring-primary' : ''}`}
+                  className={`h-8 w-8 rounded-full ${c} ${draft.accent_color === c ? 'ring-2 ring-offset-2 dark:ring-offset-slate-900 ring-primary' : ''}`}
                 />
               ))}
             </div>

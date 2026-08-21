@@ -23,6 +23,7 @@ TASK_TYPES = (
     "ai_roleplay_chat",
     "crm_workspace",
     "code_sandbox",
+    "mermaid_diagram",
 )
 
 
@@ -47,6 +48,7 @@ class Simulation(Base):
     onboarding:       Mapped[dict]                = mapped_column(JSON, nullable=False)
     onboarding_xp_award: Mapped[int]              = mapped_column(Integer, nullable=False, default=0)
     section_labels:   Mapped[dict]                = mapped_column(JSON, nullable=False, default=dict)
+    architecture_mermaid: Mapped[str | None]      = mapped_column(Text, nullable=True)
     status:           Mapped[SimulationStatus]   = mapped_column(SAEnum(SimulationStatus), default=SimulationStatus.DRAFT)
     created_by:       Mapped[int | None]         = mapped_column(Integer, nullable=True)
     created_at:       Mapped[datetime]           = mapped_column(DateTime(timezone=True), default=utcnow)

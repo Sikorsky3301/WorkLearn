@@ -22,7 +22,7 @@ export default function ManagerOnboardingTab({ draft, setDraft, onSave, saving }
     <div className="space-y-6">
       <Card>
         <CardContent className="p-6 space-y-4">
-          <h3 className="text-sm font-bold text-on-surface">Manager</h3>
+          <h3 className="text-sm font-bold text-on-surface dark:text-slate-100">Manager</h3>
           <LogoUploadField
             label="Manager photo"
             round
@@ -48,7 +48,7 @@ export default function ManagerOnboardingTab({ draft, setDraft, onSave, saving }
 
       <Card>
         <CardContent className="p-6 space-y-4">
-          <h3 className="text-sm font-bold text-on-surface">Onboarding</h3>
+          <h3 className="text-sm font-bold text-on-surface dark:text-slate-100">Onboarding</h3>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <Label className="mb-1.5 block">Company name</Label>
@@ -80,7 +80,7 @@ export default function ManagerOnboardingTab({ draft, setDraft, onSave, saving }
 
       <Card>
         <CardContent className="p-6 space-y-4">
-          <h3 className="text-sm font-bold text-on-surface">Offer letter</h3>
+          <h3 className="text-sm font-bold text-on-surface dark:text-slate-100">Offer letter</h3>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <Label className="mb-1.5 block">Offer title</Label>

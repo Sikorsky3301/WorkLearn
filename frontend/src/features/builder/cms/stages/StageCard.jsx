@@ -26,9 +26,9 @@ export default function StageCard({ task, active, onOpen, onDelete, onDuplicate 
         ref={setNodeRef}
         style={style}
         className={cn(
-          'flex items-center gap-3 rounded-lg border border-l-4 bg-white px-3 py-3 group',
+          'flex items-center gap-3 rounded-lg border border-l-4 bg-white dark:bg-slate-900 px-3 py-3 group',
           meta.border,
-          active ? 'border-primary ring-1 ring-primary/20' : 'border-border'
+          active ? 'border-primary ring-1 ring-primary/20' : 'border-border dark:border-slate-700'
         )}
       >
         <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-on-surface-variant/50 hover:text-on-surface-variant">
@@ -41,8 +41,8 @@ export default function StageCard({ task, active, onOpen, onDelete, onDuplicate 
           <TypeIcon className={cn('h-4 w-4', meta.badgeText)} />
         </span>
         <button onClick={onOpen} className="flex-1 text-left min-w-0">
-          <p className="text-sm font-semibold text-on-surface truncate">{task.title}</p>
-          <p className="text-xs text-on-surface-variant">{taskTypeRegistry[task.type]?.label || task.type}</p>
+          <p className="text-sm font-semibold text-on-surface dark:text-slate-100 truncate">{task.title}</p>
+          <p className="text-xs text-on-surface-variant dark:text-slate-400">{taskTypeRegistry[task.type]?.label || task.type}</p>
         </button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

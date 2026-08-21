@@ -43,6 +43,31 @@ export function useCreateSimulationFromTemplate() {
   })
 }
 
+export function useParseArchitecture() {
+  return useMutation({
+    mutationFn: (mermaid) => api.post('/api/admin/simulations/architecture/parse', { mermaid }),
+  })
+}
+
+export function useCreateSimulationFromArchitecture() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body) => api.post('/api/admin/simulations/from-architecture', body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-simulations'] }),
+  })
+}
+
+export function useApplyArchitecture(simId) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body) => api.post(`/api/admin/simulations/${simId}/architecture/apply`, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-simulation', simId] })
+      qc.invalidateQueries({ queryKey: ['admin-simulations'] })
+    },
+  })
+}
+
 export function useCreateSimulation() {
   const qc = useQueryClient()
   return useMutation({

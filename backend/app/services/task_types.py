@@ -59,6 +59,11 @@ TASK_TYPES: dict[str, TaskTypeSpec] = {
         requires_sandbox=True,
         secret_config_keys=("grader_key", "dataset_key", "rules", "static_input_files"),
     ),
+    "mermaid_diagram": TaskTypeSpec(
+        label="Mermaid Diagram",
+        grades_via="llm_or_manual",
+        secret_config_keys=("llm_judge_prompt",),
+    ),
 }
 
 

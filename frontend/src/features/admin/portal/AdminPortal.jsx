@@ -1,8 +1,5 @@
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
-import {
-  LayoutDashboard, Users, Building2, LineChart, Flag, ClipboardList,
-  Blocks, Wand2, SlidersHorizontal, LogOut,
-} from 'lucide-react'
+import { LogOut } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
 import PortalShell from '../../../components/design-system/PortalShell'
 import Sidebar from '../../../components/design-system/Sidebar'
@@ -16,58 +13,7 @@ import AnalyticsPage from './pages/AnalyticsPage'
 import FeatureFlagsPage from './pages/FeatureFlagsPage'
 import ActivityPage from './pages/ActivityPage'
 import ConfigurationPage from './pages/ConfigurationPage'
-
-// `need: null` items are always shown; everything else is filtered by
-// hasPermission — an Admin's nav only ever shows what their assigned
-// AdminRole actually grants (the backend enforces the same permission on
-// every underlying endpoint regardless of what the nav shows). SUPER_ADMIN's
-// hasPermission always returns true, so they see every item too.
-//
-// "Sim Builder" links to a sibling top-level route (/admin/sim-builder*, see
-// App.jsx) rather than an internal <Route> below — it's a standalone
-// full-screen tool with its own header, not part of this portal's shell.
-const SECTIONS = [
-  { items: [{ label: 'Overview', icon: LayoutDashboard, to: '/admin', end: true, need: null }] },
-  {
-    label: 'People',
-    items: [
-      { label: 'Users', icon: Users, to: '/admin/users', need: 'users.view' },
-      { label: 'Universities', icon: Building2, to: '/admin/universities', need: 'users.view' },
-    ],
-  },
-  {
-    label: 'Content',
-    items: [
-      { label: 'Simulations', icon: Blocks, to: '/admin/simulations', need: 'simulations.view' },
-      { label: 'Sim Builder', icon: Wand2, to: '/admin/sim-builder', need: 'simulations.view' },
-    ],
-  },
-  {
-    label: 'Insights',
-    items: [
-      { label: 'Analytics', icon: LineChart, to: '/admin/analytics', need: 'analytics.view_platform' },
-      { label: 'Feature Flags', icon: Flag, to: '/admin/feature-flags', need: 'feature_flags.view' },
-      { label: 'Activity', icon: ClipboardList, to: '/admin/activity', need: 'activity.view_feed' },
-    ],
-  },
-  {
-    label: 'Platform',
-    items: [
-      { label: 'Configuration', icon: SlidersHorizontal, to: '/admin/configuration', need: 'config.view' },
-    ],
-  },
-]
-
-const TITLES = {
-  '/admin': 'Overview',
-  '/admin/users': 'Users',
-  '/admin/universities': 'Universities',
-  '/admin/simulations': 'Simulations',
-  '/admin/analytics': 'Analytics',
-  '/admin/feature-flags': 'Feature Flags',
-  '/admin/activity': 'Activity',
-  '/admin/configuration': 'Configuration',
-}
+import { ADMIN_NAV_SECTIONS, ADMIN_TITLES } from './adminNav'
 
 /**
  * Admin portal — the lower RBAC tier, distinct from SuperAdmin. Nav is built
@@ -76,6 +22,10 @@ const TITLES = {
  * Configuration Center live — SuperAdmin no longer has its own copies of
  * these, it reaches them here too (see App.jsx's RequireAdmin, which lets
  * SUPER_ADMIN through).
+ *
+ * CMS list/editor routes are declared as AppRouter siblings wrapped in
+ * AdminCmsLayout (same sidebar). Nested simulations below is a fallback
+ * only if that sibling is ever absent.
  *
  * App.jsx mounts this at `path="/admin/*"` and lazy-loads it — every page
  * below is imported by THIS file, not App.jsx, so the whole subtree lands
@@ -86,10 +36,10 @@ export default function AdminPortal() {
   const location = useLocation()
   const { user, logout, hasPermission } = useAuth()
 
-  const sections = SECTIONS
+  const sections = ADMIN_NAV_SECTIONS
     .map((section) => ({ ...section, items: section.items.filter((item) => !item.need || hasPermission(item.need)) }))
     .filter((section) => section.items.length > 0)
-  const title = TITLES[location.pathname] || 'Admin'
+  const title = ADMIN_TITLES[location.pathname] || 'Admin'
 
   return (
     <PortalShell>
