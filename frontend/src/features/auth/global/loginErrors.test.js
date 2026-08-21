@@ -17,7 +17,10 @@ afterEach(() => {
 })
 
 function stubStorage() {
-  vi.stubGlobal('sessionStorage', {
+  // localStorage, not sessionStorage — the client moved to a single
+  // per-origin session. Stubbing the wrong one left the real jsdom storage in
+  // play, so these tests only passed by luck of it being empty.
+  vi.stubGlobal('localStorage', {
     getItem: () => null, setItem: () => {}, removeItem: () => {},
   })
   vi.stubGlobal('window', { location: { host: 'localhost:5173' } })

@@ -1,7 +1,9 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { Mail, Lock, Eye, EyeOff, AlertCircle, Loader2, ShieldCheck } from 'lucide-react'
 import { useAuth } from '../AuthContext'
+import { ROLES } from '../../../rbac/roles'
+import PortalSpinner from '../../../app/router/guards/PortalSpinner'
 import logo from '../../../assets/logo.png'
 
 /** Super Admin's own login, separate from the Admin portal's (see
@@ -10,7 +12,7 @@ import logo from '../../../assets/logo.png'
  * a full-height image panel on the right. */
 export default function SuperAdminLogin() {
   const navigate = useNavigate()
-  const { loginSuperAdmin } = useAuth()
+  const { user, loading: authLoading, loginSuperAdmin } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -24,8 +26,11 @@ export default function SuperAdminLogin() {
     const result = await loginSuperAdmin(email, password)
     setLoading(false)
     if (result.error) { setError(result.error); return }
-    navigate('/super-admin')
+    navigate('/super-admin', { replace: true })
   }
+
+  if (authLoading) return <PortalSpinner />
+  if (user?.role === ROLES.SUPER_ADMIN) return <Navigate to="/super-admin" replace />
 
   return (
     <div className="h-screen flex overflow-hidden">

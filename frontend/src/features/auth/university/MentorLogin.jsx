@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { Navigate, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../AuthContext'
+import { portalPathForRole } from '../../../rbac/roles'
+import PortalSpinner from '../../../app/router/guards/PortalSpinner'
 
 export default function MentorLogin() {
   const navigate = useNavigate()
-  const { loginMentor } = useAuth()
+  const { user, loading: authLoading, loginMentor } = useAuth()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -18,8 +20,11 @@ export default function MentorLogin() {
     const result = await loginMentor(email, password)
     setLoading(false)
     if (result.error) { setError(result.error); return }
-    navigate('/mentor')
+    navigate(portalPathForRole(result.role), { replace: true })
   }
+
+  if (authLoading) return <PortalSpinner />
+  if (user) return <Navigate to={portalPathForRole(user.role)} replace />
 
   const fillDemo = () => {
     setEmail('ananya@iitd.ac.in')

@@ -10,6 +10,9 @@ import uuid
 from contextvars import ContextVar
 
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
+
+logger = logging.getLogger(__name__)
 
 request_id_var: ContextVar[str] = ContextVar("request_id", default="-")
 
@@ -35,3 +38,38 @@ class RequestIdLogFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         record.request_id = request_id_var.get()
         return True
+
+
+class CatchUnhandledMiddleware(BaseHTTPMiddleware):
+    """Turn an unhandled exception into a 500 response from INSIDE the CORS layer.
+
+    Starlette's own ServerErrorMiddleware is always the outermost layer — it
+    wraps CORSMiddleware, not the other way round — so the 500 it produces for
+    an unhandled exception never passes back through CORS and carries no
+    `Access-Control-Allow-Origin` header. The browser then blocks the response
+    it did receive, `fetch()` rejects, and the frontend reports a *network*
+    failure.
+
+    That is exactly how `column universities.logo_url does not exist` reached a
+    student as "We can't reach WorkLearn right now" with the real cause visible
+    only in the server log. Every backend crash looked like a down server.
+
+    Registered so it sits inside CORSMiddleware (added BEFORE it — Starlette
+    applies middleware in reverse registration order), so the response it
+    returns travels back out through CORS and gets the headers.
+    """
+
+    async def dispatch(self, request, call_next):
+        try:
+            return await call_next(request)
+        except Exception:
+            # Same contract as the app-level handler in main.py: the traceback
+            # goes to the log, never into the response body.
+            logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "error": "Internal server error",
+                    "request_id": getattr(request.state, "request_id", "-"),
+                },
+            )

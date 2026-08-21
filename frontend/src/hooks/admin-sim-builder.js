@@ -39,11 +39,12 @@ export function useDeleteSimBuilderProject() {
 export function usePublishSimBuilderProject(projectId) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: () => api.post(`/api/admin/sim-builder/${projectId}/publish`, {}),
+    mutationFn: (body = {}) => api.post(`/api/admin/sim-builder/${projectId}/publish`, body || {}),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sim-builder-project', projectId] })
       qc.invalidateQueries({ queryKey: ['sim-builder-projects'] })
       qc.invalidateQueries({ queryKey: ['sim-builder-versions', projectId] })
+      qc.invalidateQueries({ queryKey: ['admin-simulations'] })
     },
   })
 }

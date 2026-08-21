@@ -11,7 +11,11 @@ import ProtectedRoute from './guards/ProtectedRoute'
 import RequireAdmin from './guards/RequireAdmin'
 import RequireSuperAdmin from './guards/RequireSuperAdmin'
 import RequireUniversityAdmin from './guards/RequireUniversityAdmin'
+import RequireTeacher from './guards/RequireTeacher'
+import RequireCmsAccess from './guards/RequireCmsAccess'
+import RedirectTeacherAwayFromAdminCms from './guards/RedirectTeacherAwayFromAdminCms'
 import PublicOnlyRoute from './guards/PublicOnlyRoute'
+import GuestOnlyRoute from './guards/GuestOnlyRoute'
 import PortalSpinner from './guards/PortalSpinner'
 
 // ── (public) — the marketing site ───────────────────────────────────────────
@@ -38,10 +42,11 @@ import LoginPage from '../../features/auth/global/Login'
 const SuperAdminPortal = lazy(() => import('../../features/superadmin/SuperAdminPortal'))
 const AdminPortal       = lazy(() => import('../../features/admin/portal/AdminPortal'))
 const UniversityAdminPortal = lazy(() => import('../../features/university-admin/UniversityAdminPortal'))
+const MentorPortal = lazy(() => import('../../features/mentor/MentorPortal'))
 import SimulationBuilder    from '../../features/builder/cms/SimulationBuilder'
 import SimBuilderListPage   from '../../features/builder/sim-builder/SimBuilderListPage'
 import SimBuilderEditor     from '../../features/builder/sim-builder/SimBuilderEditor'
-import ClassMentor          from '../../features/mentor/ClassMentor'
+import SimulationsPage      from '../../features/admin/portal/pages/SimulationsPage'
 import OnboardingWizard     from '../../features/onboarding/OnboardingWizard'
 import Dashboard            from '../../features/dashboard/Dashboard'
 import SimulationWorkspace  from '../../features/simulations/SimulationWorkspace'
@@ -113,8 +118,7 @@ export default function AppRouter() {
             had before this page existed.
           - `/home` is the landing page's own unguarded route. Without it a
             signed-in user has no way *back* to the marketing site — every link
-            to `/` would bounce straight to /dashboard. This is where the app
-            Navbar's logo points (see components/Navbar.jsx). */}
+            to `/` would bounce straight to /dashboard. */}
       <Route path="/"        element={<PublicOnlyRoute><LandingPage /></PublicOnlyRoute>} />
       <Route path="/home"    element={<LandingPage />} />
       <Route path="/about"        element={<AboutPage />} />
@@ -123,7 +127,7 @@ export default function AppRouter() {
       <Route path="/blog"         element={<BlogPage />} />
 
       {/* (auth) — single public entry; old role-specific URLs redirect */}
-      <Route path="/login"            element={<LoginPage />} />
+      <Route path="/login" element={<GuestOnlyRoute><LoginPage /></GuestOnlyRoute>} />
       <Route path="/university/login" element={<Navigate to="/login" replace />} />
       <Route path="/mentor/login"     element={<Navigate to="/login" replace />} />
 
@@ -147,9 +151,10 @@ export default function AppRouter() {
           ranks routes by specificity regardless of declaration order, so
           these always win over the portal's own `/*` wildcard for their
           exact paths — see AdminPortal.jsx's docblock. */}
-      <Route path="/admin/simulations/:id" element={<RequireAdmin><SimulationBuilder /></RequireAdmin>} />
-      <Route path="/admin/sim-builder" element={<RequireAdmin><SimBuilderListPage /></RequireAdmin>} />
-      <Route path="/admin/sim-builder/:id" element={<RequireAdmin><SimBuilderEditor /></RequireAdmin>} />
+      <Route path="/admin/simulations" element={<RequireCmsAccess><RedirectTeacherAwayFromAdminCms><SimulationsPage /></RedirectTeacherAwayFromAdminCms></RequireCmsAccess>} />
+      <Route path="/admin/simulations/:id" element={<RequireCmsAccess><RedirectTeacherAwayFromAdminCms><SimulationBuilder /></RedirectTeacherAwayFromAdminCms></RequireCmsAccess>} />
+      <Route path="/admin/sim-builder" element={<RequireCmsAccess><RedirectTeacherAwayFromAdminCms><SimBuilderListPage /></RedirectTeacherAwayFromAdminCms></RequireCmsAccess>} />
+      <Route path="/admin/sim-builder/:id" element={<RequireCmsAccess><RedirectTeacherAwayFromAdminCms><SimBuilderEditor /></RedirectTeacherAwayFromAdminCms></RequireCmsAccess>} />
       <Route
         path="/admin/*"
         element={
@@ -173,9 +178,26 @@ export default function AppRouter() {
         }
       />
 
+      {/* Teacher CMS — mentor-prefixed (not /admin). Ranked above /mentor/*. */}
+      <Route path="/mentor/simulations" element={<RequireCmsAccess><SimulationsPage /></RequireCmsAccess>} />
+      <Route path="/mentor/simulations/:id" element={<RequireCmsAccess><SimulationBuilder /></RequireCmsAccess>} />
+      <Route path="/mentor/sim-builder" element={<RequireCmsAccess><SimBuilderListPage /></RequireCmsAccess>} />
+      <Route path="/mentor/sim-builder/:id" element={<RequireCmsAccess><SimBuilderEditor /></RequireCmsAccess>} />
+
+      {/* Mentor (teacher) portal */}
+      <Route
+        path="/mentor/*"
+        element={
+          <RequireTeacher>
+            <Suspense fallback={<PortalSpinner />}>
+              <MentorPortal />
+            </Suspense>
+          </RequireTeacher>
+        }
+      />
+
       {/* (dashboard) — require login */}
       <Route element={<ProtectedRoute />}>
-        <Route path="/mentor"     element={<ClassMentor />} />
         {/* Full-screen — no Navbar/Footer, see OnboardingLayout */}
         <Route path="/onboarding" element={<OnboardingWizard />} />
         {/* Opened in its own browser tab from a task page. Declared out here,

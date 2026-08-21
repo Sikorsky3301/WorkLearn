@@ -14,9 +14,11 @@ from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
+from pydantic import BaseModel, Field
+
 from app.db.database import get_db
 from app.core.auth import token_user_id
-from app.core.permissions import require_permission
+from app.core.permissions import require_cms_access
 from app.models.sim_builder import SimBuilderProject, SimBuilderPage, SimBuilderBlock, SimBuilderVersion, SimBuilderStatus
 from app.schemas.sim_builder import (
     SimBuilderProjectCreate, SimBuilderProjectUpdate, SimBuilderPageCreate, SimBuilderPageUpdate,
@@ -24,9 +26,20 @@ from app.schemas.sim_builder import (
     validate_block_config,
 )
 from app.services.block_types import BLOCK_TYPES, default_config_for
+from app.services.simulation_scope import (
+    assert_can_mutate_project,
+    apply_publish_scope_for_actor,
+    is_platform_admin,
+    scope_payload,
+)
 from app.ai.services import llm
 
 router = APIRouter(prefix="/api/admin/sim-builder", tags=["admin-sim-builder"])
+
+
+class PublishScopeBody(BaseModel):
+    available_to_all: bool | None = None
+    university_ids: list[int] | None = Field(default=None)
 
 
 # ── Serialization ─────────────────────────────────────────────────────────────
@@ -101,8 +114,11 @@ async def _get_block_or_404(page_id: str, block_id: str, db: AsyncSession) -> Si
 # ── Projects ──────────────────────────────────────────────────────────────────
 
 @router.get("")
-async def list_projects(db: AsyncSession = Depends(get_db), _=Depends(require_permission("simulations.view"))):
-    result = await db.execute(select(SimBuilderProject))
+async def list_projects(db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access())):
+    q = select(SimBuilderProject)
+    if not is_platform_admin(token):
+        q = q.where(SimBuilderProject.created_by == token_user_id(token))
+    result = await db.execute(q)
     projects = result.scalars().all()
     out = []
     for project in projects:
@@ -114,7 +130,7 @@ async def list_projects(db: AsyncSession = Depends(get_db), _=Depends(require_pe
 
 
 @router.post("")
-async def create_project(body: SimBuilderProjectCreate, db: AsyncSession = Depends(get_db), token: dict = Depends(require_permission("simulations.create"))):
+async def create_project(body: SimBuilderProjectCreate, db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access())):
     project = SimBuilderProject(title=body.title, status=SimBuilderStatus.DRAFT, created_by=token_user_id(token))
     db.add(project)
     await db.commit()
@@ -123,8 +139,9 @@ async def create_project(body: SimBuilderProjectCreate, db: AsyncSession = Depen
 
 
 @router.get("/{project_id}")
-async def get_project(project_id: str, db: AsyncSession = Depends(get_db), _=Depends(require_permission("simulations.view"))):
+async def get_project(project_id: str, db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access())):
     project = await _get_project_or_404(project_id, db)
+    assert_can_mutate_project(token, project)
     await db.refresh(project, attribute_names=["pages"])
     for page in project.pages:
         await db.refresh(page, attribute_names=["blocks"])
@@ -132,8 +149,9 @@ async def get_project(project_id: str, db: AsyncSession = Depends(get_db), _=Dep
 
 
 @router.patch("/{project_id}")
-async def update_project(project_id: str, body: SimBuilderProjectUpdate, db: AsyncSession = Depends(get_db), _=Depends(require_permission("simulations.edit"))):
+async def update_project(project_id: str, body: SimBuilderProjectUpdate, db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access())):
     project = await _get_project_or_404(project_id, db)
+    assert_can_mutate_project(token, project)
     patch = body.model_dump(exclude_unset=True)
     for key, value in patch.items():
         setattr(project, key, value)
@@ -143,8 +161,9 @@ async def update_project(project_id: str, body: SimBuilderProjectUpdate, db: Asy
 
 
 @router.delete("/{project_id}")
-async def delete_project(project_id: str, db: AsyncSession = Depends(get_db), _=Depends(require_permission("simulations.delete"))):
+async def delete_project(project_id: str, db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access())):
     project = await _get_project_or_404(project_id, db)
+    assert_can_mutate_project(token, project)
     await db.delete(project)
     await db.commit()
     return {"ok": True}
@@ -153,8 +172,9 @@ async def delete_project(project_id: str, db: AsyncSession = Depends(get_db), _=
 # ── Pages ─────────────────────────────────────────────────────────────────────
 
 @router.post("/{project_id}/pages")
-async def create_page(project_id: str, body: SimBuilderPageCreate, db: AsyncSession = Depends(get_db), _=Depends(require_permission("simulations.edit"))):
-    await _get_project_or_404(project_id, db)
+async def create_page(project_id: str, body: SimBuilderPageCreate, db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access())):
+    project = await _get_project_or_404(project_id, db)
+    assert_can_mutate_project(token, project)
     existing = await db.execute(
         select(SimBuilderPage).where(SimBuilderPage.project_id == project_id, SimBuilderPage.order == body.order)
     )
@@ -169,7 +189,9 @@ async def create_page(project_id: str, body: SimBuilderPageCreate, db: AsyncSess
 
 
 @router.patch("/{project_id}/pages/{page_id}")
-async def update_page(project_id: str, page_id: str, body: SimBuilderPageUpdate, db: AsyncSession = Depends(get_db), _=Depends(require_permission("simulations.edit"))):
+async def update_page(project_id: str, page_id: str, body: SimBuilderPageUpdate, db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access())):
+    project = await _get_project_or_404(project_id, db)
+    assert_can_mutate_project(token, project)
     page = await _get_page_or_404(project_id, page_id, db)
     patch = body.model_dump(exclude_unset=True)
     for key, value in patch.items():
@@ -180,7 +202,9 @@ async def update_page(project_id: str, page_id: str, body: SimBuilderPageUpdate,
 
 
 @router.delete("/{project_id}/pages/{page_id}")
-async def delete_page(project_id: str, page_id: str, db: AsyncSession = Depends(get_db), _=Depends(require_permission("simulations.edit"))):
+async def delete_page(project_id: str, page_id: str, db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access())):
+    project = await _get_project_or_404(project_id, db)
+    assert_can_mutate_project(token, project)
     page = await _get_page_or_404(project_id, page_id, db)
     await db.delete(page)
     await db.commit()
@@ -188,7 +212,9 @@ async def delete_page(project_id: str, page_id: str, db: AsyncSession = Depends(
 
 
 @router.post("/{project_id}/pages/reorder")
-async def reorder_pages(project_id: str, body: ReorderPagesBody, db: AsyncSession = Depends(get_db), _=Depends(require_permission("simulations.edit"))):
+async def reorder_pages(project_id: str, body: ReorderPagesBody, db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access())):
+    project = await _get_project_or_404(project_id, db)
+    assert_can_mutate_project(token, project)
     result = await db.execute(select(SimBuilderPage).where(SimBuilderPage.project_id == project_id))
     pages_by_id = {p.id: p for p in result.scalars().all()}
     if set(body.page_ids) != set(pages_by_id.keys()):
@@ -208,7 +234,9 @@ async def reorder_pages(project_id: str, body: ReorderPagesBody, db: AsyncSessio
 # ── Blocks ────────────────────────────────────────────────────────────────────
 
 @router.post("/{project_id}/pages/{page_id}/blocks")
-async def create_block(project_id: str, page_id: str, body: SimBuilderBlockCreate, db: AsyncSession = Depends(get_db), _=Depends(require_permission("simulations.edit"))):
+async def create_block(project_id: str, page_id: str, body: SimBuilderBlockCreate, db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access())):
+    project = await _get_project_or_404(project_id, db)
+    assert_can_mutate_project(token, project)
     await _get_page_or_404(project_id, page_id, db)
     try:
         validated_config = validate_block_config(body.block_type, body.config)
@@ -229,7 +257,9 @@ async def create_block(project_id: str, page_id: str, body: SimBuilderBlockCreat
 
 
 @router.patch("/{project_id}/pages/{page_id}/blocks/{block_id}")
-async def update_block(project_id: str, page_id: str, block_id: str, body: SimBuilderBlockUpdate, db: AsyncSession = Depends(get_db), _=Depends(require_permission("simulations.edit"))):
+async def update_block(project_id: str, page_id: str, block_id: str, body: SimBuilderBlockUpdate, db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access())):
+    project = await _get_project_or_404(project_id, db)
+    assert_can_mutate_project(token, project)
     await _get_page_or_404(project_id, page_id, db)
     block = await _get_block_or_404(page_id, block_id, db)
     try:
@@ -242,7 +272,9 @@ async def update_block(project_id: str, page_id: str, block_id: str, body: SimBu
 
 
 @router.delete("/{project_id}/pages/{page_id}/blocks/{block_id}")
-async def delete_block(project_id: str, page_id: str, block_id: str, db: AsyncSession = Depends(get_db), _=Depends(require_permission("simulations.edit"))):
+async def delete_block(project_id: str, page_id: str, block_id: str, db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access())):
+    project = await _get_project_or_404(project_id, db)
+    assert_can_mutate_project(token, project)
     await _get_page_or_404(project_id, page_id, db)
     block = await _get_block_or_404(page_id, block_id, db)
     await db.delete(block)
@@ -251,7 +283,9 @@ async def delete_block(project_id: str, page_id: str, block_id: str, db: AsyncSe
 
 
 @router.post("/{project_id}/pages/{page_id}/blocks/reorder")
-async def reorder_blocks(project_id: str, page_id: str, body: ReorderBlocksBody, db: AsyncSession = Depends(get_db), _=Depends(require_permission("simulations.edit"))):
+async def reorder_blocks(project_id: str, page_id: str, body: ReorderBlocksBody, db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access())):
+    project = await _get_project_or_404(project_id, db)
+    assert_can_mutate_project(token, project)
     await _get_page_or_404(project_id, page_id, db)
     result = await db.execute(select(SimBuilderBlock).where(SimBuilderBlock.page_id == page_id))
     blocks_by_id = {b.id: b for b in result.scalars().all()}
@@ -270,8 +304,16 @@ async def reorder_blocks(project_id: str, page_id: str, body: ReorderBlocksBody,
 # ── Publish + Version History ────────────────────────────────────────────────
 
 @router.post("/{project_id}/publish")
-async def publish_project(project_id: str, db: AsyncSession = Depends(get_db), token: dict = Depends(require_permission("simulations.publish"))):
+async def publish_project(
+    project_id: str,
+    body: PublishScopeBody | None = None,
+    db: AsyncSession = Depends(get_db),
+    token: dict = Depends(require_cms_access()),
+):
+    from app.services.sim_builder_publish import publish_sim_builder_to_cms
+
     project = await _get_project_or_404(project_id, db)
+    assert_can_mutate_project(token, project)
     await db.refresh(project, attribute_names=["pages"])
     for page in project.pages:
         await db.refresh(page, attribute_names=["blocks"])
@@ -290,13 +332,31 @@ async def publish_project(project_id: str, db: AsyncSession = Depends(get_db), t
     db.add(version)
     project.status = SimBuilderStatus.PUBLISHED
     project.published_at = datetime.now(timezone.utc)
+
+    try:
+        sim = await publish_sim_builder_to_cms(db, project, created_by=token_user_id(token))
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+
+    scope_body = body.model_dump(exclude_none=True) if body else {}
+    await apply_publish_scope_for_actor(db, token, sim, scope_body)
+    await db.refresh(sim, attribute_names=["university_links"])
+
     await db.commit()
-    return {"ok": True, "status": project.status.value, "version_number": next_version}
+    return {
+        "ok": True,
+        "status": project.status.value,
+        "version_number": next_version,
+        "simulation_id": sim.id,
+        "slug": sim.slug,
+        **scope_payload(sim),
+    }
 
 
 @router.get("/{project_id}/versions")
-async def list_versions(project_id: str, db: AsyncSession = Depends(get_db), _=Depends(require_permission("simulations.view"))):
-    await _get_project_or_404(project_id, db)
+async def list_versions(project_id: str, db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access())):
+    project = await _get_project_or_404(project_id, db)
+    assert_can_mutate_project(token, project)
     result = await db.execute(
         select(SimBuilderVersion).where(SimBuilderVersion.project_id == project_id).order_by(SimBuilderVersion.version_number.desc())
     )
@@ -304,12 +364,13 @@ async def list_versions(project_id: str, db: AsyncSession = Depends(get_db), _=D
 
 
 @router.post("/{project_id}/versions/{version_id}/restore")
-async def restore_version(project_id: str, version_id: str, db: AsyncSession = Depends(get_db), _=Depends(require_permission("simulations.edit"))):
+async def restore_version(project_id: str, version_id: str, db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access())):
     """Destructive: replaces the project's entire live Pages/Blocks tree with
     the snapshot's contents. The frontend must confirm before calling this —
     matches this app's existing confirm-before-destructive pattern (e.g. the
     SuperAdmin user-delete flow)."""
     project = await _get_project_or_404(project_id, db)
+    assert_can_mutate_project(token, project)
     result = await db.execute(
         select(SimBuilderVersion).where(SimBuilderVersion.id == version_id, SimBuilderVersion.project_id == project_id)
     )
@@ -367,13 +428,14 @@ def _extract_json(raw: str) -> dict:
 
 
 @router.post("/{project_id}/ai-generate")
-async def ai_generate(project_id: str, body: AiGenerateBody, db: AsyncSession = Depends(get_db), _=Depends(require_permission("simulations.edit"))):
+async def ai_generate(project_id: str, body: AiGenerateBody, db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access())):
     """Generates a Weeks/Pages/Blocks skeleton from a text brief and appends
     it to the project (after any existing pages) — a v1 scoped to structural
     skeleton generation, not full content authoring. Reuses the existing
     multi-provider LLM service (app/ai/services/llm.py), same one the job-sim
     builder's AI Roleplay/Text-Rubric tasks already depend on."""
     project = await _get_project_or_404(project_id, db)
+    assert_can_mutate_project(token, project)
     if not body.prompt.strip():
         raise HTTPException(400, "prompt is required")
 

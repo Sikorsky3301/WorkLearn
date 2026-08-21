@@ -1,30 +1,19 @@
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
 
-// sessionStorage (not localStorage) — scoped per browser tab, not per
-// origin, so logging in as a different role in another tab doesn't stomp
-// on this tab's session (e.g. testing SuperAdmin in one tab and Admin in
-// another). Trade-off: the session doesn't survive closing the tab, only a
-// same-tab refresh — that's the point. (A "Remember me" checkbox on the
-// login form previously put the token in localStorage instead, which
-// persists across browser restarts — but localStorage is shared by every
-// tab, so it silently overrode this per-tab isolation the moment any
-// account had ever "remembered" a login: opening a fresh /super-admin tab
-// would pick up that leftover token and bounce to whatever role it
-// belonged to. Reverted — the multi-tab isolation matters more here than
-// surviving a browser restart.)
-// Exported so the sandbox tab handoff can read it (see lib/tabHandoff.js).
-// Per-tab isolation is exactly why that handoff has to exist at all: a tab
-// opened from this one does not reliably inherit sessionStorage.
+// localStorage — one session for the whole origin (every tab, and after a
+// browser restart) until logout or JWT expiry. All tabs share the same
+// account; you cannot stay signed in as student in one tab and admin in
+// another.
 export function getToken() {
-  return sessionStorage.getItem('wl_token')
+  return localStorage.getItem('wl_token')
 }
 
 export function setToken(token) {
-  sessionStorage.setItem('wl_token', token)
+  localStorage.setItem('wl_token', token)
 }
 
 export function clearToken() {
-  sessionStorage.removeItem('wl_token')
+  localStorage.removeItem('wl_token')
 }
 
 async function request(path, options = {}) {
@@ -85,11 +74,26 @@ async function request(path, options = {}) {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
-    const error = new Error(err.detail ?? err.error ?? 'Request failed')
+    const detail = err.detail ?? err.error ?? 'Request failed'
+
+    // FastAPI answers a 422 with `detail` as an ARRAY of per-field objects, not
+    // a string — `new Error(detail)` on that renders "[object Object]" to the
+    // user. Flatten it to "field: message" first.
+    let message
+    if (typeof detail === 'string') {
+      message = detail
+    } else if (Array.isArray(detail)) {
+      message = detail
+        .map((d) => (d?.loc ? `${d.loc.filter((x) => x !== 'body').join('.')}: ${d.msg}` : d?.msg || JSON.stringify(d)))
+        .join('; ') || 'Validation failed'
+    } else {
+      message = JSON.stringify(detail)
+    }
+
+    const error = new Error(message)
     // Carry the status through. Callers used to get a bare message, so a 500,
     // a 404 and a dropped connection were indistinguishable downstream and
-    // every one of them had to be reported as "check your connection". The
-    // message is unchanged, so existing `error.message` handling still works.
+    // every one of them had to be reported as "check your connection".
     error.status = res.status
     throw error
   }

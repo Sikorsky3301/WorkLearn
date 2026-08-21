@@ -2,7 +2,7 @@ import lumenLogoImg from '../assets/lumen-logo.png'
 import enigmaLogoImg from '../assets/enigma-logo.png'
 import nimbusLogoImg from '../assets/nimbus-logo.png'
 import derekHoltPhoto from '../assets/derek-holt.jpg'
-import daJobSimBanner from '../assets/da-job-sim-banner.jpg'
+import daJobSimBanner from '../assets/da-job-sim-banner.avif'
 import frontendDevSimBanner from '../assets/frontend-dev-sim-banner.webp'
 import salesCrmSimBanner from '../assets/sales-crm-sim-banner.jpg'
 
@@ -13,12 +13,18 @@ import salesCrmSimBanner from '../assets/sales-crm-sim-banner.jpg'
 // without branding/a photo/banner. Shared across Dashboard and Portfolio
 // (case studies) so a branding entry is only ever defined once.
 //
-// `banner` is picked to match each simulation's actual work. The data-analyst
-// and CRM sims use stock photography (Unsplash, free license) — a
-// dashboard/charts screen and a sales presentation respectively. The frontend
-// sim uses a supplied photograph of a real two-laptop coding setup (1880x1253
-// webp); check its licensing before this ships publicly, since the other two
-// ride on Unsplash's free license and this one does not.
+// `banner` is picked to match each simulation's actual work. The CRM sim uses
+// stock photography (Unsplash, free license) — a sales presentation. The
+// data-analyst (1102x798 AVIF) and frontend (1880x1253 webp) sims use supplied
+// photographs; check their licensing before this ships publicly, since only
+// the CRM one rides on Unsplash's free license.
+//
+// The DA banner is AVIF, not webp — it arrived named `.webp` but its ftyp box
+// reads `avif`, and it is stored here under the extension that matches its
+// actual bytes. Vite derives the served Content-Type from the extension, so a
+// mislabelled file relies on browser sniffing to render at all. AVIF itself is
+// fine: every browser this app targets has supported it for years, and at
+// 42 KB for 1102x798 it is a third the weight of the 900x600 JPEG it replaced.
 //
 // It is deliberately NOT run through any blur, scrim or backdrop-filter. Every
 // place a banner renders (overview card, showcase tile, workspace header,

@@ -95,10 +95,13 @@ async def update_profile(
 
 @router.post("/complete-onboarding")
 async def complete_onboarding(db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
+    from app.services.simulation_scope import assign_onboarding_simulations
+
     user = await _get_user(db, token_user_id(token))
     user.onboarding_completed = True
+    assigned = await assign_onboarding_simulations(db, user)
     await db.commit()
-    return {"ok": True}
+    return {"ok": True, "assigned_simulation_ids": assigned}
 
 
 @router.post("/photo")

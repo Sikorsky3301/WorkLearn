@@ -67,6 +67,7 @@ export default function UsersTable({ role = '', title = 'Users' }) {
         loading={isLoading}
         emptyIcon={UserCircle2}
         emptyTitle={`No ${title.toLowerCase()} yet`}
+        resetKey={search}
       />
       {manageUser && <ManageUserModal user={manageUser} onClose={() => setManageUser(null)} />}
     </div>

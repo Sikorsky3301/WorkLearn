@@ -2,9 +2,11 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Wand2, Plus, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import TablePagination, { useClientPagination } from '../../../components/design-system/TablePagination'
 import {
   useSimBuilderProjects, useCreateSimBuilderProject, useDeleteSimBuilderProject,
 } from '../../../hooks'
+import { useCmsBasePath } from '../../../hooks/useCmsBasePath'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../../components/ui/shadcn/dialog'
 import SimBuilderLogo from './SimBuilderLogo'
 
@@ -13,20 +15,22 @@ import SimBuilderLogo from './SimBuilderLogo'
  * (own header) rather than a tab embedded in SuperAdmin. */
 export default function SimBuilderListPage() {
   const navigate = useNavigate()
+  const cmsBase = useCmsBasePath()
   const { data, isLoading } = useSimBuilderProjects()
   const [newOpen, setNewOpen] = useState(false)
 
   const projects = data?.projects ?? []
+  const { page, setPage, pageSize, setPageSize, pageRows, total } = useClientPagination(projects)
 
   return (
     <div className="min-h-screen bg-surface-low">
       <header className="sticky top-0 z-10 bg-white border-b border-border">
         <div className="px-6 h-16 flex items-center gap-4">
           <button
-            onClick={() => navigate('/admin')}
+            onClick={() => navigate(cmsBase === '/mentor' ? '/mentor' : '/admin')}
             className="flex items-center gap-1.5 text-sm text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer shrink-0"
           >
-            <ArrowLeft className="h-4 w-4" /> Admin
+            <ArrowLeft className="h-4 w-4" /> {cmsBase === '/mentor' ? 'Mentor' : 'Admin'}
           </button>
           <div className="h-6 w-px bg-border shrink-0" />
           <div className="flex items-center gap-2.5 flex-1 min-w-0">
@@ -67,16 +71,23 @@ export default function SimBuilderListPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
-                {projects.map((p) => (
-                  <ProjectRow key={p.id} project={p} onOpen={() => navigate(`/admin/sim-builder/${p.id}`)} />
+                {pageRows.map((p) => (
+                  <ProjectRow key={p.id} project={p} onOpen={() => navigate(`${cmsBase}/sim-builder/${p.id}`)} />
                 ))}
               </tbody>
             </table>
+            <TablePagination
+              total={total}
+              page={page}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
           </div>
         )}
       </div>
 
-      <NewProjectDialog open={newOpen} onOpenChange={setNewOpen} />
+      <NewProjectDialog open={newOpen} onOpenChange={setNewOpen} cmsBase={cmsBase} />
     </div>
   )
 }
@@ -117,7 +128,7 @@ function ProjectRow({ project, onOpen }) {
   )
 }
 
-function NewProjectDialog({ open, onOpenChange }) {
+function NewProjectDialog({ open, onOpenChange, cmsBase = '/admin' }) {
   const navigate = useNavigate()
   const createProject = useCreateSimBuilderProject()
   const [title, setTitle] = useState('')
@@ -132,7 +143,7 @@ function NewProjectDialog({ open, onOpenChange }) {
     createProject.mutate(
       { title: title.trim() },
       {
-        onSuccess: (project) => { handleOpenChange(false); navigate(`/admin/sim-builder/${project.id}`) },
+        onSuccess: (project) => { handleOpenChange(false); navigate(`${cmsBase}/sim-builder/${project.id}`) },
         onError: (e) => toast.error(e?.message || 'Could not create project'),
       }
     )

@@ -27,9 +27,9 @@ export default function MarketingNav() {
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
 
-  // A signed-in visitor can reach the marketing site via /home (the app
-  // Navbar's logo points there), so the CTAs have to switch — offering
-  // "Log in" to someone already logged in is a dead end.
+  // Signed-in visitors can still open the marketing site at /home, so the
+  // CTAs have to switch — offering "Log in" to someone already logged in
+  // is a dead end.
   const { signedIn, homePath, startPath, startLabel } = useMarketingLinks()
 
   useEffect(() => {

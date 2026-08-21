@@ -2,9 +2,8 @@ import { useAuth } from '../auth/AuthContext'
 
 /** Destinations that differ depending on whether the visitor is signed in.
  *
- * The marketing site is reachable while logged in (the app Navbar's logo
- * points at `/home` — see app/router/AppRouter.jsx), so its links can't
- * assume a logged-out visitor:
+ * The marketing site is reachable while logged in at `/home`, so its links
+ * can't assume a logged-out visitor:
  *
  * - `homePath` — `/` is wrapped in PublicOnlyRoute and bounces a signed-in
  *   user to /dashboard, so linking there would make the marketing site

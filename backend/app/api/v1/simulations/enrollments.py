@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from pydantic import BaseModel, Field
@@ -10,10 +10,16 @@ from app.core.config import QUIZ_BONUS_THRESHOLD, QUIZ_BONUS_XP
 from app.models import (
     Enrollment, TaskCompletion, AgentMessage, MessageType, UserBadge, XpLedger, User,
 )
-from app.models.cms import Simulation, SimulationTask, SimulationStatus
+from app.models.cms import Simulation, SimulationTask
 from app.services.skill_engine import award_task_completion
 from app.services.simulation_completion import finalize_if_complete
 from app.services.simulation_lookup import get_simulation
+from app.services.tenant import TENANT_HOST_HEADER, host_from_request, resolve_tenant
+from app.services.simulation_scope import (
+    published_sims_for_university,
+    assert_sim_visible_to_tenant,
+)
+from app.models.university import University
 from sqlalchemy import func
 
 logger = logging.getLogger(__name__)
@@ -51,6 +57,14 @@ async def _get_published_sim(db: AsyncSession, key: str | int) -> Simulation | N
     return await get_simulation(db, key, published_only=True)
 
 
+async def _tenant_university(
+    db: AsyncSession,
+    request: Request,
+    x_worklearn_host: str | None,
+) -> University:
+    return await resolve_tenant(db, host_from_request(request, x_worklearn_host))
+
+
 async def _get_sim_tasks(db: AsyncSession, sim_id: int) -> list[SimulationTask]:
     result = await db.execute(
         select(SimulationTask).where(SimulationTask.simulation_id == sim_id).order_by(SimulationTask.task_index)
@@ -59,9 +73,13 @@ async def _get_sim_tasks(db: AsyncSession, sim_id: int) -> list[SimulationTask]:
 
 
 @router.get("/simulations")
-async def list_simulations(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Simulation).where(Simulation.status == SimulationStatus.PUBLISHED))
-    sims = result.scalars().all()
+async def list_simulations(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    x_worklearn_host: str | None = Header(None, alias=TENANT_HOST_HEADER),
+):
+    uni = await _tenant_university(db, request, x_worklearn_host)
+    sims = await published_sims_for_university(db, uni.id)
     out = []
     for sim in sims:
         count_res = await db.execute(
@@ -160,11 +178,20 @@ async def my_assignments(db: AsyncSession = Depends(get_db), token: dict = Depen
 
 
 @router.post("/simulations/{sim_id}/enroll")
-async def enroll(sim_id: str, background: BackgroundTasks, db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
+async def enroll(
+    sim_id: str,
+    request: Request,
+    background: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    token: dict = Depends(get_current_user),
+    x_worklearn_host: str | None = Header(None, alias=TENANT_HOST_HEADER),
+):
     user_id = token_user_id(token)
     sim = await _get_published_sim(db, sim_id)
     if not sim:
         raise HTTPException(404, "Simulation not found")
+    uni = await _tenant_university(db, request, x_worklearn_host)
+    await assert_sim_visible_to_tenant(db, sim, uni.id)
 
     result = await db.execute(
         select(Enrollment).where(Enrollment.user_id == user_id, Enrollment.simulation_id == sim.id)
@@ -181,11 +208,19 @@ async def enroll(sim_id: str, background: BackgroundTasks, db: AsyncSession = De
 
 
 @router.get("/simulations/{sim_id}/onboarding")
-async def get_onboarding(sim_id: str, db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
+async def get_onboarding(
+    sim_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    token: dict = Depends(get_current_user),
+    x_worklearn_host: str | None = Header(None, alias=TENANT_HOST_HEADER),
+):
     user_id = token_user_id(token)
     sim = await _get_published_sim(db, sim_id)
     if not sim:
         raise HTTPException(404, "No onboarding for this simulation")
+    uni = await _tenant_university(db, request, x_worklearn_host)
+    await assert_sim_visible_to_tenant(db, sim, uni.id)
     tasks = await _get_sim_tasks(db, sim.id)
     projects = [{"id": t.task_index, "name": t.title, "brief": t.objective or ""} for t in tasks]
     accepted = await _has_journey_badge(db, user_id, sim.id)
@@ -195,13 +230,19 @@ async def get_onboarding(sim_id: str, db: AsyncSession = Depends(get_db), token:
 
 @router.post("/simulations/{sim_id}/onboarding/accept")
 async def accept_onboarding(
-    sim_id: str, background: BackgroundTasks,
-    db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)
+    sim_id: str,
+    request: Request,
+    background: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    token: dict = Depends(get_current_user),
+    x_worklearn_host: str | None = Header(None, alias=TENANT_HOST_HEADER),
 ):
     user_id = token_user_id(token)
     sim = await _get_published_sim(db, sim_id)
     if not sim:
         raise HTTPException(404, "No onboarding for this simulation")
+    uni = await _tenant_university(db, request, x_worklearn_host)
+    await assert_sim_visible_to_tenant(db, sim, uni.id)
 
     enroll_res = await db.execute(
         select(Enrollment).where(Enrollment.user_id == user_id, Enrollment.simulation_id == sim.id)
@@ -221,6 +262,9 @@ async def accept_onboarding(
         #
         # Idempotent: POST /enroll already returns the existing row rather than
         # duplicating, and this runs only when there is genuinely none.
+        #
+        # The tenant check above has already run, so this cannot enrol a student
+        # into a simulation their university cannot see.
         enrollment = Enrollment(user_id=user_id, simulation_id=sim.id)
         db.add(enrollment)
         await db.commit()

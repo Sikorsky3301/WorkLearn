@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { api, setToken, clearToken } from '../../lib/client'
+import { api, setToken, clearToken, getToken } from '../../lib/client'
 import { ROLES } from '../../rbac/roles'
 
 const AuthContext = createContext(null)
@@ -10,15 +10,11 @@ export function AuthProvider({ children }) {
 
   // Restore session from stored token on mount
   useEffect(() => {
-    // One-time cleanup: a short-lived "Remember me" feature used to also
-    // write the token to localStorage, which — being shared across every
-    // tab, unlike sessionStorage — silently overrode per-tab role
-    // isolation (a fresh /super-admin tab would inherit whatever role was
-    // "remembered" and get redirected). That feature's been reverted; this
-    // just clears out any token it may have left behind on this machine.
-    localStorage.removeItem('wl_token')
+    // One-time migration: the token used to live in sessionStorage (per-tab).
+    // Clear any left over there so it can't shadow the localStorage one.
+    sessionStorage.removeItem('wl_token')
 
-    const token = sessionStorage.getItem('wl_token')
+    const token = getToken()
     if (!token) { setLoading(false); return }
 
     // 5-second safety timeout — if backend is unreachable, don't hang forever
@@ -28,6 +24,24 @@ export function AuthProvider({ children }) {
       .then(setUser)
       .catch(() => clearToken())
       .finally(() => { clearTimeout(timeout); setLoading(false) })
+  }, [])
+
+  // Other tabs share localStorage. Login/logout there should update this tab
+  // without a full reload (`storage` only fires in tabs that did not write).
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key !== 'wl_token') return
+      if (!e.newValue) {
+        setUser(null)
+        return
+      }
+      api.get('/api/auth/me').then(setUser).catch(() => {
+        clearToken()
+        setUser(null)
+      })
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
   }, [])
 
   // Flattening the thrown error to a bare `{ error: message }` lost the two

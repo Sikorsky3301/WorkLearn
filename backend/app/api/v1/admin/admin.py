@@ -1,13 +1,16 @@
 from datetime import date, datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, distinct, delete
 from sqlalchemy.orm import selectinload
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from app.db.database import get_db
 from app.models import User, Enrollment, EnrollmentStatus, XpLedger, UnlockedFeature, TaskCompletion, UserBadge
 from app.models.cms import Simulation
 from app.models.university import University
 from app.models.roles import RoleSlug, ROLE_IDS
+from app.models.feature_flags import FeatureFlagOverride
 from app.api.v1.simulations.enrollments import JOURNEY_BADGE_KEY
 from app.core.permissions import require_permission, require_roles
 from app.core.auth import token_user_id, hash_password
@@ -31,7 +34,7 @@ async def _load_actor(db: AsyncSession, token: dict) -> User:
     return user
 
 
-def _user_row_out(u: User, enroll_count: int) -> dict:
+def _user_row_out(u: User, enroll_count: int, cms_access: bool = False) -> dict:
     uni_name = u.university.name if u.university else None
     return {
         "id": u.id, "name": u.name, "email": u.email,
@@ -41,6 +44,7 @@ def _user_row_out(u: User, enroll_count: int) -> dict:
         "section": u.section, "xp": u.xp,
         "is_active": u.is_active, "suspended_at": u.suspended_at.isoformat() if u.suspended_at else None,
         "enrollments": enroll_count,
+        "cms_access": cms_access if u.role == RoleSlug.TEACHER else False,
         "joined": u.created_at.strftime("%b %d"),
         "last_active": u.last_seen_at.strftime("%b %d") if u.last_seen_at else "—",
     }
@@ -123,6 +127,7 @@ async def admin_universities(
             "id": uni.id,
             "code": uni.code,
             "name": uni.name,
+            "logo_url": uni.logo_url,
             "students": student_res.scalar() or 0,
             "mentors": mentor_res.scalar() or 0,
             "status": "active",
@@ -149,7 +154,12 @@ async def onboard_university(
     if existing_user.scalar_one_or_none():
         raise HTTPException(400, "Admin email already in use")
 
-    uni = University(code=body.code, name=body.name, is_default=False)
+    uni = University(
+        code=body.code,
+        name=body.name,
+        logo_url=body.logo_url,
+        is_default=False,
+    )
     db.add(uni)
     await db.flush()
 
@@ -170,7 +180,7 @@ async def onboard_university(
         db, actor_id=actor_id, actor_role=actor_role, actor_name=actor_name,
         action="university.onboard", target_type="university", target_id=str(uni.id),
         meta={
-            "code": uni.code, "name": uni.name,
+            "code": uni.code, "name": uni.name, "logo_url": uni.logo_url,
             "university_admin_id": admin_user.id, "university_admin_email": email,
         },
     )
@@ -181,6 +191,7 @@ async def onboard_university(
     return {
         "university": {
             "id": uni.id, "code": uni.code, "name": uni.name,
+            "logo_url": uni.logo_url,
             "is_default": uni.is_default, "students": 0, "mentors": 0, "status": "active",
         },
         "admin": {
@@ -198,7 +209,7 @@ async def update_university(
     db: AsyncSession = Depends(get_db),
     token: dict = Depends(require_roles(RoleSlug.ADMIN)),
 ):
-    """Platform Admin only — rename university (code is immutable)."""
+    """Platform Admin only — rename university / update logo (code is immutable)."""
     result = await db.execute(select(University).where(University.id == university_id))
     uni = result.scalar_one_or_none()
     if not uni:
@@ -207,11 +218,13 @@ async def update_university(
         raise HTTPException(400, "Cannot rename the default academy university via this endpoint")
 
     uni.name = body.name
+    if "logo_url" in body.model_fields_set:
+        uni.logo_url = body.logo_url
     actor_id, actor_role, actor_name = await resolve_actor_info(token, db)
     await log_action(
         db, actor_id=actor_id, actor_role=actor_role, actor_name=actor_name,
         action="university.update", target_type="university", target_id=str(uni.id),
-        meta={"name": uni.name, "code": uni.code},
+        meta={"name": uni.name, "code": uni.code, "logo_url": uni.logo_url},
     )
     await db.commit()
     await db.refresh(uni)
@@ -228,6 +241,7 @@ async def update_university(
     )
     return {
         "id": uni.id, "code": uni.code, "name": uni.name,
+        "logo_url": uni.logo_url,
         "students": student_res.scalar() or 0,
         "mentors": mentor_res.scalar() or 0,
         "status": "active", "is_default": uni.is_default,
@@ -266,11 +280,77 @@ async def admin_users(
     q = q.options(selectinload(User.university), selectinload(User.role_row)).order_by(User.created_at.desc()).limit(limit)
     result = await db.execute(q)
     users = result.scalars().all()
+
+    teacher_ids = [str(u.id) for u in users if u.role == RoleSlug.TEACHER]
+    cms_on: set[str] = set()
+    if teacher_ids:
+        ov_res = await db.execute(
+            select(FeatureFlagOverride).where(
+                FeatureFlagOverride.flag_key == "cms_access",
+                FeatureFlagOverride.scope_type == "user",
+                FeatureFlagOverride.scope_value.in_(teacher_ids),
+                FeatureFlagOverride.enabled == True,  # noqa: E712
+            )
+        )
+        cms_on = {o.scope_value for o in ov_res.scalars().all()}
+
     out = []
     for u in users:
         enroll_res = await db.execute(select(func.count()).select_from(Enrollment).where(Enrollment.user_id == u.id))
-        out.append(_user_row_out(u, enroll_res.scalar() or 0))
+        out.append(_user_row_out(u, enroll_res.scalar() or 0, cms_access=str(u.id) in cms_on))
     return out
+
+
+class CmsAccessBody(BaseModel):
+    enabled: bool
+
+
+@router.put("/users/{user_id}/cms-access")
+async def set_teacher_cms_access(
+    user_id: int,
+    body: CmsAccessBody,
+    db: AsyncSession = Depends(get_db),
+    token: dict = Depends(require_roles(RoleSlug.ADMIN, RoleSlug.UNIVERSITY_ADMIN, RoleSlug.SUPER_ADMIN)),
+):
+    """University Admin (org) / Platform Admin: enable or disable CMS for a teacher."""
+    actor = await _load_actor(db, token)
+    result = await db.execute(select(User).where(User.id == user_id).options(selectinload(User.role_row)))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(404, "User not found")
+    await _assert_org_user_access(actor, user)
+    if user.role != RoleSlug.TEACHER:
+        raise HTTPException(400, "CMS access can only be set for teachers")
+
+    scope_value = str(user.id)
+    if body.enabled:
+        stmt = pg_insert(FeatureFlagOverride).values(
+            flag_key="cms_access",
+            scope_type="user",
+            scope_value=scope_value,
+            enabled=True,
+        ).on_conflict_do_update(
+            index_elements=["flag_key", "scope_type", "scope_value"],
+            set_={"enabled": True},
+        )
+        await db.execute(stmt)
+    else:
+        await db.execute(
+            delete(FeatureFlagOverride).where(
+                FeatureFlagOverride.flag_key == "cms_access",
+                FeatureFlagOverride.scope_type == "user",
+                FeatureFlagOverride.scope_value == scope_value,
+            )
+        )
+
+    actor_id, actor_role, actor_name = await resolve_actor_info(token, db)
+    await log_action(
+        db, actor_id=actor_id, actor_role=actor_role, actor_name=actor_name,
+        action="user.cms_access", target_type="user", target_id=str(user_id),
+        meta={"enabled": body.enabled},
+    )
+    await db.commit()
+    return {"ok": True, "cms_access": body.enabled}
 
 
 @router.get("/activity")

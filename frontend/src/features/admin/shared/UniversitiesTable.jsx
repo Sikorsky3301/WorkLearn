@@ -1,9 +1,20 @@
 import { useState } from 'react'
-import { Search, Building2, Copy, Check, Pencil, UserPlus } from 'lucide-react'
+import { Search, Building2, Copy, Check, Pencil, UserPlus, ImageIcon } from 'lucide-react'
 import { useAdminUniversities, useUpdateUniversity } from '../../../hooks'
+import { resolveMediaUrl } from '../../../lib/client'
 import DataTable from '../../../components/design-system/DataTable'
+import LogoUploadField from '../../builder/cms/shared/LogoUploadField'
 
-function Avatar({ name }) {
+function UniAvatar({ name, logoUrl }) {
+  if (logoUrl) {
+    return (
+      <img
+        src={resolveMediaUrl(logoUrl)}
+        alt=""
+        className="h-8 w-8 rounded-lg object-contain bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shrink-0"
+      />
+    )
+  }
   const initials = (name || '?').trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase()
   return (
     <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
@@ -21,6 +32,8 @@ export default function UniversitiesTable({ onProvision }) {
   const [copied, setCopied] = useState(null)
   const [editing, setEditing] = useState(null)
   const [editName, setEditName] = useState('')
+  const [logoEdit, setLogoEdit] = useState(null)
+  const [editLogoUrl, setEditLogoUrl] = useState('')
   const { data: universities, isLoading } = useAdminUniversities()
   const updateUni = useUpdateUniversity()
 
@@ -57,11 +70,37 @@ export default function UniversitiesTable({ onProvision }) {
     }
   }
 
+  const startLogoEdit = (u) => {
+    if (u.is_default) return
+    setLogoEdit(u)
+    setEditLogoUrl(u.logo_url || '')
+  }
+
+  const saveLogoEdit = async () => {
+    if (!logoEdit) return
+    const next = (editLogoUrl || '').trim() || null
+    const prev = logoEdit.logo_url || null
+    if (next === prev) {
+      setLogoEdit(null)
+      return
+    }
+    try {
+      await updateUni.mutateAsync({
+        id: logoEdit.id,
+        name: logoEdit.name,
+        logo_url: next,
+      })
+      setLogoEdit(null)
+    } catch {
+      /* keep modal open */
+    }
+  }
+
   const columns = [
     {
       key: 'name', header: 'Institution', render: (u) => (
         <div className="flex items-center gap-2.5 min-w-0">
-          <Avatar name={u.name} />
+          <UniAvatar name={u.name} logoUrl={u.logo_url} />
           {editing === u.id ? (
             <input
               autoFocus
@@ -117,6 +156,9 @@ export default function UniversitiesTable({ onProvision }) {
               <button type="button" onClick={() => startEdit(u)} className="text-xs text-slate-500 hover:text-primary cursor-pointer" title="Rename">
                 <Pencil className="h-3.5 w-3.5" />
               </button>
+              <button type="button" onClick={() => startLogoEdit(u)} className="text-xs text-slate-500 hover:text-primary cursor-pointer" title="Edit logo">
+                <ImageIcon className="h-3.5 w-3.5" />
+              </button>
               {onProvision && (
                 <button
                   type="button"
@@ -152,7 +194,52 @@ export default function UniversitiesTable({ onProvision }) {
         emptyIcon={Building2}
         emptyTitle="No universities found"
         emptyDescription="Use Onboard University to create a partner org."
+        resetKey={search}
       />
+
+      {logoEdit && (
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center z-50 p-4"
+          onClick={() => setLogoEdit(null)}
+          role="presentation"
+        >
+          <div
+            className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md shadow-xl p-5 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-logo-title"
+          >
+            <div>
+              <h3 id="edit-logo-title" className="font-bold text-slate-900 dark:text-slate-100">University logo</h3>
+              <p className="text-xs text-slate-500 mt-0.5">{logoEdit.name}</p>
+            </div>
+            <LogoUploadField
+              label="Logo"
+              value={editLogoUrl}
+              onChange={setEditLogoUrl}
+            />
+            <p className="text-[11px] text-slate-500">Clear to fall back to the WorkLearn logo on the partner subdomain.</p>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setLogoEdit(null)}
+                className="flex-1 py-2.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={updateUni.isPending}
+                onClick={saveLogoEdit}
+                className="btn-primary flex-1 py-2.5 text-sm"
+              >
+                {updateUni.isPending ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

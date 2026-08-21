@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
 from app.core.paths import STATIC_DIR
 from app.core.logging_config import configure_logging
-from app.core.request_context import RequestIdMiddleware
+from app.core.request_context import RequestIdMiddleware, CatchUnhandledMiddleware
 from app.db.database import engine, Base, AsyncSessionLocal
 from app.api.v1.auth import auth
 from app.api.v1.tenant import router as tenant_router
@@ -103,6 +103,12 @@ def _cors_origins() -> list[str]:
 _CORS_ORIGIN_REGEX = r"https?://([a-z0-9-]+\.)?localhost:\d+"
 
 
+# Registered BEFORE CORS so it ends up INSIDE it (Starlette applies middleware
+# in reverse registration order). That placement is the entire point: see the
+# docstring — a 500 raised past the CORS layer reaches the browser with no
+# Access-Control-Allow-Origin, and the frontend can only report it as an
+# unreachable server.
+app.add_middleware(CatchUnhandledMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins(),
