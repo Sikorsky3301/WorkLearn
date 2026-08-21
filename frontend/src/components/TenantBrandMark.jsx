@@ -10,7 +10,7 @@ const SIZES = {
     mark: 'w-3.5 h-3.5',
   },
   md: {
-    img: 'h-11 w-auto max-w-[10rem]',
+    img: 'h-24 w-auto max-w-[16rem]',
     powered: 'text-[10px]',
     brand: 'text-xs',
     mark: 'w-4 h-4',
@@ -63,11 +63,11 @@ export default function TenantBrandMark({ size = 'sm', className = '' }) {
 
   if (!isPartner) {
     return (
-      <div className={`flex items-center gap-2 min-w-0 ${className}`}>
+      <div className={`flex items-end gap-2 min-w-0 ${className}`}>
         <img
           src={worklearnLogo}
           alt="WorkLearn"
-          className={`${size === 'md' || size === 'lg' ? 'w-10 h-10 rounded-xl' : 'w-8 h-8 rounded'} object-cover shrink-0`}
+          className={`${size === 'md' || size === 'lg' ? 'w-10 h-10 rounded-xl' : 'w-8 h-8 rounded'} object-cover object-bottom shrink-0`}
         />
         <span className={`font-bold text-on-surface tracking-tight ${wordSize}`}>WorkLearn</span>
       </div>
@@ -79,7 +79,7 @@ export default function TenantBrandMark({ size = 'sm', className = '' }) {
       <img
         src={src}
         alt={alt}
-        className={`${s.img} object-contain object-left shrink-0 rounded-sm`}
+        className={`${s.img} object-contain object-left-bottom shrink-0 rounded-sm`}
       />
       <PoweredByWorkLearn size={size} />
     </div>

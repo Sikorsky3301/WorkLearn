@@ -190,6 +190,15 @@ class DeclarativeRule(BaseModel):
     case_sensitive: bool = True
 
 
+class MermaidDiagramConfig(TaskConfigBase):
+    grading_mode: Literal["llm", "manual"] = "manual"
+    min_words: int = 0
+    llm_judge_prompt: str | None = None
+    starter_code: str = ""
+    temperature: float | None = Field(None, ge=0, le=2)
+    max_tokens: int | None = None
+
+
 class CodeSandboxConfig(TaskConfigBase):
     language: Literal["python", "javascript", "jsx", "html", "text"] = "python"
     grading_strategy: Literal["registered_grader", "declarative_rules"] = "declarative_rules"
@@ -221,6 +230,7 @@ CONFIG_MODELS: dict[str, type[TaskConfigBase]] = {
     "ai_roleplay_chat": AiRoleplayChatConfig,
     "crm_workspace": CrmWorkspaceConfig,
     "code_sandbox": CodeSandboxConfig,
+    "mermaid_diagram": MermaidDiagramConfig,
 }
 
 
@@ -277,6 +287,7 @@ class SimulationCreate(BaseModel):
     onboarding: OnboardingContent
     onboarding_xp_award: int = 0
     section_labels: dict[str, str] = Field(default_factory=dict)
+    architecture_mermaid: str | None = None
 
 
 class SimulationUpdate(BaseModel):
@@ -299,6 +310,7 @@ class SimulationUpdate(BaseModel):
     onboarding: OnboardingContent | None = None
     onboarding_xp_award: int | None = None
     section_labels: dict[str, str] | None = None
+    architecture_mermaid: str | None = None
 
 
 class ReferenceField(BaseModel):
@@ -327,7 +339,7 @@ class ModelSolution(BaseModel):
 class SimulationTaskCreate(BaseModel):
     task_index: int
     title: str
-    type: Literal["text_rubric", "structured_form", "quiz", "ai_roleplay_chat", "crm_workspace", "code_sandbox"]
+    type: Literal["text_rubric", "structured_form", "quiz", "ai_roleplay_chat", "crm_workspace", "code_sandbox", "mermaid_diagram"]
     objective: str | None = None
     briefing: str = ""
     what_to_do: list[str] = Field(default_factory=list)
@@ -374,6 +386,28 @@ class DuplicateSimulationBody(BaseModel):
 class CreateFromTemplateBody(BaseModel):
     slug: str = Field(pattern=SLUG_PATTERN)
     title: str | None = None
+
+
+class ArchitectureParseBody(BaseModel):
+    mermaid: str
+
+
+class CreateFromArchitectureBody(BaseModel):
+    slug: str = Field(pattern=SLUG_PATTERN)
+    mermaid: str
+    title: str | None = None
+    description: str | None = None
+    company: str | None = None
+    domain: str | None = None
+    category: str | None = None
+    difficulty: str | None = None
+    estimated_hours: str | None = None
+    skills: list[str] | None = None
+
+
+class ApplyArchitectureBody(BaseModel):
+    mermaid: str
+    mode: Literal["append", "replace"] = "append"
 
 
 def validate_task_config(task_type: str, config: dict) -> dict:

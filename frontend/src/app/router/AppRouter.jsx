@@ -36,9 +36,8 @@ import LoginPage from '../../features/auth/global/Login'
 // ── (dashboard) — everything behind authentication. SuperAdminPortal/
 // AdminPortal stay lazy — a regular student never downloads either portal's
 // bundle (shell + every page + shared admin components). The job-sim CMS
-// editor and Sim Builder are regular imports — they're standalone
-// full-screen tools re-hosted under /admin/*, not part of either portal's
-// own code-split chunk. ──────────────────────────────────────────────────────
+// editor and Sim Builder are regular imports on AppRouter sibling routes,
+// wrapped in AdminCmsLayout / MentorCmsLayout for portal sidebar + theme. ───
 const SuperAdminPortal = lazy(() => import('../../features/superadmin/SuperAdminPortal'))
 const AdminPortal       = lazy(() => import('../../features/admin/portal/AdminPortal'))
 const UniversityAdminPortal = lazy(() => import('../../features/university-admin/UniversityAdminPortal'))
@@ -47,6 +46,8 @@ import SimulationBuilder    from '../../features/builder/cms/SimulationBuilder'
 import SimBuilderListPage   from '../../features/builder/sim-builder/SimBuilderListPage'
 import SimBuilderEditor     from '../../features/builder/sim-builder/SimBuilderEditor'
 import SimulationsPage      from '../../features/admin/portal/pages/SimulationsPage'
+import AdminCmsLayout       from '../../features/admin/portal/AdminCmsLayout'
+import MentorCmsLayout      from '../../features/mentor/MentorCmsLayout'
 import OnboardingWizard     from '../../features/onboarding/OnboardingWizard'
 import Dashboard            from '../../features/dashboard/Dashboard'
 import SimulationWorkspace  from '../../features/simulations/SimulationWorkspace'
@@ -145,16 +146,13 @@ export default function AppRouter() {
       />
 
       {/* (dashboard) — Admin: the lower RBAC tier (SUPER_ADMIN can reach this
-          too, see RequireAdmin). The job-sim CMS editor and Sim Builder are
-          standalone full-screen tools (own header, no sidebar chrome),
-          siblings of the portal shell rather than nested in it. React Router
-          ranks routes by specificity regardless of declaration order, so
-          these always win over the portal's own `/*` wildcard for their
-          exact paths — see AdminPortal.jsx's docblock. */}
-      <Route path="/admin/simulations" element={<RequireCmsAccess><RedirectTeacherAwayFromAdminCms><SimulationsPage /></RedirectTeacherAwayFromAdminCms></RequireCmsAccess>} />
-      <Route path="/admin/simulations/:id" element={<RequireCmsAccess><RedirectTeacherAwayFromAdminCms><SimulationBuilder /></RedirectTeacherAwayFromAdminCms></RequireCmsAccess>} />
-      <Route path="/admin/sim-builder" element={<RequireCmsAccess><RedirectTeacherAwayFromAdminCms><SimBuilderListPage /></RedirectTeacherAwayFromAdminCms></RequireCmsAccess>} />
-      <Route path="/admin/sim-builder/:id" element={<RequireCmsAccess><RedirectTeacherAwayFromAdminCms><SimBuilderEditor /></RedirectTeacherAwayFromAdminCms></RequireCmsAccess>} />
+          too, see RequireAdmin). CMS list/editor routes stay AppRouter siblings
+          (win over /admin/*) but wrap AdminCmsLayout so sidebar + theme match
+          the rest of the portal. */}
+      <Route path="/admin/simulations" element={<RequireCmsAccess><RedirectTeacherAwayFromAdminCms><AdminCmsLayout><SimulationsPage /></AdminCmsLayout></RedirectTeacherAwayFromAdminCms></RequireCmsAccess>} />
+      <Route path="/admin/simulations/:id" element={<RequireCmsAccess><RedirectTeacherAwayFromAdminCms><AdminCmsLayout><SimulationBuilder /></AdminCmsLayout></RedirectTeacherAwayFromAdminCms></RequireCmsAccess>} />
+      <Route path="/admin/sim-builder" element={<RequireCmsAccess><RedirectTeacherAwayFromAdminCms><AdminCmsLayout><SimBuilderListPage /></AdminCmsLayout></RedirectTeacherAwayFromAdminCms></RequireCmsAccess>} />
+      <Route path="/admin/sim-builder/:id" element={<RequireCmsAccess><RedirectTeacherAwayFromAdminCms><AdminCmsLayout><SimBuilderEditor /></AdminCmsLayout></RedirectTeacherAwayFromAdminCms></RequireCmsAccess>} />
       <Route
         path="/admin/*"
         element={
@@ -179,10 +177,10 @@ export default function AppRouter() {
       />
 
       {/* Teacher CMS — mentor-prefixed (not /admin). Ranked above /mentor/*. */}
-      <Route path="/mentor/simulations" element={<RequireCmsAccess><SimulationsPage /></RequireCmsAccess>} />
-      <Route path="/mentor/simulations/:id" element={<RequireCmsAccess><SimulationBuilder /></RequireCmsAccess>} />
-      <Route path="/mentor/sim-builder" element={<RequireCmsAccess><SimBuilderListPage /></RequireCmsAccess>} />
-      <Route path="/mentor/sim-builder/:id" element={<RequireCmsAccess><SimBuilderEditor /></RequireCmsAccess>} />
+      <Route path="/mentor/simulations" element={<RequireCmsAccess><MentorCmsLayout><SimulationsPage /></MentorCmsLayout></RequireCmsAccess>} />
+      <Route path="/mentor/simulations/:id" element={<RequireCmsAccess><MentorCmsLayout><SimulationBuilder /></MentorCmsLayout></RequireCmsAccess>} />
+      <Route path="/mentor/sim-builder" element={<RequireCmsAccess><MentorCmsLayout><SimBuilderListPage /></MentorCmsLayout></RequireCmsAccess>} />
+      <Route path="/mentor/sim-builder/:id" element={<RequireCmsAccess><MentorCmsLayout><SimBuilderEditor /></MentorCmsLayout></RequireCmsAccess>} />
 
       {/* Mentor (teacher) portal */}
       <Route

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ChevronDown, Loader2 } from 'lucide-react'
+import { ArrowLeft, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../../auth/AuthContext'
 import { useCmsBasePath } from '../../../hooks/useCmsBasePath'
@@ -12,8 +12,8 @@ import MetadataTab from './tabs/MetadataTab'
 import ManagerOnboardingTab from './tabs/ManagerOnboardingTab'
 import StagesTab from './tabs/StagesTab'
 import PreviewTab from './tabs/PreviewTab'
+import ArchitectureTab from './tabs/ArchitectureTab'
 import PublishScopeModal from '../shared/PublishScopeModal'
-import logo from '../../../assets/logo.png'
 
 const BLANK_SIM = {
   id: '', title: '', description: '', company: '', domain: '', category: '',
@@ -23,13 +23,8 @@ const BLANK_SIM = {
   onboarding_xp_award: 0,
 }
 
-/** Standalone admin page (not nested in SuperAdmin's sidebar chrome — the
- * builder wants full width and is a long-lived editing session, so it gets
- * its own route/URL) for creating/editing one simulation: Metadata /
- * Onboarding / Stages (drag-and-drop) / Preview, in a full-width
- * toolbar+canvas layout. Distinct from the separate "Sim Builder" visual
- * canvas tool (src/features/builder/sim-builder/) — this is the structured,
- * form-driven builder. */
+/** Job-sim CMS editor — Metadata / Onboarding / Architecture / Stages / Preview.
+ * Mounted under AdminCmsLayout / MentorCmsLayout (sidebar stays visible). */
 export default function SimulationBuilder() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -123,7 +118,7 @@ export default function SimulationBuilder() {
 
   if (!isNew && isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center min-h-[40vh]">
         <Loader2 className="h-6 w-6 animate-spin text-primary" />
       </div>
     )
@@ -131,8 +126,8 @@ export default function SimulationBuilder() {
 
   if (!isNew && isError) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-3 px-6">
-        <p className="text-sm text-on-surface-variant">{error?.message || 'Could not load this simulation.'}</p>
+      <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6 min-h-[40vh]">
+        <p className="text-sm text-on-surface-variant dark:text-slate-400">{error?.message || 'Could not load this simulation.'}</p>
         <Button variant="outline" onClick={() => navigate(`${cmsBase}/simulations`)}>Back to list</Button>
       </div>
     )
@@ -141,32 +136,33 @@ export default function SimulationBuilder() {
   const hasRealSim = !!realId && !isNew
 
   return (
-    <div className="min-h-screen bg-surface-low">
-      <Tabs defaultValue="metadata">
+    <div className="flex-1 min-h-0 flex flex-col bg-surface-low dark:bg-slate-950">
+      <Tabs defaultValue="metadata" className="flex-1 min-h-0 flex flex-col">
         {/* ── Toolbar ── */}
-        <header className="sticky top-0 z-10 bg-white border-b border-border">
+        <header className="sticky top-0 z-10 shrink-0 bg-white dark:bg-slate-900 border-b border-border dark:border-slate-800">
           <div className="px-6 h-16 flex items-center gap-4">
             <button
-              onClick={() => navigate(cmsBase === '/mentor' ? '/mentor' : '/admin')}
-              title={cmsBase === '/mentor' ? 'Back to Mentor' : 'Back to Admin'}
+              type="button"
+              onClick={() => navigate(`${cmsBase}/simulations`)}
+              title="Back to simulations list"
               className="flex items-center gap-2 shrink-0 cursor-pointer group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-lg px-1 -mx-1"
             >
-              <img src={logo} alt="WorkLearn" className="w-8 h-8 rounded-lg object-cover shrink-0" />
-              <ChevronDown className="h-3.5 w-3.5 text-outline group-hover:text-on-surface-variant transition-colors shrink-0" />
-              <span className="text-sm font-bold text-on-surface whitespace-nowrap">Simulation Builder</span>
+              <ArrowLeft className="h-4 w-4 text-outline group-hover:text-on-surface-variant dark:text-slate-400 dark:group-hover:text-slate-200 transition-colors shrink-0" />
+              <span className="text-sm font-bold text-on-surface dark:text-slate-100 whitespace-nowrap">Simulations</span>
             </button>
 
-            <div className="h-6 w-px bg-border shrink-0" />
+            <div className="h-6 w-px bg-border dark:bg-slate-700 shrink-0" />
 
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-on-surface truncate">{draft.title || 'New Simulation'}</p>
-              <p className="text-xs text-outline truncate">{draft.id || 'unsaved'}</p>
+              <p className="text-sm font-bold text-on-surface dark:text-slate-100 truncate">{draft.title || 'New Simulation'}</p>
+              <p className="text-xs text-outline dark:text-slate-500 truncate">{draft.id || 'unsaved'}</p>
             </div>
 
             <div className="shrink-0 overflow-x-auto">
               <TabsList>
                 <TabsTrigger value="metadata">Metadata</TabsTrigger>
                 <TabsTrigger value="onboarding" disabled={!hasRealSim}>Onboarding</TabsTrigger>
+                <TabsTrigger value="architecture" disabled={!hasRealSim}>Architecture</TabsTrigger>
                 <TabsTrigger value="stages" disabled={!hasRealSim}>Stages</TabsTrigger>
                 <TabsTrigger value="preview" disabled={!hasRealSim}>Preview</TabsTrigger>
               </TabsList>
@@ -204,7 +200,7 @@ export default function SimulationBuilder() {
         />
 
         {/* ── Content ── */}
-        <div className="py-8">
+        <div className="flex-1 min-h-0 overflow-y-auto py-8">
           <TabsContent value="metadata" className="!mt-0 max-w-4xl mx-auto px-6">
             <MetadataTab draft={draft} setDraft={setDraft} isNew={!hasRealSim} />
             <div className="mt-6 flex flex-col items-end gap-2">
@@ -213,8 +209,8 @@ export default function SimulationBuilder() {
                   <Button onClick={handleCreate} disabled={createSim.isPending}>
                     {createSim.isPending && <Loader2 className="h-4 w-4 animate-spin" />} Create Simulation
                   </Button>
-                  <p className="text-xs text-on-surface-variant">
-                    Create the simulation first to unlock Onboarding, Stages, and Preview.
+                  <p className="text-xs text-on-surface-variant dark:text-slate-400">
+                    Create the simulation first to unlock Onboarding, Architecture, Stages, and Preview.
                   </p>
                 </>
               ) : (
@@ -229,6 +225,9 @@ export default function SimulationBuilder() {
             <>
               <TabsContent value="onboarding" className="!mt-0 max-w-4xl mx-auto px-6">
                 <ManagerOnboardingTab draft={draft} setDraft={setDraft} onSave={handleSaveMetadata} saving={updateSim.isPending} />
+              </TabsContent>
+              <TabsContent value="architecture" className="!mt-0 px-6">
+                <ArchitectureTab simId={realId} />
               </TabsContent>
               <TabsContent value="stages" className="!mt-0 px-6">
                 <StagesTab simId={realId} />

@@ -6,6 +6,7 @@ import CrmWorkspaceTask from '../../../simulations/generic/CrmWorkspaceTask'
 import TextRubricTask from '../../../simulations/generic/TextRubricTask'
 import AiRoleplayChatTask from '../../../simulations/generic/AiRoleplayChatTask'
 import CodeSandboxPreviewTask from '../../../simulations/generic/CodeSandboxPreviewTask'
+import MermaidDiagramTask from '../../../simulations/generic/MermaidDiagramTask'
 
 // Mounts the REAL student-facing component for structured_form/crm_workspace
 // directly against the live (unsaved) draft — no server dependency, so
@@ -42,7 +43,15 @@ export default function TaskLivePreviewPane({ simId, draft, savedTask }) {
     )
   }
 
-  if (draft.type === 'text_rubric' || draft.type === 'ai_roleplay_chat') {
+  if (draft.type === 'mermaid_diagram' && draft.config?.grading_mode !== 'llm') {
+    return (
+      <div className="p-4">
+        <MermaidDiagramTask task={draft} onComplete={noop} />
+      </div>
+    )
+  }
+
+  if (draft.type === 'text_rubric' || draft.type === 'ai_roleplay_chat' || draft.type === 'mermaid_diagram') {
     return <SaveThenTestPane simId={simId} draft={draft} savedTask={savedTask} />
   }
 
@@ -75,7 +84,11 @@ function SaveThenTestPane({ simId, draft, savedTask }) {
     )
   }
 
-  const Component = draft.type === 'ai_roleplay_chat' ? AiRoleplayChatTask : TextRubricTask
+  const Component = draft.type === 'ai_roleplay_chat'
+    ? AiRoleplayChatTask
+    : draft.type === 'mermaid_diagram'
+      ? MermaidDiagramTask
+      : TextRubricTask
   return (
     <div className="p-4">
       <Component simId={simId} task={savedTask} onComplete={noop} />

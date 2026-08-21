@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { LogOut } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
 import PortalShell from '../../components/design-system/PortalShell'
@@ -7,17 +7,13 @@ import Sidebar from '../../components/design-system/Sidebar'
 import Topbar from '../../components/design-system/Topbar'
 import ThemeToggle from '../../components/design-system/ThemeToggle'
 import TenantBrandMark from '../../components/TenantBrandMark'
-import MentorOverviewPage from './pages/MentorOverviewPage'
-import MentorStudentsPage from './pages/MentorStudentsPage'
-import MentorAssignmentsPage from './pages/MentorAssignmentsPage'
-import { buildMentorNavSections, mentorTitleForPath } from './mentorNav'
+import { buildMentorNavSections, mentorTitleForPath, isMentorCmsEditorPath } from './mentorNav'
 
 /**
- * Mentor (teacher) portal — university-scoped roster + optional CMS tools
- * when University Admin has enabled cms_access for this teacher.
- * CMS list/editor routes live on AppRouter siblings wrapped in MentorCmsLayout.
+ * Portal chrome for AppRouter CMS routes (/mentor/simulations*, /mentor/sim-builder*).
+ * Mirrors MentorPortal so teachers can switch tabs without leaving the shell.
  */
-export default function MentorPortal() {
+export default function MentorCmsLayout({ children }) {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout, hasFeature } = useAuth()
@@ -26,6 +22,7 @@ export default function MentorPortal() {
 
   const sections = useMemo(() => buildMentorNavSections(cms), [cms])
   const title = mentorTitleForPath(location.pathname)
+  const editor = isMentorCmsEditorPath(location.pathname)
 
   return (
     <PortalShell>
@@ -60,14 +57,10 @@ export default function MentorPortal() {
           </div>
         }
       />
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
         <Topbar title={title} description={`${uniLabel} · Mentor`} actions={<ThemeToggle />} />
-        <main className="flex-1 overflow-y-auto p-6">
-          <Routes>
-            <Route index element={<MentorOverviewPage />} />
-            <Route path="students" element={<MentorStudentsPage />} />
-            <Route path="assignments" element={<MentorAssignmentsPage />} />
-          </Routes>
+        <main className={editor ? 'flex-1 min-h-0 overflow-hidden flex flex-col' : 'flex-1 overflow-y-auto p-6'}>
+          {children}
         </main>
       </div>
     </PortalShell>

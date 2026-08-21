@@ -10,13 +10,14 @@ export const TASK_TYPES = Object.entries(taskTypeRegistry).map(([type, entry]) =
 // Steers non-sales genres away from a type that only makes sense for them.
 export const PALETTE_HINTS = {
   crm_workspace: 'Renders the built-in sales CRM app — best for sales/account-management simulations. For other genres, consider Structured Form or AI Roleplay Chat instead.',
+  mermaid_diagram: 'Students write Mermaid flowchart code, run a live diagram, then submit. Grade manually or with an LLM judge.',
 }
 
 // Purely a sidebar grouping aid — doesn't touch taskTypeRegistry or the data
 // model, just organizes the palette the way a builder tool groups its
 // component library into labeled, collapsible sections.
 const GROUPS = [
-  { name: 'Content', types: ['text_rubric', 'structured_form', 'quiz'] },
+  { name: 'Content', types: ['text_rubric', 'structured_form', 'quiz', 'mermaid_diagram'] },
   { name: 'Interactive', types: ['ai_roleplay_chat', 'crm_workspace', 'code_sandbox'] },
 ]
 
@@ -47,7 +48,7 @@ export default function StagePalette() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search stage types…"
-          className="w-full bg-white border border-border rounded-lg pl-8 pr-3 py-1.5 text-xs placeholder-outline/70 outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15"
+          className="w-full bg-white dark:bg-slate-900 border border-border dark:border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs placeholder-outline/70 outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15 text-on-surface dark:text-slate-100"
         />
       </div>
 
@@ -98,7 +99,7 @@ function PaletteItem({ type, label, hint }) {
       {...attributes}
       title={hint}
       style={{ transform: CSS.Translate.toString(transform) }}
-      className="flex items-center gap-2.5 cursor-grab active:cursor-grabbing rounded-lg border border-border bg-white px-2.5 py-2 text-xs font-semibold text-on-surface hover:border-primary/50 hover:shadow-sm transition-all select-none"
+      className="flex items-center gap-2.5 cursor-grab active:cursor-grabbing rounded-lg border border-border dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-2 text-xs font-semibold text-on-surface dark:text-slate-100 hover:border-primary/50 hover:shadow-sm transition-all select-none"
     >
       <span className={`h-6 w-6 rounded-md flex items-center justify-center shrink-0 ${meta.badgeBg}`}>
         <TypeIcon className={`h-3.5 w-3.5 ${meta.badgeText}`} />

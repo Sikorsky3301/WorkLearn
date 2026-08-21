@@ -10,8 +10,8 @@ import { Button } from '../../../components/ui/shadcn/button'
 export default function PropertiesPanel({ block, draftConfig, onDraftChange, onSave, saving, onClose }) {
   if (!block) {
     return (
-      <aside className="w-80 shrink-0 border-l border-border bg-white flex items-center justify-center p-6">
-        <p className="text-xs text-on-surface-variant text-center">Select a block to edit its properties.</p>
+      <aside className="w-80 shrink-0 border-l border-border dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-center p-6">
+        <p className="text-xs text-on-surface-variant dark:text-slate-400 text-center">Select a block to edit its properties.</p>
       </aside>
     )
   }
@@ -21,11 +21,11 @@ export default function PropertiesPanel({ block, draftConfig, onDraftChange, onS
   const Icon = entry?.meta.icon
 
   return (
-    <aside className="w-80 shrink-0 border-l border-border bg-white flex flex-col">
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+    <aside className="w-80 shrink-0 border-l border-border dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-border dark:border-slate-800">
         {Icon && <Icon className="h-4 w-4 text-primary shrink-0" />}
-        <p className="text-sm font-bold text-on-surface flex-1 truncate">{entry?.meta.label || 'Block'}</p>
-        <button onClick={onClose} className="text-on-surface-variant hover:text-on-surface cursor-pointer shrink-0">
+        <p className="text-sm font-bold text-on-surface dark:text-slate-100 flex-1 truncate">{entry?.meta.label || 'Block'}</p>
+        <button onClick={onClose} className="text-on-surface-variant dark:text-slate-400 hover:text-on-surface dark:hover:text-slate-100 cursor-pointer shrink-0">
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -36,7 +36,7 @@ export default function PropertiesPanel({ block, draftConfig, onDraftChange, onS
           <p className="text-xs text-on-surface-variant">No editor available for this block type.</p>
         )}
       </div>
-      <div className="p-4 border-t border-border">
+      <div className="p-4 border-t border-border dark:border-slate-800">
         <Button onClick={onSave} disabled={saving} className="w-full">
           {saving && <Loader2 className="h-4 w-4 animate-spin" />} Save
         </Button>

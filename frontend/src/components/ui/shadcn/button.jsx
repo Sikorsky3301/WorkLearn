@@ -9,9 +9,9 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: 'bg-primary text-white hover:bg-primary-dark',
-        secondary: 'bg-surface-container text-on-surface hover:bg-surface-high border border-border',
-        outline: 'border border-border bg-white text-on-surface hover:bg-surface-low',
-        ghost: 'text-on-surface hover:bg-surface-low',
+        secondary: 'bg-surface-container dark:bg-slate-800 text-on-surface dark:text-slate-100 hover:bg-surface-high dark:hover:bg-slate-700 border border-border dark:border-slate-700',
+        outline: 'border border-border dark:border-slate-700 bg-white dark:bg-slate-900 text-on-surface dark:text-slate-100 hover:bg-surface-low dark:hover:bg-slate-800',
+        ghost: 'text-on-surface dark:text-slate-100 hover:bg-surface-low dark:hover:bg-slate-800',
         destructive: 'bg-red-600 text-white hover:bg-red-700',
         link: 'text-primary underline-offset-4 hover:underline',
       },

@@ -50,7 +50,7 @@ async def get_full_simulation(sim_id: str, db: AsyncSession = Depends(get_db), t
     return build_simulation_public_dict(sim, tasks)
 
 
-async def _get_task(db: AsyncSession, sim_key: str, task_index: int, task_type: str) -> SimulationTask:
+async def _get_task(db: AsyncSession, sim_key: str, task_index: int, task_type: str | tuple[str, ...]) -> SimulationTask:
     """Intentionally status-agnostic (no PUBLISHED filter) — this is what
     lets roleplay_message/grade_text below work against DRAFT simulations
     for any authenticated user, which is exactly what makes the admin
@@ -59,15 +59,16 @@ async def _get_task(db: AsyncSession, sim_key: str, task_index: int, task_type: 
     sim = await get_simulation(db, sim_key)
     if not sim:
         raise HTTPException(404, "Simulation not found")
+    types = (task_type,) if isinstance(task_type, str) else task_type
     result = await db.execute(
         select(SimulationTask).where(
             SimulationTask.simulation_id == sim.id, SimulationTask.task_index == task_index,
-            SimulationTask.type == task_type,
+            SimulationTask.type.in_(types),
         )
     )
     task = result.scalar_one_or_none()
     if not task:
-        raise HTTPException(404, f"No {task_type} task at index {task_index} for this simulation")
+        raise HTTPException(404, f"No {'/'.join(types)} task at index {task_index} for this simulation")
     return task
 
 
@@ -198,17 +199,27 @@ async def grade_text(
     sim_id: str, task_index: int, body: GradeTextBody,
     db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user),
 ):
-    task = await _get_task(db, sim_id, task_index, "text_rubric")
+    task = await _get_task(db, sim_id, task_index, ("text_rubric", "mermaid_diagram"))
     config = task.config
     if config.get("grading_mode") != "llm":
         raise HTTPException(400, "This task is not configured for LLM grading")
     if not body.text.strip():
         raise HTTPException(400, "text is required")
+    min_words = int(config.get("min_words") or 0)
+    if min_words and len(body.text.split()) < min_words:
+        raise HTTPException(400, f"Submission must be at least {min_words} words")
 
-    prompt_template = config.get("llm_judge_prompt") or (
-        "Grade this submission 0-100 and give 2-4 sentences of specific feedback. "
+    default_prompt = (
+        "Grade this Mermaid flowchart 0-100 for architecture correctness, named components, "
+        "and valid flowchart structure. Give 2-4 sentences of specific feedback. "
         "Respond with ONLY JSON: {{\"overall\": <0-100>, \"feedback\": \"...\"}}\n\nSubmission:\n{text}"
+        if task.type == "mermaid_diagram"
+        else (
+            "Grade this submission 0-100 and give 2-4 sentences of specific feedback. "
+            "Respond with ONLY JSON: {{\"overall\": <0-100>, \"feedback\": \"...\"}}\n\nSubmission:\n{text}"
+        )
     )
+    prompt_template = config.get("llm_judge_prompt") or default_prompt
     # An admin-authored llm_judge_prompt can reference any field key the task
     # collects (e.g. {subject}/{body}/{cta}). The retry below used to drop
     # **fields and call format() again *outside* a try — so when the template

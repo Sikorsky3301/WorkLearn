@@ -32,11 +32,11 @@ export default function LogoUploadField({ label, value, onChange, round = false 
     <div>
       <Label className="mb-1.5 block">{label}</Label>
       <div className="flex items-center gap-3">
-        <div className={`h-14 w-14 shrink-0 border border-border bg-surface-low flex items-center justify-center overflow-hidden ${round ? 'rounded-full' : 'rounded-lg'}`}>
+        <div className={`h-14 w-14 shrink-0 border border-border dark:border-slate-700 bg-surface-low dark:bg-slate-800 flex items-center justify-center overflow-hidden ${round ? 'rounded-full' : 'rounded-lg'}`}>
           {value ? (
             <img src={resolveMediaUrl(value)} alt="" className="h-full w-full object-cover" />
           ) : (
-            <Upload className="h-5 w-5 text-on-surface-variant/40" />
+            <Upload className="h-5 w-5 text-on-surface-variant/40 dark:text-slate-500" />
           )}
         </div>
         <div className="flex-1 space-y-1.5">

@@ -94,8 +94,8 @@ function BlockRow({ block, active, effectiveConfig, onSelect, onDelete }) {
       style={style}
       onClick={onSelect}
       className={cn(
-        'group relative rounded-xl border-2 bg-white p-4 cursor-pointer transition-colors',
-        active ? 'border-primary ring-2 ring-primary/15' : 'border-transparent hover:border-border'
+        'group relative rounded-xl border-2 bg-white dark:bg-slate-900 p-4 cursor-pointer transition-colors',
+        active ? 'border-primary ring-2 ring-primary/15' : 'border-transparent hover:border-border dark:hover:border-slate-700'
       )}
     >
       <div className="flex items-center gap-2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -117,7 +117,7 @@ function BlockPicker({ onPick, onClose }) {
   return (
     <>
       <div className="fixed inset-0 z-10" onClick={onClose} />
-      <div className="absolute left-0 right-0 top-full mt-2 z-20 rounded-xl border border-border bg-white shadow-lg p-2">
+      <div className="absolute left-0 right-0 top-full mt-2 z-20 rounded-xl border border-border dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg p-2">
         {BLOCK_GROUPS.map((group) => (
           <div key={group.name} className="mb-2 last:mb-0">
             <p className="px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60">{group.name}</p>
