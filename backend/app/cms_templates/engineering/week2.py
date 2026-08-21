@@ -208,7 +208,7 @@ TASK_4 = dict(
                             "every success path clears what the last failure left behind.",
         "example_solution": starters.TASK4_SOLUTION,
     },
-    xp_award=80, skill_awards={"javascript": 20, "accessibility": 20},
+    xp_award=80, skill_awards={"javascript": 10, "accessibility": 11},
 )
 
 
@@ -410,7 +410,7 @@ TASK_5 = dict(
                             "array, and the screen always says something true.",
         "example_solution": starters.TASK5_SOLUTION,
     },
-    xp_award=90, skill_awards={"javascript": 25, "async": 20},
+    xp_award=90, skill_awards={"javascript": 13, "async_data": 40},
 )
 
 
@@ -605,7 +605,7 @@ TASK_6 = dict(
                             "filtering is.",
         "example_solution": starters.TASK6_SOLUTION,
     },
-    xp_award=90, skill_awards={"javascript": 30},
+    xp_award=90, skill_awards={"javascript": 16},
 )
 
 

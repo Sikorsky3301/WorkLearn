@@ -17,7 +17,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.database import get_db
 from app.core.auth import get_current_user, token_user_id
 from app.core.paths import UPLOAD_DIR, PHOTO_DIR, RESUME_DIR
-from app.models import User
+from app.core.config import SKILL_LABELS, SKILL_CATEGORIES
+from app.models import User, UserSkill
 from app.models.profile import EducationEntry
 from app.schemas.profile import ProfileUpdateBody, EducationIn, EducationOut
 
@@ -38,6 +39,37 @@ async def _get_user(db: AsyncSession, user_id: int) -> User:
     if not user:
         raise HTTPException(404, "User not found")
     return user
+
+
+@router.get("/skills")
+async def my_skills(db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
+    """Every skill point this student has earned, highest first.
+
+    The Portfolio page has always called GET /api/users/me/skills, but the route
+    did not exist — so the request 404'd and the "Verified skills" and
+    "Competencies" sections rendered their empty state permanently, no matter
+    how many tasks the student had completed. Skill points are written by
+    skill_engine.award_task_completion() on every graded task.
+
+    Label and category are resolved server-side from the single config
+    vocabulary; the frontend used to carry its own partial copies covering only
+    the Data Analytics skills.
+    """
+    user_id = token_user_id(token)
+    result = await db.execute(
+        select(UserSkill)
+        .where(UserSkill.user_id == user_id)
+        .order_by(UserSkill.current_score.desc())
+    )
+    return [
+        {
+            "skill_key": s.skill_key,
+            "label": SKILL_LABELS.get(s.skill_key, s.skill_key.replace("_", " ").title()),
+            "category": SKILL_CATEGORIES.get(s.skill_key, "Technical"),
+            "current_score": s.current_score,
+        }
+        for s in result.scalars().all()
+    ]
 
 
 @router.put("/profile")

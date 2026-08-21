@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, MessageCircle, TrendingUp, Settings, LayoutDashboard, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
-import { useSkillGPS } from '../../hooks'
+import { useSkillGpsRoles, useSkillGPS } from '../../hooks'
 
 /** Left nav shell for the AI Mentor page, matching the reference app-shell
  * layout (New Chat / Features nav / Settings & Help / profile card). Items
@@ -13,7 +13,12 @@ import { useSkillGPS } from '../../hooks'
 export default function ChatSidebar({ onNewChat, hasMessages }) {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { data: gpsData } = useSkillGPS(user?.target_role || 'junior_da')
+  // The role comes from the server's recommendation (driven by the simulation
+  // this student is enrolled in), not from `user.target_role`, which defaults
+  // to junior_da for everyone at signup — so an Engineering student's sidebar
+  // used to list Data Analytics gaps.
+  const { data: gpsRoles } = useSkillGpsRoles()
+  const { data: gpsData } = useSkillGPS(gpsRoles?.recommended)
   const [collapsed, setCollapsed] = useState(false)
 
   const topGaps = gpsData?.top_gaps ?? []
@@ -71,7 +76,7 @@ export default function ChatSidebar({ onNewChat, hasMessages }) {
             {topGaps.slice(0, 3).map((gap) => {
               const pct = gap.required ? Math.min(100, Math.round((gap.current / gap.required) * 100)) : 0
               return (
-                <div key={gap.skill}>
+                <div key={gap.skill_key}>
                   <div className="flex justify-between text-[10px] text-on-surface-variant mb-1">
                     <span className="truncate pr-2">{gap.skill}</span>
                     <span className="shrink-0 tabular-nums">{gap.current}/{gap.required}</span>

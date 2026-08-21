@@ -13,6 +13,11 @@ import BadgeTile from './components/BadgeTile'
 import CaseStudyCard from './components/CaseStudyCard'
 import CertificateCard from './components/CertificateCard'
 
+// Fallbacks only. Every row from GET /api/users/me/skills carries its own
+// `label` and `category`, resolved from the one config vocabulary on the
+// server. These maps used to be the only source and covered just the Data
+// Analytics skills, so an Engineering or Sales student saw raw keys like
+// "state_management" filed under the wrong heading.
 const SKILL_LABELS = {
   sql:                'SQL Queries',
   python:             'Python & EDA',
@@ -26,6 +31,10 @@ const SKILL_LABELS = {
   communication:      'Communication',
   data_storytelling:  'Data Storytelling',
 }
+
+const prettyKey = (key) => key.replace(/_/g, ' ').replace(/\w/g, (c) => c.toUpperCase())
+const skillLabel = (s) => s.label || SKILL_LABELS[s.skill_key] || prettyKey(s.skill_key)
+const skillCategory = (s) => s.category || SKILL_CATEGORIES[s.skill_key] || 'Technical'
 
 const SKILL_CATEGORIES = {
   sql:                'Technical',
@@ -262,7 +271,7 @@ export default function Portfolio() {
                   <InlinePrompt text="Complete simulation tasks to earn verified skill points — they'll appear here automatically." />
                 ) : (
                   <div className="grid sm:grid-cols-2 gap-3">
-                    {topSkills.map(s => <SkillBar key={s.skill_key} skillKey={s.skill_key} score={s.current_score} />)}
+                    {topSkills.map(s => <SkillBar key={s.skill_key} label={skillLabel(s)} category={skillCategory(s)} score={s.current_score} />)}
                   </div>
                 )}
               </Panel>
@@ -291,7 +300,7 @@ export default function Portfolio() {
             ) : (
               <div className="space-y-6">
                 {CATEGORY_ORDER.map((category) => {
-                  const items = skills.filter(s => (SKILL_CATEGORIES[s.skill_key] || 'Technical') === category)
+                  const items = skills.filter(s => skillCategory(s) === category)
                   if (items.length === 0) return null
                   return (
                     <Panel key={category} title={category} subtitle={`${items.length} skill${items.length !== 1 ? 's' : ''}`} dot={categoryDot[category]}>
@@ -299,7 +308,7 @@ export default function Portfolio() {
                         {items.map(s => (
                           <div key={s.skill_key} className={`border border-border border-l-[3px] ${categoryBorder[category]} rounded-lg p-4 hover:shadow-sm transition-shadow`}>
                             <div className="flex items-center justify-between mb-2.5">
-                              <p className="text-sm font-semibold text-on-surface">{SKILL_LABELS[s.skill_key] || s.skill_key}</p>
+                              <p className="text-sm font-semibold text-on-surface">{skillLabel(s)}</p>
                               <span className="text-sm font-bold text-primary tabular-nums ml-2 shrink-0">{s.current_score}</span>
                             </div>
                             <div className="h-1.5 bg-surface-high rounded-full overflow-hidden">
@@ -518,9 +527,7 @@ function InlinePrompt({ text, action, onClick }) {
   )
 }
 
-function SkillBar({ skillKey, score }) {
-  const label    = SKILL_LABELS[skillKey] || skillKey
-  const category = SKILL_CATEGORIES[skillKey] || 'Technical'
+function SkillBar({ label, category, score }) {
   return (
     <div className="border border-border rounded-lg p-3.5 hover:border-primary/40 transition-colors">
       <div className="flex items-center justify-between mb-2">

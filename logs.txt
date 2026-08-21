@@ -1551,3 +1551,466 @@ FILES   frontend/package.json                              (+remark-gfm)
         backend/app/ai/services/mentor_personas.py
 
 ================================================================================
+
+--------------------------------------------------------------------------------
+ 28. SKILL GPS — FIXED THE FEATURE, NOT JUST THE PAGE
+--------------------------------------------------------------------------------
+ASKED     Deploying to 1000+ users. Fix Skill GPS, remove placeholder content,
+          and explain how it fetches data and how it all fits together.
+
+WHAT WAS ACTUALLY WRONG (all verified before touching anything)
+
+  1. TWO OF THE FOUR ROLE BUTTONS WERE FICTION
+     SkillGPS.jsx hardcoded ['junior_da','mid_da','senior_da','lead_da'].
+     TARGET_ROLE_REQUIREMENTS has no mid_da and no lead_da, and
+     compute_skill_gps did .get(role, TARGET_ROLE_REQUIREMENTS["junior_da"]).
+     So clicking "Mid-level DA" or "Lead DA" re-rendered Junior DA's exact
+     numbers under a different label. Nothing logged, nothing errored.
+
+  2. THE PLATFORM'S OTHER TWO SIMULATIONS HAD NO ROLE AT ALL
+     The backend already had junior_frontend_dev and junior_sales_rep
+     benchmarks. The UI offered neither. A student doing the Engineering sim
+     was benchmarked against Data Analytics skills they had never touched.
+
+  3. GET /api/users/me/skills DID NOT EXIST
+     Confirmed by enumerating app.routes: 'skill-gps' present, 'me/skills'
+     absent. Portfolio.jsx has always called it. So the "Verified skills" and
+     "Competencies" sections rendered their empty state for EVERY student
+     forever, no matter how much they had completed. Not a styling problem —
+     a 404 on every page load.
+
+  4. SKILL POINTS AND XP WERE PAID ON EVERY RE-SUBMIT
+     award_task_completion() computed `first_completion` and used it only to
+     gate the congratulation message. The skill loop and the XP insert ran
+     unconditionally, and BOTH the sandbox submit and /complete call through
+     it. Re-submitting task 1 five times paid it five times. The dev database
+     still shows the result: user 8 sits at 100/100 on four Engineering
+     skills. The readiness score was measuring how often you pressed Submit.
+
+  5. THE AWARDS WERE MISCALIBRATED BY ~4x AGAINST THE BENCHMARKS
+     Finishing 100% of a simulation reached:
+         Data Analytics       26% of Junior Data Analyst
+         Sales                ~60% of Junior Sales Rep
+         Engineering          html_css 55/60 — short even at full completion
+     Two skills were unreachable at any amount of work:
+         "async_data"       benchmarked; week2 task 5 awarded "async" (typo),
+                            so the points went into an orphan row no page read
+         "component_design" benchmarked; awarded by no task anywhere
+
+  6. EVERY PAGE LOAD MADE AN LLM CALL, AND BLOCKED ON IT
+     next_actions was generated inside GET /api/skill-gps. The page shows a
+     full-screen spinner until that query resolves, so every visit AND every
+     role-button click waited on a model round trip and burned a completion.
+     At 1000+ users that is the slowest thing on the page and an uncapped
+     per-student cost. The prompt was also hardcoded to "A data analyst
+     student..." regardless of the role asked for.
+
+WHAT CHANGED — BACKEND
+
+  app/core/config.py
+        + CAREER_TRACKS / ROLE_META / DOMAIN_TO_TRACK — the role catalog:
+          three tracks (Data Analytics, Frontend Engineering, Sales), each a
+          real two-rung ladder, each mapped from a Simulation.domain string.
+        + senior_frontend_dev and senior_sales_rep benchmarks, so the two
+          non-DA tracks are ladders rather than dead ends. NEW CONTENT —
+          tune the numbers if they do not match your intent.
+        + SKILL_CATEGORIES / CATEGORY_ORDER — one category vocabulary for the
+          whole product. Portfolio and Skill GPS each carried a private
+          partial copy covering only the DA skills.
+
+  app/services/skill_engine.py
+        + role_exists / track_for_role / recommended_role / role_catalog
+        · compute_skill_gps no longer substitutes junior_da for an unknown
+          role — unknown is now a 404 at the route.
+        · returns `role` metadata and `track_progress`: real readiness for
+          every rung of the track, so the career ladder is measured instead
+          of decorative.
+        · _skill_category reads config instead of a local DA-only dict.
+        · skills and XP paid ONCE, on first completion. Re-submitting still
+          updates TaskCompletion.score; it just no longer pays twice.
+
+  app/ai/routes/ai_mentor.py
+        + GET /api/skill-gps/roles        — the catalog + recommended role
+        · GET /api/skill-gps              — no LLM. 3ms measured.
+        + GET /api/skill-gps/next-actions — the model call, on its own request,
+          cached by (user, role, gap fingerprint) in a bounded LRU. The
+          fingerprint is the gap scores themselves, so the cache invalidates
+          exactly when a task is graded and never serves anything stale.
+          Prompt now names the real role and track.
+
+  app/api/v1/users/profile.py
+        + GET /api/users/me/skills — the missing route. Returns label and
+          category per row so no page needs its own maps.
+
+  app/ai/services/mentor_tools.py
+        · tool_get_skill_gaps resolves an invented role (the model picks it
+          freely) to the student's recommended one instead of raising.
+
+WHAT CHANGED — CONTENT
+
+  Every task's skill_awards rebalanced so that finishing a track's simulation
+  reaches EXACTLY 100% readiness for that track's entry-level role. Relative
+  weights between tasks preserved; only the totals were scaled.
+        week2 task 5   "async" -> "async_data"   (the typo)
+        week3 tasks    + component_design 15/10/15 = 40   (was unreachable)
+  Verified: all three tracks now land on 100%, and no single skill exceeds
+  the 100-point UserSkill cap.
+
+WHAT CHANGED — FRONTEND
+
+  hooks/skills.js          rewritten: useSkillGpsRoles / useSkillGPS /
+                           useSkillGpsActions / useUserSkills
+  skill-gps/SkillGPS.jsx   rewritten. Roles come from the server. Track pills
+                           + rung pills instead of one flat DA-only row.
+                           Opens on the recommended role. Career ladder shows
+                           real per-rung readiness — the old one hardcoded
+                           "(You)" onto index 0. Category chips. Next Actions
+                           is its own component with its own query, so a slow
+                           model degrades one card, not the page.
+  ai-mentor/ChatSidebar    uses the recommended role instead of
+                           user.target_role, which defaults to junior_da for
+                           every account at signup.
+  users/portfolio/         uses server-supplied label/category; local maps
+                           demoted to fallbacks.
+
+SCRIPT    sync_skill_awards.py (new, dry-run by default)
+          Pushes xp_award/skill_awards from the templates into the database —
+          migrate_legacy_sims.py skips any sim that already exists, so
+          template edits alone changed nothing. Touches two columns, never
+          student progress. Also folds existing "async" UserSkill rows into
+          "async_data" so earned points survive the rename.
+          APPLIED to the dev database: 23 task rows, 1 skill row
+          (user 8: async=40 -> async_data=55). Re-running now reports 0.
+
+VERIFIED  GET /api/skill-gps/roles              200, 3 tracks, 6 roles
+          GET /api/skill-gps                    200 in 0.003s (was: 1.3s+)
+          GET /api/skill-gps?role=mid_da        404 (was: silent junior_da)
+          GET /api/skill-gps/next-actions       200 cold 1.31s source=ai
+                                                200 warm 0.00s source=cache
+          GET /api/users/me/skills              200, 11 rows (was: 404)
+          track_progress on frontend track      86% junior / 81% senior
+          pytest                                161 passed (was 116; +45 new)
+          vitest                                117 passed / 20 files
+          npm run build                         clean
+
+NEW TESTS tests/unit/test_skill_gps.py (45)
+          The two datasets this feature multiplies together — what tasks award
+          and what roles demand — were edited independently and nothing
+          connected them. These tests connect them: every awarded skill must
+          be benchmarked somewhere, every benchmarked skill must be awarded by
+          its own simulation, finishing a sim must reach 100%, no award may
+          exceed the 100-point cap, senior benchmarks must be strictly above
+          junior, every skill must have a label and a valid category, and the
+          served catalog may only contain roles that have real benchmarks.
+          Each one of those fails on a bug that was live.
+
+FILES     backend/app/core/config.py
+          backend/app/services/skill_engine.py
+          backend/app/ai/routes/ai_mentor.py
+          backend/app/ai/services/mentor_tools.py
+          backend/app/api/v1/users/profile.py
+          backend/app/cms_templates/engineering/{__init__,week1,week2,week3}.py
+          backend/migrate_legacy_sims.py
+          backend/sync_skill_awards.py                        (new)
+          backend/tests/unit/test_skill_gps.py                (new, 45)
+          frontend/src/hooks/skills.js
+          frontend/src/features/skill-gps/SkillGPS.jsx
+          frontend/src/features/ai-mentor/ChatSidebar.jsx
+          frontend/src/features/users/portfolio/Portfolio.jsx
+
+STILL OPEN (not mine to decide)
+          · The 100/100 skill scores in the dev database are residue from the
+            re-submit farming. The code no longer produces them; the existing
+            rows are untouched. Say the word and I will recompute every
+            UserSkill row from TaskCompletion.
+          · component_design shows 0 for students who finished the React
+            tasks before the award existed. It accrues on new completions
+            only, unless you want the same recompute.
+
+================================================================================
+
+--------------------------------------------------------------------------------
+ 29. SKILL GPS — REDESIGN: CLEAN, PROFESSIONAL, DATA-RICH
+--------------------------------------------------------------------------------
+ASKED     A clean yet professional Skill GPS UI, rich in data.
+
+PRINCIPLE Rich meant more real facts, not more decoration. Everything added
+          here is measured from data already in the database — no invented
+          metrics, no filler charts. The one place the numbers can legitimately
+          disagree with each other, the page says so out loud rather than
+          quietly picking one.
+
+NEW DATA ON GET /api/skill-gps  (still no LLM on this path)
+
+  sources[] per skill    Which tasks award this skill, from
+                         SimulationTask.skill_awards — the same column
+                         award_task_completion() actually pays out from —
+                         with the simulation, week, points, and whether this
+                         student has completed it. This is the change that
+                         matters: a gap is only useful if you can see the
+                         specific work that closes it. "Component Design 0/40"
+                         becomes "these three tasks, 40 points, here they are."
+  points_available       Points still on the table for that skill.
+  category_summary       Readiness per category, same formula as the headline
+                         so the two can never tell different stories.
+  totals                 points earned/required/remaining, qualifying tasks
+                         completed/total.
+  readiness_history      Readiness after each completed task, replayed from
+                         TaskCompletion. UserSkill keeps only a running total
+                         with no history, so the curve is reconstructed
+                         against TODAY's award values.
+
+  Cost: 2 extra queries, both small. Measured across all six roles: 8-12ms
+  end to end for the whole enriched payload.
+
+  Also removed a duplicate query — _completions() was being run twice per
+  request (once directly, once inside _completed_task_keys). The helper is
+  gone; a second copy of the same query is how the two drift apart later.
+
+CATEGORY TAXONOMY REWORKED
+          The first pass filed all seven junior_frontend_dev skills under
+          "Technical", so the breakdown carried zero information for anyone on
+          that track. Re-cut so judgement-shaped skills (component_design,
+          state_management, discovery, negotiation, objection_handling) sit in
+          Cognitive. Every role now has a real spread:
+              junior_da        Tech 4 / Domain 3 / Cognitive 2 / Leadership 2
+              junior_frontend  Tech 4 / Domain 1 / Cognitive 2
+              junior_sales     Tech 1 / Domain 1 / Cognitive 3 / Leadership 3
+
+UI — REBUILT AS SEVEN COMPONENTS, NOT ONE 250-LINE FILE
+
+  SkillGPS.jsx           orchestration + skeleton/error/empty states
+  components/RoleSelector      track segmented control + benchmark <select>;
+                               a flat row of every role does not survive three
+                               tracks, and a flat row is what let two
+                               non-existent roles sit in the UI unnoticed
+  components/MetricStrip       4 KPIs as ONE bordered strip with hairline
+                               dividers — five floating cards read as five
+                               unrelated widgets
+  components/ReadinessChart    hand-rolled SVG area+line, hover tooltips,
+                               non-scaling stroke. No charting dependency for
+                               one series in a 2.2MB bundle.
+  components/SkillMatrix       the centrepiece: dense table with column
+                               headings, dual-fact progress bar (fill = you,
+                               tick = the benchmark), and expandable rows
+                               revealing the source tasks. Sorted gaps-first,
+                               biggest-first, so the top of the list is the
+                               thing worth doing next.
+  components/CategoryBreakdown where you're strong, by kind of skill
+  components/CareerLadder      rungs with measured per-rung readiness; each
+                               one clickable to re-benchmark
+  components/NextActions       AI card, own query, own failure state
+  categories.js                one presentation vocabulary, shared by three
+                               components that draw the same four buckets
+
+  Design language matched to the app rather than invented: hairline borders,
+  rounded-xl surfaces, #312E81 as the single data ink, emerald only for
+  "cleared", amber for shortfall (a gap is remaining work, not an error —
+  red was overstating it). Loading is a skeleton in the real layout, so
+  nothing jumps when data lands.
+
+THE HONEST FOOTNOTE
+          The replayed curve reaches 100% for user 8 while their stored
+          balance reads 86%, because component_design was added to the React
+          tasks after they had already finished them and points are not
+          backfilled. Rather than fudge either number, the chart shows both
+          and explains the difference — and only when they actually differ by
+          more than 2 points.
+
+VERIFIED  All six roles, warm, full payload:
+              junior_da            5%   9.0ms   pts 25/485
+              senior_da            3%   8.0ms   pts 25/775
+              junior_frontend_dev 86%  10.0ms   pts 290/330  tasks 10/10
+              senior_frontend_dev 81%  12.3ms   pts 415/505
+              junior_sales_rep    29%   9.7ms   pts 105/365
+              senior_sales_rep    19%   7.7ms   pts 105/555
+          pytest   161 passed
+          vitest   128 passed / 22 files  (+11 new)
+          build    clean
+
+NEW TESTS SkillMatrix.test.jsx (7) — source tasks stay collapsed until asked
+          for, earned vs available points are distinguished, clicking a task
+          navigates to it, and a skill no task awards says so plainly.
+          ReadinessChart.test.jsx (4) — including that the replay/stored
+          discrepancy note appears when they disagree and stays quiet when
+          they agree.
+
+FILES     backend/app/core/config.py                      (category taxonomy)
+          backend/app/services/skill_engine.py            (sources, totals,
+                                                           category_summary,
+                                                           readiness_history)
+          frontend/src/features/skill-gps/SkillGPS.jsx
+          frontend/src/features/skill-gps/categories.js              (new)
+          frontend/src/features/skill-gps/components/RoleSelector.jsx      (new)
+          frontend/src/features/skill-gps/components/MetricStrip.jsx       (new)
+          frontend/src/features/skill-gps/components/ReadinessChart.jsx    (new)
+          frontend/src/features/skill-gps/components/SkillMatrix.jsx       (new)
+          frontend/src/features/skill-gps/components/CategoryBreakdown.jsx (new)
+          frontend/src/features/skill-gps/components/CareerLadder.jsx      (new)
+          frontend/src/features/skill-gps/components/NextActions.jsx       (new)
+          frontend/src/features/skill-gps/components/SkillMatrix.test.jsx  (new)
+          frontend/src/features/skill-gps/components/ReadinessChart.test.jsx (new)
+
+NOTE      Verified while testing: user 8 has TaskCompletion rows only for the
+          Engineering sim, yet holds Sales skill points. So the Sales card
+          honestly reports 0/9 qualifying tasks against real earned points.
+          Not a bug in this work — the points predate the completion log —
+          but it is the second thing the UserSkill recompute would tidy.
+
+================================================================================
+
+--------------------------------------------------------------------------------
+ 30. ANALYTICS — SAME TREATMENT AS THE SKILL GPS
+--------------------------------------------------------------------------------
+ASKED     Do for Analytics what was just done for Skill GPS: fix what's broken,
+          strip the placeholder content, make it clean, professional and rich
+          in real data.
+
+WHAT WAS ACTUALLY WRONG (verified against the live endpoint first)
+
+  1. THE PERIOD SELECTOR DID NOTHING
+     `period` only moved the `since` used by two queries, and the only thing
+     built from those was `_week_activity()` — which always returned the
+     CURRENT Mon-Sun week regardless. Probed all three options against the
+     running app:
+         week_activity identical across week vs all time : True
+         top_stats identical                             : True
+     The one field that did change, `xp_history`, was never read by the
+     frontend. So three buttons, zero effect.
+
+  2. THE TREND ARROWS WERE FABRICATED
+     The page rendered `{s.up ? '↑' : '↓'} {s.delta}`. The backend hardcoded
+     `"up": True` for Total XP and `streak > 0` for the streak, and NEVER
+     returned `delta` at all:
+         any 'delta' key present: False
+     Every card showed a green up-arrow followed by an empty string,
+     permanently, whether or not anything had gone up.
+
+  3. THE HEATMAP LEGEND DESCRIBED A SCALE THAT DID NOT EXIST
+     Legend said Less -> More across four shades. `_streak_grid` only ever
+     emitted 0 or 3. Confirmed: grid levels: [0, 3].
+
+  4. THE HEATMAP WAS NOT A CALENDAR
+     `d = today - timedelta(weeks=week, days=(6 - day))` produces rolling
+     7-day columns, so row 0 is not a weekday and the grid lines up with no
+     calendar a student could check against.
+
+  5. THE STREAK WAS WRONG TWICE OVER
+     `_compute_streak` required TODAY to be an active day, so finishing a task
+     yesterday and opening the page this morning read as a streak of 0 — the
+     most discouraging thing this page could possibly say, and untrue. It also
+     compared UTC completion dates against the server's LOCAL `date.today()`.
+     Live: 10 completed tasks, streak reported as "0 days".
+
+  6. SKILLS CAME BACK AS RAW KEYS
+     A bare {key: score} dict against a five-entry label map in the component,
+     so an Engineering or Sales student read `crm_accuracy`, `html_css`.
+
+  7. HALF THE PAGE WAS THE SAME FOUR NUMBERS TWICE
+     The bottom of the streak panel re-rendered `topStats.slice(0, 4)`.
+
+  8. NOTHING MEASURED QUALITY
+     Only XP — volume of work. A student's grades could be falling while every
+     bar on the page rose.
+
+BACKEND — analytics.py rewritten
+
+  Periods are now real and served, not hardcoded in the page:
+        GET /api/analytics/periods -> week / month / quarter / all
+        unknown period -> 400, not a silent fallback to a year
+        "all time" (the old frontend's spelling) still aliases to "all"
+
+  Every section respects the period. Proven across all four:
+        week     day  x8   xp=1340   deltas=[710, 10, 4, None]
+        month    day  x31  xp=1970   deltas=[1970, 10, 4, None]
+        quarter  week x14  xp=1970
+        all      day  x14  xp=1970   deltas=[None, None, None, None]
+        all four periods distinct: True
+
+  stats[]            real comparison against the equivalent PRECEDING window,
+                     with three honest states the UI draws differently:
+                     a measured delta / "nothing to compare in the previous N
+                     days" / not comparable at all (all-time).
+  streak             counts back from today OR yesterday; `active_today` says
+                     which. Adds `longest`. All UTC on both sides.
+  activity           XP and tasks bucketed across the period — daily to 31
+                     days, weekly beyond. Empty buckets are kept: a gap in the
+                     chart is information.
+  heatmap            true Monday-start calendar weeks, month labels, per-day
+                     tasks and XP, `future` flag, and four real intensity
+                     levels scaled to the student's OWN busiest day (absolute
+                     thresholds leave a light user permanently on one shade).
+                     Live levels now [0, 1, 3].
+  score_trend        graded scores over time. NEW — nothing measured grades
+                     before. Unscored tasks are omitted, not plotted as zero.
+  xp_breakdown       completions vs quiz bonuses vs assessment bonuses. The
+                     ledger has recorded `source` all along; nothing read it.
+  simulations[]      per-enrollment: tasks done/total, percent, average score,
+                     graded count, last activity. The old page's only statement
+                     at this level was one global "Simulations Done" count.
+  skills[]           label + category resolved server-side from the config
+                     vocabulary.
+
+  Two full-history reads, then arithmetic. 8-10ms for the whole payload.
+
+FRONTEND — rebuilt as eight components
+
+  Analytics.jsx            orchestration, skeleton/error/empty states
+  components/StatStrip     4 KPIs in ONE bordered strip; three delta states;
+                           a missing average renders "—", never 0/100
+  components/ActivityChart XP bars + task markers, gridlines, hover tooltips,
+                           granularity stated on the card
+  components/ContributionHeatmap  weekday labels, month labels, per-day
+                           tooltip, its own horizontal scroll so the card can
+                           never push the page sideways
+  components/StreakCard    current/longest/last active, and an at-risk note
+                           when today hasn't been worked yet
+  components/ScoreTrend    SVG line of graded scores against your own average
+  components/SimulationProgress  per-simulation rows, clickable
+  components/SkillGrowth   skills with category colour, links to Skill GPS
+  components/XpBreakdown   one stacked bar + legend
+
+  Design matched to the Skill GPS work so the two pages read as one product:
+  hairline borders, rounded-xl, #312E81 as the data ink, emerald for cleared,
+  amber for attention. Changing period dims in place instead of tearing the
+  page down (placeholderData), because the layout is identical between periods.
+
+  Moved features/skill-gps/categories.js -> lib/skillCategories.js; both pages
+  now share one category vocabulary instead of each keeping a copy.
+
+VERIFIED  4 periods x full payload   8.0-9.6ms, all four genuinely distinct
+          unknown period             400 with the valid list in the message
+          pytest                     190 passed (was 161; +29)
+          vitest                     137 passed / 24 files (was 128; +9)
+          build                      clean
+          sole consumer of useAnalytics is this page — nothing else broke
+
+NEW TESTS tests/unit/test_analytics.py (29)
+          Every test corresponds to something that shipped broken: period
+          aliases and rejection, a decline rendering as a decline, flat vs
+          "nothing to compare" vs not-comparable, a missing average staying
+          null, the streak surviving a day that isn't over yet, the streak
+          breaking after a full missed day, longest-run tracking, weekly
+          bucketing on long periods, DIFFERENT periods producing DIFFERENT
+          series, Monday-start calendar columns, all four intensity levels,
+          relative intensity, future-day marking, and ledger-source
+          classification.
+          StatStrip.test.jsx (5) + StreakCard.test.jsx (4) — the two
+          components that encode the fabricated-arrow and dead-streak bugs.
+
+FILES     backend/app/api/v1/analytics/analytics.py        (rewritten)
+          backend/tests/unit/test_analytics.py             (new, 29)
+          frontend/src/hooks/analytics.js
+          frontend/src/lib/skillCategories.js              (moved here)
+          frontend/src/features/analytics/Analytics.jsx    (rewritten)
+          frontend/src/features/analytics/components/*.jsx (8 new)
+          frontend/src/features/skill-gps/components/{SkillMatrix,
+              CategoryBreakdown}.jsx                       (import path)
+
+NOTE      The XP figures on this page are inflated by the re-submit
+          double-payment fixed in entry 28 — the ledger still shows
+          task_1_completion paid 8 times for one user. The code no longer
+          does that; the historical rows are untouched. Same recompute offer
+          stands.
+
+================================================================================

@@ -163,6 +163,30 @@ TARGET_ROLE_REQUIREMENTS: dict[str, dict[str, int]] = {
         "closing": 45,
         "communication": 55,
     },
+    # The two senior tiers below were added so that every track is a real
+    # ladder. Before them the Skill GPS UI offered "Mid-level DA" and "Lead DA"
+    # — neither of which exists here — and compute_skill_gps' .get(role,
+    # junior_da) fallback quietly served Junior DA numbers under those labels.
+    # A role that is not a key in this dict is now a 404, not a silent swap.
+    "senior_frontend_dev": {
+        "html_css": 80,
+        "accessibility": 65,
+        "javascript": 80,
+        "async_data": 65,
+        "react": 80,
+        "component_design": 70,
+        "state_management": 65,
+    },
+    "senior_sales_rep": {
+        "sales_research": 65,
+        "email_writing": 60,
+        "discovery": 75,
+        "crm_accuracy": 70,
+        "objection_handling": 70,
+        "negotiation": 70,
+        "closing": 70,
+        "communication": 75,
+    },
 }
 
 SKILL_LABELS: dict[str, str] = {
@@ -192,6 +216,107 @@ SKILL_LABELS: dict[str, str] = {
     "negotiation": "Negotiation",
     "closing": "Closing",
 }
+
+# Career-track metadata for the Skill GPS.
+#
+# TARGET_ROLE_REQUIREMENTS above says what a role DEMANDS; this says what a role
+# IS — its display name, which ladder it sits on, and where on that ladder. The
+# Skill GPS UI is driven entirely from here (GET /api/skill-gps/roles), because
+# the previous hardcoded frontend list had drifted: it offered four Data Analyst
+# tiers, two of which had no backend definition at all, and offered nothing for
+# the Engineering or Sales simulations this platform actually ships.
+#
+# `level` orders the ladder inside a track. `domains` maps a Simulation.domain
+# string (free text — see app/models/cms.py) onto a track, so a student's
+# recommended role follows the simulation they enrolled in.
+CAREER_TRACKS: list[dict] = [
+    {
+        "key": "data",
+        "label": "Data Analytics",
+        "domains": ["Data Analytics"],
+        "roles": [
+            {"key": "junior_da", "label": "Junior Data Analyst", "level": 1},
+            {"key": "senior_da", "label": "Senior Data Analyst", "level": 2},
+        ],
+    },
+    {
+        "key": "frontend",
+        "label": "Frontend Engineering",
+        "domains": ["Engineering", "IT & Engineering"],
+        "roles": [
+            {"key": "junior_frontend_dev", "label": "Junior Frontend Developer", "level": 1},
+            {"key": "senior_frontend_dev", "label": "Senior Frontend Developer", "level": 2},
+        ],
+    },
+    {
+        "key": "sales",
+        "label": "Sales",
+        "domains": ["Sales"],
+        "roles": [
+            {"key": "junior_sales_rep", "label": "Junior Sales Rep", "level": 1},
+            {"key": "senior_sales_rep", "label": "Senior Sales Rep", "level": 2},
+        ],
+    },
+]
+
+# Flat key -> {label, track, track_label, level} view of CAREER_TRACKS.
+ROLE_META: dict[str, dict] = {
+    role["key"]: {
+        "key": role["key"],
+        "label": role["label"],
+        "level": role["level"],
+        "track": track["key"],
+        "track_label": track["label"],
+    }
+    for track in CAREER_TRACKS
+    for role in track["roles"]
+}
+
+# Simulation.domain -> track key, derived from CAREER_TRACKS so the two can
+# never disagree.
+DOMAIN_TO_TRACK: dict[str, str] = {
+    domain: track["key"] for track in CAREER_TRACKS for domain in track["domains"]
+}
+
+DEFAULT_TARGET_ROLE = "junior_da"
+
+# One category vocabulary for the whole product. The Portfolio page and the
+# Skill GPS each used to carry their own partial copy of this, both covering
+# only the Data Analytics skills, so every Engineering and Sales skill fell
+# through to a default bucket.
+SKILL_CATEGORIES: dict[str, str] = {
+    # Technical — you build or query the thing itself
+    "sql": "Technical",
+    "python": "Technical",
+    "data_cleaning": "Technical",
+    "data_viz": "Technical",
+    "html_css": "Technical",
+    "javascript": "Technical",
+    "react": "Technical",
+    "async_data": "Technical",
+    "crm_accuracy": "Technical",
+    # Domain — knowledge and standards particular to the field
+    "analytics": "Domain",
+    "customer_analysis": "Domain",
+    "segmentation": "Domain",
+    "sales_research": "Domain",
+    "accessibility": "Domain",
+    # Cognitive — judgement calls, architecture, reasoning under uncertainty
+    "statistics": "Cognitive",
+    "hypothesis_testing": "Cognitive",
+    "component_design": "Cognitive",
+    "state_management": "Cognitive",
+    "discovery": "Cognitive",
+    "objection_handling": "Cognitive",
+    "negotiation": "Cognitive",
+    # Leadership — getting the work across to other people
+    "communication": "Leadership",
+    "data_storytelling": "Leadership",
+    "email_writing": "Leadership",
+    "closing": "Leadership",
+}
+
+CATEGORY_ORDER: list[str] = ["Technical", "Domain", "Cognitive", "Leadership"]
 
 QUIZ_BONUS_THRESHOLD = 80
 QUIZ_BONUS_XP = 20

@@ -191,7 +191,7 @@ TASK_7 = dict(
         "great_looks_like": "Three tests, three lines each, no mocking of anything.",
         "example_solution": starters.TASK7_SOLUTION,
     },
-    xp_award=100, skill_awards={"react": 30},
+    xp_award=100, skill_awards={"react": 14, "component_design": 15},
 )
 
 
@@ -388,7 +388,7 @@ TASK_8 = dict(
                             "attempt feels like it worked because it visibly did.",
         "example_solution": starters.TASK8_SOLUTION,
     },
-    xp_award=110, skill_awards={"react": 30, "state_management": 15},
+    xp_award=110, skill_awards={"react": 14, "component_design": 10, "state_management": 13},
 )
 
 
@@ -613,7 +613,7 @@ TASK_9 = dict(
                             "exactly as you left it.",
         "example_solution": starters.TASK9_SOLUTION,
     },
-    xp_award=130, skill_awards={"react": 35, "state_management": 25},
+    xp_award=130, skill_awards={"react": 17, "component_design": 15, "state_management": 22},
 )
 
 

@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Enrollment, TaskCompletion, User, XpLedger
-from app.services.skill_engine import compute_skill_gps
+from app.services.skill_engine import compute_skill_gps, role_exists, recommended_role
 from app.api.v1.simulations.enrollments import _build_assignment, _get_sim_tasks
 
 logger = logging.getLogger(__name__)
@@ -103,7 +103,13 @@ async def tool_get_current_task(ctx: MentorToolContext, **_kwargs) -> dict:
 
 
 async def tool_get_skill_gaps(ctx: MentorToolContext, target_role: str | None = None, **_kwargs) -> dict:
-    role = target_role or ctx.user.target_role or "junior_da"
+    # The model picks `target_role` freely, so it can and does invent roles.
+    # compute_skill_gps no longer silently substitutes junior_da for an unknown
+    # role, so anything unrecognised is resolved to the student's own
+    # recommended role instead of exploding mid-conversation.
+    role = target_role or ctx.user.target_role or ""
+    if not role_exists(role):
+        role = await recommended_role(ctx.db, ctx.user_id)
     return await compute_skill_gps(ctx.db, ctx.user_id, role)
 
 

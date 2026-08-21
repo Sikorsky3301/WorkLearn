@@ -1,6 +1,8 @@
 import functools
 import json
 import logging
+import re
+from collections import OrderedDict
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,7 +13,9 @@ from app.core.auth import get_current_user, token_user_id
 from app.models import User, Enrollment, MentorChatMessage
 from app.models.cms import SimulationTask
 from app.services.simulation_lookup import get_simulation
-from app.services.skill_engine import compute_skill_gps
+from app.services.skill_engine import (
+    compute_skill_gps, role_exists, recommended_role, role_catalog,
+)
 from app.ai.services.llm import stream_chat, generate, chat_with_tools
 from app.ai.services.langfuse_client import traced_observation, traced_context, get_current_trace_id, score_trace
 from app.ai.services.mentor_tools import TOOL_SCHEMAS, execute_tool, MentorToolContext
@@ -314,31 +318,129 @@ async def mentor_topics(db: AsyncSession = Depends(get_db), token: dict = Depend
     return {"domain": domain, "topics": persona.topics, "tagline": persona.tagline}
 
 
-@router.get("/skill-gps")
-async def skill_gps(role: str = "junior_da", db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
+@router.get("/skill-gps/roles")
+async def skill_gps_roles(db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
+    """The roles a student can benchmark against, plus which one their Skill GPS
+    should open on.
+
+    This exists because the frontend used to hardcode its own role list, and it
+    had drifted away from the backend: two of the four roles it offered
+    ("Mid-level DA", "Lead DA") had no entry in TARGET_ROLE_REQUIREMENTS at all,
+    so they rendered Junior DA's numbers under a different name, and no role was
+    offered for the Engineering or Sales simulations. Serving the catalog makes
+    that class of drift impossible.
+    """
     user_id = token_user_id(token)
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-    target_role = role or (user.target_role if user else "junior_da")
+    return role_catalog(await recommended_role(db, user_id))
+
+
+@router.get("/skill-gps")
+async def skill_gps(
+    role: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    token: dict = Depends(get_current_user),
+):
+    """Gap analysis for one role.
+
+    Deliberately contains no LLM call. It used to generate the "next best
+    actions" inline, which meant every single page load — and every click on a
+    role button — blocked for the length of a model round-trip and burned a
+    completion. At the scale this is being deployed at that is both the slowest
+    part of the page and a per-student cost with no cap. The recommendations now
+    live at /skill-gps/next-actions, which the page loads separately.
+    """
+    user_id = token_user_id(token)
+    target_role = role or await recommended_role(db, user_id)
+
+    if not role_exists(target_role):
+        raise HTTPException(
+            status_code=404,
+            detail=f"Unknown target role '{target_role}'.",
+        )
 
     gps = await compute_skill_gps(db, user_id, target_role)
+    return {**gps, "target_role": target_role}
 
-    next_actions = []
-    if gps["top_gaps"]:
-        gap_list = ", ".join(f"{g['skill']} ({g['current']}/{g['required']})" for g in gps["top_gaps"])
-        try:
-            with traced_context(user_id=user_id, tags=["skill-gps"]):
-                raw = await generate(
-                    f"A data analyst student has these skill gaps: {gap_list}. Target role: {target_role}. "
-                    f"List exactly 3 specific, actionable next steps as a JSON array of strings. Only output the JSON array.",
-                    max_tokens=300,
-                    trace_name="skill-gps-next-actions",
-                )
-            import re
-            match = re.search(r'\[.*\]', raw, re.DOTALL)
-            next_actions = json.loads(match.group()) if match else []
-        except Exception:
-            logger.warning("skill-gps next_actions generation/parsing failed, using fallback", exc_info=True)
-            next_actions = [f"Improve your {g['skill']} by completing related simulation tasks" for g in gps["top_gaps"]]
 
-    return {**gps, "target_role": target_role, "next_actions": next_actions}
+# Cache for the generated recommendations, keyed by (user, role, gap
+# fingerprint). Skill scores only move when a task is graded, so between two
+# gradings the same student asking the same question has exactly one right
+# answer — regenerating it on every page view is spend with no upside. The
+# fingerprint means the cache invalidates itself the moment their scores change,
+# so there is no staleness to reason about.
+#
+# Bounded, because an unbounded per-user dict in a long-lived process is a leak.
+_NEXT_ACTIONS_CACHE: "OrderedDict[tuple, list[str]]" = OrderedDict()
+_NEXT_ACTIONS_CACHE_MAX = 2048
+
+
+def _actions_cache_key(user_id: int, target_role: str, top_gaps: list[dict]) -> tuple:
+    return (user_id, target_role, tuple((g["skill_key"], g["current"]) for g in top_gaps))
+
+
+def _fallback_actions(top_gaps: list[dict], role_label: str) -> list[str]:
+    return [
+        f"Close the {g['skill']} gap ({g['current']}/{g['required']}) — "
+        f"finish the simulation tasks that award it to reach {role_label}."
+        for g in top_gaps
+    ]
+
+
+@router.get("/skill-gps/next-actions")
+async def skill_gps_next_actions(
+    role: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    token: dict = Depends(get_current_user),
+):
+    """AI-generated next steps for the current gaps. Split out of /skill-gps so
+    a slow or failing model degrades one card instead of the whole page."""
+    user_id = token_user_id(token)
+    target_role = role or await recommended_role(db, user_id)
+
+    if not role_exists(target_role):
+        raise HTTPException(status_code=404, detail=f"Unknown target role '{target_role}'.")
+
+    gps = await compute_skill_gps(db, user_id, target_role)
+    top_gaps = gps["top_gaps"]
+    if not top_gaps:
+        return {"target_role": target_role, "next_actions": [], "source": "none"}
+
+    cache_key = _actions_cache_key(user_id, target_role, top_gaps)
+    cached = _NEXT_ACTIONS_CACHE.get(cache_key)
+    if cached is not None:
+        _NEXT_ACTIONS_CACHE.move_to_end(cache_key)
+        return {"target_role": target_role, "next_actions": cached, "source": "cache"}
+
+    meta = gps["role"]
+    gap_list = ", ".join(f"{g['skill']} ({g['current']}/{g['required']})" for g in top_gaps)
+    source = "ai"
+    try:
+        with traced_context(user_id=user_id, tags=["skill-gps"]):
+            raw = await generate(
+                # Previously hardcoded to "A data analyst student", which was
+                # wrong for every student on the Engineering or Sales track.
+                f"A student is working towards the role of {meta['label']} "
+                f"({meta['track_label']}). Their three largest skill gaps, as "
+                f"current score out of required score, are: {gap_list}. "
+                f"List exactly 3 specific, actionable next steps they should take. "
+                f"Each step must be one sentence and must name one of those skills. "
+                f"Only output a JSON array of 3 strings.",
+                max_tokens=300,
+                trace_name="skill-gps-next-actions",
+            )
+        match = re.search(r"\[.*\]", raw, re.DOTALL)
+        parsed = json.loads(match.group()) if match else []
+        next_actions = [str(a) for a in parsed if str(a).strip()][:3]
+        if not next_actions:
+            raise ValueError("model returned no usable actions")
+    except Exception:
+        logger.warning("skill-gps next_actions generation/parsing failed, using fallback", exc_info=True)
+        next_actions = _fallback_actions(top_gaps, meta["label"])
+        source = "fallback"
+
+    if source == "ai":
+        _NEXT_ACTIONS_CACHE[cache_key] = next_actions
+        while len(_NEXT_ACTIONS_CACHE) > _NEXT_ACTIONS_CACHE_MAX:
+            _NEXT_ACTIONS_CACHE.popitem(last=False)
+
+    return {"target_role": target_role, "next_actions": next_actions, "source": source}

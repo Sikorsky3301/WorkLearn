@@ -1,183 +1,182 @@
-import { useState } from 'react'
-import { useAnalytics } from '../../hooks'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { BarChart3, AlertTriangle } from 'lucide-react'
+import { useAnalytics, useAnalyticsPeriods } from '../../hooks'
+import StatStrip from './components/StatStrip'
+import ActivityChart from './components/ActivityChart'
+import ContributionHeatmap from './components/ContributionHeatmap'
+import StreakCard from './components/StreakCard'
+import ScoreTrend from './components/ScoreTrend'
+import SimulationProgress from './components/SimulationProgress'
+import SkillGrowth from './components/SkillGrowth'
+import XpBreakdown from './components/XpBreakdown'
 
-const intensityColors = ['bg-surface-high', 'bg-primary/30', 'bg-primary/60', 'bg-primary']
-
-const SKILL_LABELS = {
-  sql:        'SQL Queries',
-  python:     'Python & EDA',
-  analytics:  'Data Analytics',
-  statistics: 'Statistics',
-  communication: 'Communication',
-}
+// Progress analytics for one student.
+//
+// The page this replaced claimed more than it computed. Its period selector was
+// decorative — week, month and "all time" returned byte-identical payloads, and
+// the chart always drew the current Monday-to-Sunday week regardless. Its trend
+// arrows were fabricated: the backend hardcoded `up: true` and never sent the
+// delta the page rendered beside the arrow, so every card carried a green
+// up-arrow followed by an empty string. Its heatmap legend advertised four
+// intensity levels over data that only ever had two. Half the page was two
+// copies of the same four numbers.
+//
+// Everything here is measured, the period genuinely drives all of it, and where
+// a number cannot honestly be computed the UI says so instead of showing a zero.
 
 export default function Analytics() {
-  const [period, setPeriod] = useState('week')
-  const { data, isLoading } = useAnalytics(period)
+  const navigate = useNavigate()
+  const [period, setPeriod] = useState(null)
 
-  const topStats   = data?.top_stats    ?? []
-  const weekAct    = data?.week_activity ?? []
-  const streakGrid = data?.streak_grid   ?? []
-  const skills     = data?.skills        ?? {}
+  const { data: options, isLoading: optionsLoading, isError: optionsError } = useAnalyticsPeriods()
 
-  const maxXp = weekAct.length ? Math.max(...weekAct.map(d => d.xp), 1) : 1
+  useEffect(() => {
+    if (options?.default && period === null) setPeriod(options.default)
+  }, [options, period])
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
+  const { data, isLoading, isError, isPlaceholderData } = useAnalytics(period)
+
+  if (optionsLoading || (period && isLoading)) return <PageSkeleton />
+  if (optionsError || isError) return <LoadError />
+
+  const periodLabel = data?.period?.label ?? ''
+  const hasActivity = (data?.totals?.tasks ?? 0) > 0 || (data?.totals?.xp ?? 0) > 0
 
   return (
-    <div className="max-w-container mx-auto px-6 py-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-7">
+    <div className="mx-auto max-w-container px-6 py-8">
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-6 border-b border-border pb-6">
         <div>
-          <h1 className="text-2xl font-bold text-on-surface">Progress & Analytics</h1>
-          <p className="text-sm text-on-surface-variant mt-1">Track your learning velocity, streaks, and skill growth over time.</p>
+          <span className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-widest text-primary">
+            <BarChart3 className="h-3 w-3" /> Analytics
+          </span>
+          <h1 className="text-2xl font-bold tracking-tight text-on-surface">Your progress</h1>
+          <p className="mt-1 max-w-xl text-sm text-on-surface-variant">
+            Effort, consistency and grades — counted from your graded tasks and XP ledger.
+          </p>
         </div>
-        <div className="flex border border-border rounded-lg overflow-hidden">
-          {['week', 'month', 'all time'].map(p => (
-            <button key={p} onClick={() => setPeriod(p)}
-              className={`px-4 py-1.5 text-xs font-semibold capitalize transition-colors ${period === p ? 'bg-primary text-white' : 'bg-white text-on-surface-variant hover:bg-surface-low'}`}>
-              {p}
-            </button>
-          ))}
+
+        {/* Options come from the server. A selector built from a literal in this
+            file is how the old one ended up offering three periods the backend
+            treated identically. */}
+        <label className="block">
+          <span className="mb-1.5 block text-[0.65rem] font-bold uppercase tracking-widest text-on-surface-variant">
+            Period
+          </span>
+          <div className="inline-flex rounded-lg border border-border bg-surface-low p-0.5">
+            {(options?.periods ?? []).map((p) => (
+              <button
+                key={p.key}
+                onClick={() => setPeriod(p.key)}
+                aria-pressed={period === p.key}
+                className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  period === p.key
+                    ? 'bg-white text-on-surface shadow-sm'
+                    : 'text-on-surface-variant hover:text-on-surface'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </label>
+      </header>
+
+      {!hasActivity ? (
+        <EmptyState onStart={() => navigate('/simulations')} />
+      ) : (
+        // Dim while the next period is in flight rather than tearing the page
+        // down — the layout is identical between periods, only the numbers move.
+        <div className={`space-y-5 transition-opacity ${isPlaceholderData ? 'opacity-60' : ''}`}>
+          <StatStrip stats={data?.stats ?? []} />
+
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <ActivityChart activity={data?.activity} periodLabel={periodLabel} />
+            </div>
+            <StreakCard streak={data?.streak} />
+          </div>
+
+          <ContributionHeatmap heatmap={data?.heatmap} />
+
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <ScoreTrend trend={data?.score_trend} periodLabel={periodLabel} />
+            </div>
+            <XpBreakdown breakdown={data?.xp_breakdown} periodLabel={periodLabel} />
+          </div>
+
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <SimulationProgress
+                simulations={data?.simulations}
+                onOpen={(s) => navigate(`/simulations/${s.slug}/overview`)}
+              />
+            </div>
+            <SkillGrowth skills={data?.skills} onOpenSkillGps={() => navigate('/skill-gps')} />
+          </div>
+
+          <p className="pb-2 text-center text-xs text-on-surface-variant">
+            {data?.totals?.first_activity
+              ? `Tracking since ${data.totals.first_activity} · ${data.totals.tasks} tasks · ${data.totals.xp} XP all time`
+              : `${data?.totals?.tasks ?? 0} tasks · ${data?.totals?.xp ?? 0} XP all time`}
+          </p>
         </div>
+      )}
+    </div>
+  )
+}
+
+function PageSkeleton() {
+  return (
+    <div className="mx-auto max-w-container animate-pulse px-6 py-8">
+      <div className="mb-6 space-y-3 border-b border-border pb-6">
+        <div className="h-5 w-24 rounded bg-surface-high" />
+        <div className="h-7 w-56 rounded bg-surface-high" />
       </div>
-
-      {/* Top stat cards */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        {topStats.length === 0 ? (
-          Array(4).fill(0).map((_, i) => (
-            <div key={i} className="card">
-              <p className="text-xs text-on-surface-variant mb-1">—</p>
-              <p className="text-2xl font-bold text-primary mb-1">0</p>
-              <p className="text-xs font-semibold text-on-surface-variant">No data yet</p>
-            </div>
-          ))
-        ) : topStats.map(s => (
-          <div key={s.label} className="card">
-            <p className="text-xs text-on-surface-variant mb-1">{s.label}</p>
-            <p className="text-2xl font-bold text-primary mb-1">{s.value}</p>
-            <p className={`text-xs font-semibold flex items-center gap-1 ${s.up ? 'text-green-600' : 'text-red-500'}`}>
-              {s.up ? '↑' : '↓'} {s.delta ?? ''}
-            </p>
-          </div>
-        ))}
+      <div className="mb-5 h-28 rounded-xl border border-border bg-surface-low" />
+      <div className="mb-5 grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <div className="h-72 rounded-xl border border-border bg-surface-low lg:col-span-2" />
+        <div className="h-72 rounded-xl border border-border bg-surface-low" />
       </div>
+      <div className="h-44 rounded-xl border border-border bg-surface-low" />
+    </div>
+  )
+}
 
-      <div className="grid grid-cols-3 gap-5">
-
-        {/* Weekly Activity Bar Chart */}
-        <div className="col-span-2 card">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <span className="section-label">Daily Activity</span>
-              <p className="text-sm font-bold text-on-surface mt-0.5">XP earned per day</p>
-            </div>
-            <span className="text-xs text-on-surface-variant">Tasks · XP</span>
-          </div>
-          {weekAct.length === 0 ? (
-            <div className="h-40 flex items-center justify-center text-sm text-on-surface-variant">
-              No activity yet for this period.
-            </div>
-          ) : (
-            <div className="flex items-end gap-3 h-40">
-              {weekAct.map(d => (
-                <div key={d.day} className="flex-1 flex flex-col items-center gap-1.5">
-                  <span className="text-xs font-semibold text-primary">{d.xp > 0 ? `${d.xp}xp` : ''}</span>
-                  <div className="w-full bg-primary/80 rounded-t" style={{ height: `${Math.max((d.xp / maxXp) * 120, d.xp > 0 ? 4 : 0)}px` }} />
-                  <span className="text-xs text-on-surface-variant">{d.day}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Skills Breakdown */}
-        <div className="card">
-          <span className="section-label mb-4 block">Skills Breakdown</span>
-          {Object.keys(skills).length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-32 text-on-surface-variant">
-              <p className="text-xs text-center">Complete simulation tasks to earn skill points.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {Object.entries(skills).map(([key, score]) => (
-                <div key={key}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium text-on-surface">{SKILL_LABELS[key] ?? key}</span>
-                    <span className="text-xs font-bold text-on-surface">{score}</span>
-                  </div>
-                  <div className="h-1.5 bg-surface-high rounded-full overflow-hidden">
-                    <div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(score, 100)}%` }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Streak Calendar */}
-        <div className="col-span-3 card">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <span className="section-label">Activity Streak</span>
-              <p className="text-sm font-bold text-on-surface mt-0.5">Last 12 weeks</p>
-            </div>
-            <div className="flex items-center gap-1 text-xs text-on-surface-variant">
-              <span>Less</span>
-              {intensityColors.map((c, i) => (
-                <div key={i} className={`w-3 h-3 rounded-sm ${c} border border-white`} />
-              ))}
-              <span>More</span>
-            </div>
-          </div>
-          {streakGrid.length === 0 ? (
-            <div className="h-20 flex items-center justify-center text-sm text-on-surface-variant">
-              No streak data yet.
-            </div>
-          ) : (
-            <div className="flex gap-1">
-              {streakGrid.map((week, wi) => (
-                <div key={wi} className="flex flex-col gap-1">
-                  {week.map((level, di) => (
-                    <div
-                      key={di}
-                      className={`w-4 h-4 rounded-sm ${intensityColors[Math.min(level, intensityColors.length - 1)]} border border-white`}
-                    />
-                  ))}
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="mt-4 pt-3 border-t border-border">
-            <div className="grid grid-cols-4 gap-3">
-              {topStats.slice(0, 4).map(s => (
-                <div key={s.label} className="bg-surface-low rounded-lg p-2 text-center">
-                  <p className="text-sm font-bold text-primary">{s.value}</p>
-                  <p className="text-xs text-on-surface-variant">{s.label}</p>
-                </div>
-              ))}
-              {topStats.length === 0 && [
-                { label: 'Total XP', val: '0' },
-                { label: 'Tasks Done', val: '0' },
-                { label: 'Active Days', val: '0' },
-                { label: 'Streak', val: '0 days' },
-              ].map(s => (
-                <div key={s.label} className="bg-surface-low rounded-lg p-2 text-center">
-                  <p className="text-sm font-bold text-primary">{s.val}</p>
-                  <p className="text-xs text-on-surface-variant">{s.label}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+function LoadError() {
+  return (
+    <div className="mx-auto max-w-container px-6 py-8">
+      <div className="rounded-xl border border-border bg-white px-6 py-16 text-center">
+        <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 text-amber-600">
+          <AlertTriangle className="h-5 w-5" />
+        </span>
+        <h2 className="mb-2 text-lg font-bold text-on-surface">We couldn&apos;t load your analytics</h2>
+        <p className="mx-auto mb-6 max-w-sm text-sm text-on-surface-variant">
+          Your progress is safe — this page only reads it. Refresh to try again.
+        </p>
+        <button onClick={() => window.location.reload()} className="btn-primary text-sm">
+          Refresh
+        </button>
       </div>
+    </div>
+  )
+}
 
+function EmptyState({ onStart }) {
+  return (
+    <div className="rounded-xl border border-border bg-white px-6 py-16 text-center">
+      <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+        <BarChart3 className="h-5 w-5" />
+      </span>
+      <h2 className="mb-2 text-lg font-bold text-on-surface">Nothing to chart yet</h2>
+      <p className="mx-auto mb-6 max-w-sm text-sm text-on-surface-variant">
+        This page fills in from graded tasks. Complete your first one and your activity,
+        streak, scores and skill growth all start here.
+      </p>
+      <button onClick={onStart} className="btn-primary text-sm">
+        Browse simulations
+      </button>
     </div>
   )
 }

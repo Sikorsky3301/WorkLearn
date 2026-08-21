@@ -4,6 +4,7 @@ the full server. Not part of the pytest suite (see tests/) — this hits a
 real provider and prints output for a human to read, it has no assertions.
 Usage: python check_ai_provider.py
 """
+
 import asyncio
 from dotenv import load_dotenv
 load_dotenv()

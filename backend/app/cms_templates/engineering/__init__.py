@@ -165,7 +165,7 @@ _FINAL_TASK = dict(
         "pass_mark": FINAL_ASSESSMENT["pass_mark"],
     },
     xp_award=200,
-    skill_awards={"html_css": 20, "javascript": 20, "react": 20, "accessibility": 15},
+    skill_awards={"html_css": 22, "javascript": 11, "react": 10, "accessibility": 9},
 )
 
 

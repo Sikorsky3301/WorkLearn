@@ -222,7 +222,7 @@ TASK_1 = dict(
                             "tells you what everything is.",
         "example_solution": starters.TASK1_SOLUTION,
     },
-    xp_award=50, skill_awards={"html_css": 15, "accessibility": 10},
+    xp_award=50, skill_awards={"html_css": 16, "accessibility": 6},
 )
 
 
@@ -428,7 +428,7 @@ TASK_2 = dict(
                             "it looks broken.",
         "example_solution": starters.TASK2_SOLUTION,
     },
-    xp_award=60, skill_awards={"html_css": 20, "accessibility": 10},
+    xp_award=60, skill_awards={"html_css": 22, "accessibility": 6},
 )
 
 
@@ -612,7 +612,7 @@ TASK_3 = dict(
                             "are set in the same place so they cannot diverge.",
         "example_solution": starters.TASK3_SOLUTION,
     },
-    xp_award=70, skill_awards={"javascript": 20, "accessibility": 15},
+    xp_award=70, skill_awards={"javascript": 10, "accessibility": 8},
 )
 
 

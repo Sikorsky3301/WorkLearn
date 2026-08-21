@@ -443,7 +443,7 @@ def da_job_sim():
              },
              config={**common, "grader_key": "da_job_sim.task1_cleaning", "starter_code": TASK1_STARTER,
                      "input_filename": "dataset.csv", "output_filename": "output.csv"},
-             xp_award=50, skill_awards={"sql": 10, "data_cleaning": 15}),
+             xp_award=50, skill_awards={"sql": 60, "data_cleaning": 50}),
         dict(task_index=2, title="Task 2 — Sales Report", type="code_sandbox", week=1,
              objective="Monthly business review numbers — needed by Friday EOD",
              briefing="Leadership's monthly business review is Friday. I need the core numbers: how are we doing on "
@@ -495,7 +495,7 @@ def da_job_sim():
              },
              config={**common, "grader_key": "da_job_sim.task2_report", "starter_code": TASK2_STARTER,
                      "input_filename": "dataset.csv", "output_filename": "output.json"},
-             xp_award=80, skill_awards={"python": 15, "analytics": 20, "data_viz": 10}),
+             xp_award=80, skill_awards={"python": 50, "analytics": 60, "data_viz": 40}),
         dict(task_index=3, title="Task 3 — RFM Segmentation", type="code_sandbox", week=2,
              objective="Customer segmentation — Marketing wants to stop spray-and-pray",
              briefing='Marketing wants to stop blasting the same email to everyone. Can you segment our customers '
@@ -564,7 +564,7 @@ def da_job_sim():
              },
              config={**common, "grader_key": "da_job_sim.task3_segmentation", "starter_code": TASK3_STARTER,
                      "input_filename": "dataset.csv", "output_filename": "output.json"},
-             xp_award=90, skill_awards={"customer_analysis": 20, "segmentation": 15}),
+             xp_award=90, skill_awards={"customer_analysis": 30, "segmentation": 30}),
         dict(task_index=4, title="Task 4 — A/B Test Analysis", type="code_sandbox", week=2,
              objective="Check the free-shipping experiment before we roll it out",
              briefing='We tested a new free-shipping threshold on half of traffic last quarter — experiment_group = '
@@ -620,7 +620,7 @@ def da_job_sim():
              },
              config={**common, "grader_key": "da_job_sim.task4_ab_test", "starter_code": TASK4_STARTER,
                      "input_filename": "dataset.csv", "output_filename": "output.json"},
-             xp_award=100, skill_awards={"statistics": 25, "hypothesis_testing": 20}),
+             xp_award=100, skill_awards={"statistics": 40, "hypothesis_testing": 35}),
         dict(task_index=5, title="Task 5 — Executive Brief", type="code_sandbox", week=2,
              objective="One-pager for the VP — due EOD today",
              briefing="Pull it all together. Our VP gets one page from us this week. Tell her what's working, "
@@ -672,7 +672,7 @@ def da_job_sim():
              },
              config={"grading_strategy": "registered_grader", "grader_key": "da_job_sim.task5_brief",
                      "language": "text", "submission_mode": "text", "starter_code": ""},
-             xp_award=120, skill_awards={"communication": 15, "data_storytelling": 20}),
+             xp_award=120, skill_awards={"communication": 50, "data_storytelling": 40}),
     ]
     return sim, tasks
 
@@ -928,7 +928,7 @@ def sales_crm_sim():
                  {"key": "notes", "label": "Notes", "type": "textarea", "required": False},
                  {"key": "reasoning", "label": "Reasoning", "type": "textarea", "required": True, "min_length": 40},
              ], "post_task_quiz": _quiz(1)},
-             xp_award=40, skill_awards={"sales_research": 10, "crm_accuracy": 5}),
+             xp_award=40, skill_awards={"sales_research": 13, "crm_accuracy": 8}),
         dict(task_index=2, title="Stage 2 — Research", type="structured_form", week=1,
              objective="Build a real picture of the account before you reach out.",
              briefing="Dig into the account — company profile, products, competitors, challenges, decision "
@@ -1013,7 +1013,7 @@ def sales_crm_sim():
                  {"key": "opportunities", "label": "Opportunities", "type": "textarea", "required": True},
                  {"key": "risks", "label": "Risks", "type": "textarea", "required": True},
              ], "post_task_quiz": _quiz(2)},
-             xp_award=50, skill_awards={"sales_research": 20}),
+             xp_award=50, skill_awards={"sales_research": 27}),
         dict(task_index=3, title="Stage 3 — Cold Outreach", type="text_rubric", week=1,
              objective="Write a cold email that earns a reply.",
              briefing="Turn your research into a cold email — a clear subject line, a personalized body that "
@@ -1056,7 +1056,7 @@ def sales_crm_sim():
                          {"key": "cta", "label": "Call to action", "type": "text", "required": False},
                      ],
                      "post_task_quiz": _quiz(3)},
-             xp_award=70, skill_awards={"email_writing": 20, "communication": 10}),
+             xp_award=70, skill_awards={"email_writing": 40, "communication": 16}),
         dict(task_index=4, title="Stage 4 — Discovery Call", type="ai_roleplay_chat", week=1,
              objective="Get the prospect talking and uncover what actually matters to them.",
              briefing="You're live with the prospect now. Build rapport, ask real discovery questions, and come "
@@ -1118,7 +1118,7 @@ def sales_crm_sim():
                  "mode": "discovery", "min_messages_for_completion": 6,
                  "post_task_quiz": _quiz(4),
              },
-             xp_award=100, skill_awards={"discovery": 25, "communication": 15}),
+             xp_award=100, skill_awards={"discovery": 50, "communication": 24}),
         dict(task_index=5, title="Stage 5 — CRM — Work the Deal", type="crm_workspace", week=1,
              objective="Get the deal properly logged and moving through your pipeline.",
              briefing="Time to work the CRM like it's your job — because it is. Create the account, contact, and "
@@ -1159,7 +1159,7 @@ def sales_crm_sim():
                  "seed_data_key": "atlas-forge-manufacturing",
                  "post_task_quiz": _quiz(5),
              },
-             xp_award=90, skill_awards={"crm_accuracy": 25}),
+             xp_award=90, skill_awards={"crm_accuracy": 42}),
         dict(task_index=6, title="Stage 6 — Objection Handling", type="ai_roleplay_chat", week=1,
              objective="Handle real pushback without losing the deal.",
              briefing="The prospect has concerns — price, a competitor, approval, security, whatever comes up. "
@@ -1222,7 +1222,7 @@ def sales_crm_sim():
                  "mode": "objection", "min_messages_for_completion": 4,
                  "post_task_quiz": _quiz(6),
              },
-             xp_award=100, skill_awards={"objection_handling": 25, "negotiation": 10}),
+             xp_award=100, skill_awards={"objection_handling": 45, "negotiation": 10}),
         dict(task_index=7, title="Stage 7 — Proposal", type="structured_form", week=1,
              objective="Put together a proposal that makes the business case.",
              briefing="Write the proposal you'd actually send: the business problem, your recommended solution, "
@@ -1265,7 +1265,7 @@ def sales_crm_sim():
                  {"key": "timeline", "label": "Timeline", "type": "textarea", "required": True},
                  {"key": "pricingSummary", "label": "Pricing summary", "type": "textarea", "required": True},
              ], "post_task_quiz": _quiz(7)},
-             xp_award=80, skill_awards={"negotiation": 15, "communication": 10}),
+             xp_award=80, skill_awards={"negotiation": 15, "communication": 15}),
         dict(task_index=8, title="Stage 8 — Close", type="structured_form", week=1,
              objective="Take the concrete actions that actually close a deal.",
              briefing="This is where deals actually close or stall. Schedule the demo, request the signature, "
@@ -1304,7 +1304,7 @@ def sales_crm_sim():
                  {"key": "onboardingTaskCreated", "label": "Onboarding task created", "type": "checkbox", "required": False},
                  {"key": "opportunityStageUpdated", "label": "Opportunity stage updated", "type": "checkbox", "required": False},
              ], "post_task_quiz": _quiz(8)},
-             xp_award=120, skill_awards={"closing": 25, "negotiation": 15}),
+             xp_award=120, skill_awards={"closing": 45, "negotiation": 15}),
     ]
     return sim, tasks
 
