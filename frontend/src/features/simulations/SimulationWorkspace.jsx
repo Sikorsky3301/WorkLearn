@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueries } from '@tanstack/react-query'
-import { Clock, ListChecks } from 'lucide-react'
+import { Clock, ListChecks, TriangleAlert } from 'lucide-react'
 import { useSimulations, useEnrollment } from '../../hooks'
 import { api, resolveMediaUrl } from '../../lib/client'
 import { resolveDomainIcon, resolveDomainImage } from '../../lib/domainIcons'
@@ -41,7 +41,7 @@ export default function SimulationWorkspace() {
     if (searchParams.get('filter') === 'enrolled' && statusTab !== 'active') setStatusTab('active')
   }, [searchParams])
 
-  const { data, isLoading: simsLoading } = useSimulations()
+  const { data, isLoading: simsLoading, isError, error, refetch, isRefetching } = useSimulations()
   const simulations = data?.simulations || []
 
   // Check enrollment status across every simulation (not just the first) so
@@ -110,7 +110,30 @@ export default function SimulationWorkspace() {
 
       <DomainFilterBar sims={simulations} selected={selectedDomain} onSelect={setSelectedDomain} />
 
-      {showEmptyState ? (
+      {isError ? (
+        // A failed request used to fall through to the SAME empty state as a
+        // genuinely empty catalogue — every job simulation reads as "gone"
+        // instead of "the request failed" (this is exactly what happened
+        // after the Mermaid-architecture merge left a column missing: every
+        // /api/simulations call 500'd and the catalogue silently looked
+        // empty). Same fix as the admin Simulations panel.
+        <div className="flex items-start gap-3 border border-red-200 bg-red-50 rounded-xl p-5">
+          <TriangleAlert className="h-5 w-5 shrink-0 text-red-500 mt-0.5" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-red-900">Could not load simulations</p>
+            <p className="text-xs text-red-700 mt-0.5">
+              {error?.message || 'The request failed.'} If this keeps happening, try refreshing or signing out and back in.
+            </p>
+          </div>
+          <button
+            onClick={() => refetch()}
+            disabled={isRefetching}
+            className="shrink-0 text-xs font-semibold text-red-700 hover:underline cursor-pointer disabled:opacity-50"
+          >
+            {isRefetching ? 'Retrying…' : 'Retry'}
+          </button>
+        </div>
+      ) : showEmptyState ? (
         <div className="text-center py-16 border border-dashed border-border rounded-xl">
           <p className="text-sm text-on-surface-variant mb-4">
             {statusTab === 'active' && "You haven't enrolled in any simulations yet."}

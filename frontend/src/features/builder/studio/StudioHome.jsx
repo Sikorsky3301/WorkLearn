@@ -1,17 +1,19 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft, ArrowUpRight, Blocks, Layers, Loader2, Plus, Search, Sparkles,
+  ArrowLeft, ArrowUpRight, Blocks, Layers, Loader2, Plus, Search, Sparkles, Workflow,
 } from 'lucide-react'
 import { cn } from '../../../lib/cn'
 import { adoptHandoffToken } from '../../../lib/tabHandoff'
 import { useCmsBasePath } from '../../../hooks/useCmsBasePath'
 import {
   useAdminSimulations, useBuilderCatalog, useCreateSimulation,
-  useCreateSimulationFromTemplate, useSimulationTemplates,
+  useCreateSimulationFromTemplate, useCreateSimulationFromArchitecture, useSimulationTemplates,
 } from '../../../hooks'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../../components/ui/shadcn/dialog'
 import { Field, TextInput, Select, Note } from './editors/Fields'
+import MermaidArchitectureEditor from '../cms/architecture/MermaidArchitectureEditor'
+import { AUTHOR_STARTER_MMD } from '../cms/architecture/constants'
 import StudioBoot from './StudioBoot'
 import logo from '../../../assets/logo.png'
 
@@ -76,20 +78,24 @@ function NewSimulationDialog({ open, onOpenChange, onCreated }) {
   const [difficulty, setDifficulty] = useState('Beginner')
   const [hours, setHours] = useState('6-8 hours')
   const [template, setTemplate] = useState(null)
+  const [mermaid, setMermaid] = useState(AUTHOR_STARTER_MMD)
+  const [parseResult, setParseResult] = useState(null)
   const [error, setError] = useState('')
 
   const createSim = useCreateSimulation()
   const fromTemplate = useCreateSimulationFromTemplate()
+  const fromArch = useCreateSimulationFromArchitecture()
   const { data: templateData, isLoading: templatesLoading } = useSimulationTemplates()
   const templates = templateData?.templates ?? []
-  const pending = createSim.isPending || fromTemplate.isPending
+  const pending = createSim.isPending || fromTemplate.isPending || fromArch.isPending
 
   const effectiveSlug = slugTouched ? slug : slugify(title)
 
   function reset() {
     setMode('blank'); setTitle(''); setSlug(''); setSlugTouched(false)
     setCompany(''); setDomain(DOMAINS[0]); setDifficulty('Beginner')
-    setHours('6-8 hours'); setTemplate(null); setError('')
+    setHours('6-8 hours'); setTemplate(null)
+    setMermaid(AUTHOR_STARTER_MMD); setParseResult(null); setError('')
   }
 
   function close(next) {
@@ -114,6 +120,18 @@ function NewSimulationDialog({ open, onOpenChange, onCreated }) {
       return
     }
 
+    if (mode === 'architecture') {
+      if (!mermaid.trim()) { setError('Paste a Mermaid flowchart first.'); return }
+      fromArch.mutate(
+        { slug: effectiveSlug, title: title.trim(), mermaid },
+        {
+          onSuccess: (res) => { close(false); onCreated(res.id ?? res.slug) },
+          onError: (e) => setError(e?.message || 'Could not create from the diagram.'),
+        }
+      )
+      return
+    }
+
     if (!company.trim()) { setError('Name the company the student will be working for.'); return }
     createSim.mutate(
       blankSimulation({
@@ -127,22 +145,30 @@ function NewSimulationDialog({ open, onOpenChange, onCreated }) {
     )
   }
 
+  const isArchitecture = mode === 'architecture'
+
   return (
     <Dialog open={open} onOpenChange={close}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
+      <DialogContent
+        className={cn(
+          'flex max-h-[min(90vh,calc(100dvh-2rem))] flex-col overflow-hidden',
+          isArchitecture ? 'max-w-3xl' : 'max-w-2xl'
+        )}
+      >
+        <DialogHeader className="shrink-0">
           <DialogTitle>New simulation</DialogTitle>
           <DialogDescription>
-            Start empty and build the three-week shape from the Review page, or start from a template
-            that already has one.
+            Start empty, start from a template that already has one, or paste a Mermaid flowchart to
+            generate the shape from it.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5">
-          <div className="grid gap-2 sm:grid-cols-2">
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
+          <div className="grid gap-2 sm:grid-cols-3">
             {[
               { key: 'blank', icon: Plus, title: 'Start blank', body: 'An empty simulation. Scaffold the format in one click once you are inside.' },
               { key: 'template', icon: Sparkles, title: 'From a template', body: 'A domain starter with tasks already written, to edit rather than invent.' },
+              { key: 'architecture', icon: Workflow, title: 'From architecture', body: 'Paste Mermaid flowchart code and generate stages from it.' },
             ].map((option) => (
               <button
                 key={option.key}
@@ -202,6 +228,13 @@ function NewSimulationDialog({ open, onOpenChange, onCreated }) {
                 <TextInput value={hours} onChange={(e) => setHours(e.target.value)} placeholder="6-8 hours" />
               </Field>
             </div>
+          ) : mode === 'architecture' ? (
+            <MermaidArchitectureEditor
+              source={mermaid}
+              onChange={setMermaid}
+              parseResult={parseResult}
+              onParseResult={setParseResult}
+            />
           ) : (
             <Field label="Template" help="Every template can be edited freely afterwards.">
               {templatesLoading ? (

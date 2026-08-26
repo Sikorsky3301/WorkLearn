@@ -1,10 +1,9 @@
-# Spins up the whole local stack in one command. The frontend is
-# deliberately NOT containerized here — same convention as k8s/README.md:
-# `cd frontend && npm run dev` (Vite, port 5173) against whichever backend
-# is running, compose or otherwise.
+# Spins up the whole local stack in one command, frontend included. K8s
+# (k8s/README.md) is a separate deployment target and still runs the frontend
+# locally with `npm run dev` — that doc is unaffected by this file.
 #
 # Usage:
-#   docker compose up postgres backend           # app only
+#   docker compose up postgres backend frontend  # app only
 #   docker compose up                            # app + LiteLLM Proxy
 #   docker compose exec backend python seed.py   # once, after first `up`, to get demo accounts
 #
@@ -12,6 +11,14 @@
 # etc. — see backend/.env.example) except DATABASE_URL, which is overridden
 # below to point at the `postgres` service instead of whatever
 # Supabase/localhost URL backend/.env has for running uvicorn directly.
+#
+# `frontend` runs the Vite dev server (not a production build) — matches
+# `backend`'s own dev-oriented Dockerfile (no --reload either), and keeps
+# `docker compose up` behaving the same as running both halves locally. Vite
+# proxies /api and /static to BACKEND_ORIGIN (see vite.config.js) rather than
+# baking a URL into the browser bundle, so it's pointed at the `backend`
+# service's Docker DNS name below instead of the 127.0.0.1 default that only
+# resolves on the host.
 #
 # litellm-proxy/litellm-proxy-db are optional (see
 # backend/litellm-proxy/README.md) — needs LITELLM_MASTER_KEY and the
@@ -47,6 +54,19 @@ services:
       - backend/.env
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/worklearn
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "5173:5173"
+    environment:
+      # The Vite process reads this to proxy /api and /static — never reaches
+      # the browser, so the compose service name is correct here even though
+      # frontend/.env.local's own default (127.0.0.1) is not.
+      BACKEND_ORIGIN: http://backend:3001
 
   litellm-proxy-db:
     image: postgres:16
