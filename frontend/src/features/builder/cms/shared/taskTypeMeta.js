@@ -1,4 +1,4 @@
-import { FileText, ListChecks, HelpCircle, MessageCircle, Building2, Code2 } from 'lucide-react'
+import { FileText, ListChecks, HelpCircle, MessageCircle, Building2, Code2, Workflow } from 'lucide-react'
 
 // Icon + accent classes per task type, for the visual Stages builder
 // (StageCard uses `border` for its left accent strip; StageFlowOverview uses
@@ -46,6 +46,13 @@ export const taskTypeMeta = {
     solidBorder: 'border-slate-500',
     badgeBg: 'bg-slate-50',
     badgeText: 'text-slate-600',
+  },
+  mermaid_diagram: {
+    icon: Workflow,
+    border: 'border-l-teal-500',
+    solidBorder: 'border-teal-500',
+    badgeBg: 'bg-teal-50',
+    badgeText: 'text-teal-600',
   },
 }
 

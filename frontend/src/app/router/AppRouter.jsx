@@ -36,9 +36,8 @@ import LoginPage from '../../features/auth/global/Login'
 // ── (dashboard) — everything behind authentication. SuperAdminPortal/
 // AdminPortal stay lazy — a regular student never downloads either portal's
 // bundle (shell + every page + shared admin components). The job-sim CMS
-// editor and Sim Builder are regular imports — they're standalone
-// full-screen tools re-hosted under /admin/*, not part of either portal's
-// own code-split chunk. ──────────────────────────────────────────────────────
+// editor and Sim Builder are regular imports on AppRouter sibling routes,
+// wrapped in AdminCmsLayout / MentorCmsLayout for portal sidebar + theme. ───
 const SuperAdminPortal = lazy(() => import('../../features/superadmin/SuperAdminPortal'))
 const AdminPortal       = lazy(() => import('../../features/admin/portal/AdminPortal'))
 const UniversityAdminPortal = lazy(() => import('../../features/university-admin/UniversityAdminPortal'))
@@ -49,6 +48,8 @@ import SimBuilderListPage   from '../../features/builder/sim-builder/SimBuilderL
 import SimBuilderEditor     from '../../features/builder/sim-builder/SimBuilderEditor'
 import LegacyBuilderRedirect from './LegacyBuilderRedirect'
 import SimulationsPage      from '../../features/admin/portal/pages/SimulationsPage'
+import AdminCmsLayout       from '../../features/admin/portal/AdminCmsLayout'
+import MentorCmsLayout      from '../../features/mentor/MentorCmsLayout'
 import OnboardingWizard     from '../../features/onboarding/OnboardingWizard'
 import Dashboard            from '../../features/dashboard/Dashboard'
 import SimulationWorkspace  from '../../features/simulations/SimulationWorkspace'
@@ -160,10 +161,13 @@ export default function AppRouter() {
           siblings of the portal shell rather than nested in it. React Router
           ranks routes by specificity regardless of declaration order, so
           these always win over the portal's own `/*` wildcard for their
-          exact paths — see AdminPortal.jsx's docblock. */}
+          exact paths — see AdminPortal.jsx's docblock. The catalogue below is
+          the one CMS surface that stays inside the portal chrome — it's a
+          list page, not an editor, so it wraps AdminCmsLayout for the same
+          sidebar/theme as the rest of /admin. */}
       {/* The catalogue: publish, unpublish, unenrol, delete. BUILDING a
           simulation is a different job and lives under /content/sim-builder. */}
-      <Route path="/admin/simulations" element={<RequireCmsAccess><RedirectTeacherAwayFromAdminCms><SimulationsPage /></RedirectTeacherAwayFromAdminCms></RequireCmsAccess>} />
+      <Route path="/admin/simulations" element={<RequireCmsAccess><RedirectTeacherAwayFromAdminCms><AdminCmsLayout><SimulationsPage /></AdminCmsLayout></RedirectTeacherAwayFromAdminCms></RequireCmsAccess>} />
 
       {/* Sim Builder — opened in its own tab from the Content nav. The static
           `projects` segment outranks `:id` regardless of declaration order. */}
@@ -199,8 +203,11 @@ export default function AppRouter() {
         }
       />
 
-      {/* Teacher CMS — mentor-prefixed (not /admin). Ranked above /mentor/*. */}
-      <Route path="/mentor/simulations" element={<RequireCmsAccess><SimulationsPage /></RequireCmsAccess>} />
+      {/* Teacher CMS — mentor-prefixed (not /admin). Ranked above /mentor/*.
+          Mirrors the admin block above: the catalogue wraps MentorCmsLayout,
+          the Studio builder stays standalone, and the old sim-builder paths
+          redirect into it. */}
+      <Route path="/mentor/simulations" element={<RequireCmsAccess><MentorCmsLayout><SimulationsPage /></MentorCmsLayout></RequireCmsAccess>} />
       <Route path="/mentor/content/sim-builder" element={<RequireCmsAccess><StudioHome /></RequireCmsAccess>} />
       <Route path="/mentor/content/sim-builder/projects" element={<RequireCmsAccess><SimBuilderListPage /></RequireCmsAccess>} />
       <Route path="/mentor/content/sim-builder/projects/:id" element={<RequireCmsAccess><SimBuilderEditor /></RequireCmsAccess>} />

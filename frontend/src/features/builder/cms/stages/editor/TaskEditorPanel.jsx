@@ -15,6 +15,7 @@ import QuizEditor from './type-editors/QuizEditor'
 import PersonaEditor from './type-editors/PersonaEditor'
 import CrmWorkspaceEditor from './type-editors/CrmWorkspaceEditor'
 import CodeSandboxEditor from './type-editors/CodeSandboxEditor'
+import MermaidDiagramEditor from './type-editors/MermaidDiagramEditor'
 
 /** Unified per-task editor — common fields (title/objective/briefing/hints/
  * success_criteria/xp/skills/rubric) plus a type-specific config section
@@ -147,6 +148,7 @@ export default function TaskEditorPanel({ simId, draft, onDraftChange, onSaved, 
         {draft.type === 'ai_roleplay_chat' && <PersonaEditor config={draft.config} setConfig={setConfig} />}
         {draft.type === 'crm_workspace' && <CrmWorkspaceEditor config={draft.config} setConfig={setConfig} />}
         {draft.type === 'code_sandbox' && <CodeSandboxEditor config={draft.config} setConfig={setConfig} />}
+        {draft.type === 'mermaid_diagram' && <MermaidDiagramEditor config={draft.config} setConfig={setConfig} />}
       </div>
 
       <div className="flex justify-end gap-2 pt-2 border-t border-border">

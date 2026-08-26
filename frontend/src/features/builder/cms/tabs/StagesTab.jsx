@@ -23,6 +23,7 @@ function defaultConfigFor(type) {
     case 'ai_roleplay_chat': return { persona: { name: 'Contact Name', role: 'Role', personality_prompt: 'Describe the persona here.', mood_options: ['neutral'], opening_mood: 'neutral' }, context: {}, mode: 'custom', min_messages_for_completion: 4 }
     case 'crm_workspace': return { required_entities: { accounts: 1, contacts: 1, opportunities: 1 }, pipeline_stages: ['Qualification', 'Proposal', 'Closed Won', 'Closed Lost'] }
     case 'code_sandbox': return { language: 'python', grading_strategy: 'declarative_rules', submission_mode: 'code', starter_code: '', input_filename: 'submission.py', output_filename: 'output.json', rules: [] }
+    case 'mermaid_diagram': return { grading_mode: 'manual', starter_code: 'flowchart TD\n  startNode[Start] --> process[Name the components]\n  process --> endNode[End]\n', min_words: 0 }
     default: return {}
   }
 }
@@ -152,12 +153,12 @@ export default function StagesTab({ simId }) {
       <div id="cms-stages-top" />
       <div className="flex items-start justify-between gap-3 mb-1">
         <WeekPillStrip tasks={tasks} sim={sim} collapsedWeeks={collapsedWeeks} onSelectWeek={expandWeek} />
-        <div className="flex items-center gap-0.5 rounded-lg border border-border bg-white p-0.5 shrink-0">
+        <div className="flex items-center gap-0.5 rounded-lg border border-border dark:border-slate-700 bg-white dark:bg-slate-900 p-0.5 shrink-0">
           <button
             onClick={() => setViewMode('list')}
             className={cn(
               'flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors cursor-pointer',
-              viewMode === 'list' ? 'bg-primary/10 text-primary' : 'text-on-surface-variant hover:text-on-surface'
+              viewMode === 'list' ? 'bg-primary/10 text-primary' : 'text-on-surface-variant dark:text-slate-400 hover:text-on-surface dark:hover:text-slate-100'
             )}
           >
             <LayoutList className="h-3.5 w-3.5" /> List
@@ -166,7 +167,7 @@ export default function StagesTab({ simId }) {
             onClick={() => setViewMode('flow')}
             className={cn(
               'flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors cursor-pointer',
-              viewMode === 'flow' ? 'bg-primary/10 text-primary' : 'text-on-surface-variant hover:text-on-surface'
+              viewMode === 'flow' ? 'bg-primary/10 text-primary' : 'text-on-surface-variant dark:text-slate-400 hover:text-on-surface dark:hover:text-slate-100'
             )}
           >
             <Workflow className="h-3.5 w-3.5" /> Flow
@@ -186,7 +187,7 @@ export default function StagesTab({ simId }) {
         <ResizeHandle onMouseDown={startPaletteResize} />
 
         {viewMode === 'flow' ? (
-          <div className="rounded-xl border border-border bg-white p-3">
+          <div className="rounded-xl border border-border dark:border-slate-700 bg-white dark:bg-slate-900 p-3">
             <StageFlowOverview tasks={tasks} sim={sim} openTaskId={openTaskId} onOpen={(task) => setOpenTaskId(task.id)} />
           </div>
         ) : (
@@ -206,10 +207,10 @@ export default function StagesTab({ simId }) {
         {openTask && (
           <>
             <ResizeHandle onMouseDown={startEditorResize} />
-            <div className="sticky top-24 h-[75vh] rounded-xl border border-border bg-white overflow-hidden flex flex-col">
-              <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
-                <p className="text-sm font-bold text-on-surface truncate">{openTask.title}</p>
-                <button onClick={() => setOpenTaskId(null)} className="text-on-surface-variant hover:text-on-surface shrink-0 cursor-pointer">
+            <div className="sticky top-24 h-[75vh] rounded-xl border border-border dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between px-4 py-2.5 border-b border-border dark:border-slate-800 shrink-0">
+                <p className="text-sm font-bold text-on-surface dark:text-slate-100 truncate">{openTask.title}</p>
+                <button onClick={() => setOpenTaskId(null)} className="text-on-surface-variant dark:text-slate-400 hover:text-on-surface dark:hover:text-slate-100 shrink-0 cursor-pointer">
                   <X className="h-4 w-4" />
                 </button>
               </div>
@@ -223,7 +224,7 @@ export default function StagesTab({ simId }) {
 
       <DragOverlay>
         {activeDrag?.source === 'palette' ? (
-          <div className="rounded-lg border border-primary bg-white shadow-lg px-3 py-2 text-xs font-semibold text-primary">
+          <div className="rounded-lg border border-primary bg-white dark:bg-slate-900 shadow-lg px-3 py-2 text-xs font-semibold text-primary">
             {taskTypeRegistry[activeDrag.taskType]?.label}
           </div>
         ) : null}

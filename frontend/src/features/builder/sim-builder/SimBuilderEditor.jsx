@@ -232,7 +232,7 @@ export default function SimBuilderEditor() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center min-h-[40vh]">
         <Loader2 className="h-6 w-6 animate-spin text-primary" />
       </div>
     )
@@ -240,14 +240,14 @@ export default function SimBuilderEditor() {
 
   if (!project) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-sm text-on-surface-variant">Project not found.</p>
+      <div className="flex-1 flex items-center justify-center min-h-[40vh]">
+        <p className="text-sm text-on-surface-variant dark:text-slate-400">Project not found.</p>
       </div>
     )
   }
 
   return (
-    <div className="h-screen flex flex-col bg-surface-low">
+    <div className="flex-1 min-h-0 flex flex-col bg-surface-low dark:bg-slate-950">
       <Toolbar
         project={project}
         onSave={handleSaveBlock}

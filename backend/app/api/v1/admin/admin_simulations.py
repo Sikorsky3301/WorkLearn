@@ -20,6 +20,10 @@ from app.api.v1.simulations.enrollments import JOURNEY_BADGE_KEY
 from app.schemas.cms import (
     SimulationCreate, SimulationUpdate, SimulationTaskCreate, SimulationTaskUpdate,
     ReorderTasksBody, DuplicateSimulationBody, CreateFromTemplateBody, validate_task_config,
+    ArchitectureParseBody, CreateFromArchitectureBody, ApplyArchitectureBody,
+)
+from app.services.mermaid_architecture import (
+    parse_flowchart, plan_to_tasks, architecture_placeholder_sim,
 )
 from app.cms_templates import TEMPLATES
 from app.services.sim_view import build_simulation_public_dict
@@ -82,6 +86,7 @@ def _sim_dict(sim: Simulation) -> dict:
         "skills": sim.skills, "rating": sim.rating, "rating_count": sim.rating_count,
         "manager": sim.manager, "onboarding": sim.onboarding,
         "onboarding_xp_award": sim.onboarding_xp_award, "section_labels": sim.section_labels,
+        "architecture_mermaid": sim.architecture_mermaid,
         "status": sim.status.value, "created_by": sim.created_by,
         "created_at": sim.created_at.isoformat(), "updated_at": sim.updated_at.isoformat(),
         "published_at": sim.published_at.isoformat() if sim.published_at else None,
@@ -96,6 +101,30 @@ async def _get_sim_or_404(sim_key: str, db: AsyncSession) -> Simulation:
         raise HTTPException(404, "Simulation not found")
     await db.refresh(sim, attribute_names=["university_links"])
     return sim
+
+
+def _architecture_plan_or_400(mermaid: str):
+    parsed = parse_flowchart(mermaid)
+    if parsed["errors"]:
+        raise HTTPException(400, "; ".join(parsed["errors"]))
+    tasks, labels = plan_to_tasks(parsed)
+    if not tasks:
+        raise HTTPException(400, "No stages could be generated from the diagram.")
+    return parsed, tasks, labels
+
+
+def _add_tasks_from_plan(db: AsyncSession, sim: Simulation, tasks: list[dict]):
+    for t in tasks:
+        task_data = SimulationTaskCreate(**t)
+        validated_config = validate_task_config(task_data.type, task_data.config)
+        db.add(SimulationTask(
+            simulation_id=sim.id, task_index=task_data.task_index, title=task_data.title, type=task_data.type,
+            objective=task_data.objective, briefing=task_data.briefing,
+            what_to_do=task_data.what_to_do, what_to_submit=task_data.what_to_submit,
+            hints=task_data.hints, success_criteria=task_data.success_criteria,
+            config=validated_config,
+            xp_award=task_data.xp_award, skill_awards=task_data.skill_awards, week=task_data.week,
+        ))
 
 
 @router.get("")
@@ -131,6 +160,7 @@ async def create_simulation(body: SimulationCreate, db: AsyncSession = Depends(g
         rating=body.rating, rating_count=body.rating_count,
         manager=body.manager.model_dump(), onboarding=body.onboarding.model_dump(),
         onboarding_xp_award=body.onboarding_xp_award, section_labels=body.section_labels,
+        architecture_mermaid=body.architecture_mermaid,
         status=SimulationStatus.DRAFT, created_by=token_user_id(token),
     )
     db.add(sim)
@@ -165,6 +195,7 @@ async def duplicate_simulation(
         manager=source.manager, onboarding=source.onboarding,
         onboarding_xp_award=source.onboarding_xp_award,
         section_labels=source.section_labels,
+        architecture_mermaid=source.architecture_mermaid,
         status=SimulationStatus.DRAFT, created_by=token_user_id(token),
     )
     db.add(new_sim)
@@ -214,6 +245,7 @@ async def create_from_template(
         rating=sim_data.rating, rating_count=sim_data.rating_count,
         manager=sim_data.manager.model_dump(), onboarding=sim_data.onboarding.model_dump(),
         onboarding_xp_award=sim_data.onboarding_xp_award, section_labels=sim_data.section_labels,
+        architecture_mermaid=sim_data.architecture_mermaid,
         status=SimulationStatus.DRAFT, created_by=token_user_id(token),
     )
     db.add(sim)
@@ -233,6 +265,66 @@ async def create_from_template(
             xp_award=task_data.xp_award, skill_awards=task_data.skill_awards, week=task_data.week,
         ))
 
+    await db.commit()
+    await db.refresh(sim, attribute_names=["tasks"])
+    from sqlalchemy.orm.attributes import set_committed_value
+    set_committed_value(sim, "university_links", [])
+    return _sim_dict(sim)
+
+
+@router.post("/architecture/parse")
+async def parse_architecture(body: ArchitectureParseBody, token: dict = Depends(require_cms_access())):
+    parsed = parse_flowchart(body.mermaid)
+    tasks, labels = ([], parsed.get("section_labels") or {})
+    if not parsed["errors"]:
+        tasks, labels = plan_to_tasks(parsed)
+    return {
+        "errors": parsed["errors"],
+        "warnings": parsed["warnings"],
+        "section_labels": labels,
+        "tasks": [
+            {"task_index": t["task_index"], "title": t["title"], "type": t["type"], "week": t.get("week")}
+            for t in tasks
+        ],
+    }
+
+
+@router.post("/from-architecture")
+async def create_from_architecture(
+    body: CreateFromArchitectureBody,
+    db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access()),
+):
+    _, tasks, labels = _architecture_plan_or_400(body.mermaid)
+    existing = await db.execute(select(Simulation).where(Simulation.slug == body.slug))
+    if existing.scalar_one_or_none():
+        raise HTTPException(409, f"Simulation slug '{body.slug}' already exists")
+
+    extra = {
+        k: v for k, v in {
+            "description": body.description, "company": body.company, "domain": body.domain,
+            "category": body.category, "difficulty": body.difficulty,
+            "estimated_hours": body.estimated_hours, "skills": body.skills,
+        }.items() if v is not None
+    }
+    sim_fields = architecture_placeholder_sim(body.slug, body.title, len(tasks), extra)
+    sim_data = SimulationCreate(**sim_fields, architecture_mermaid=body.mermaid, section_labels=labels)
+    sim = Simulation(
+        slug=sim_data.slug, title=sim_data.title, description=sim_data.description, company=sim_data.company,
+        logo_url=sim_data.logo_url, domain=sim_data.domain, category=sim_data.category,
+        accent_color=sim_data.accent_color, difficulty=sim_data.difficulty,
+        estimated_hours=sim_data.estimated_hours, skills=sim_data.skills,
+        rating=sim_data.rating, rating_count=sim_data.rating_count,
+        manager=sim_data.manager.model_dump(), onboarding=sim_data.onboarding.model_dump(),
+        onboarding_xp_award=sim_data.onboarding_xp_award, section_labels=sim_data.section_labels,
+        architecture_mermaid=sim_data.architecture_mermaid,
+        status=SimulationStatus.DRAFT, created_by=token_user_id(token),
+    )
+    db.add(sim)
+    await db.flush()
+    try:
+        _add_tasks_from_plan(db, sim, tasks)
+    except (ValidationError, KeyError) as e:
+        raise HTTPException(422, f"Invalid generated task config: {e}")
     await db.commit()
     await db.refresh(sim, attribute_names=["tasks"])
     from sqlalchemy.orm.attributes import set_committed_value
@@ -276,6 +368,37 @@ async def update_simulation(sim_id: str, body: SimulationUpdate, db: AsyncSessio
     await db.commit()
     await db.refresh(sim, attribute_names=["tasks", "university_links"])
     return _sim_dict(sim)
+
+
+@router.post("/{sim_id}/architecture/apply")
+async def apply_architecture(
+    sim_id: str, body: ApplyArchitectureBody,
+    db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access()),
+):
+    sim = await _get_sim_or_404(sim_id, db)
+    assert_can_mutate_simulation(token, sim)
+    parsed, tasks, labels = _architecture_plan_or_400(body.mermaid)
+    sim.architecture_mermaid = body.mermaid
+    sim.section_labels = {**(sim.section_labels or {}), **labels}
+
+    if body.mode == "replace":
+        await db.execute(delete(SimulationTask).where(SimulationTask.simulation_id == sim.id))
+    else:
+        max_res = await db.execute(
+            select(func.max(SimulationTask.task_index)).where(SimulationTask.simulation_id == sim.id)
+        )
+        offset = max_res.scalar() or 0
+        for t in tasks:
+            t["task_index"] = t["task_index"] + offset
+
+    try:
+        _add_tasks_from_plan(db, sim, tasks)
+    except (ValidationError, KeyError) as e:
+        raise HTTPException(422, f"Invalid generated task config: {e}")
+
+    await db.commit()
+    await db.refresh(sim, attribute_names=["tasks", "university_links"])
+    return {"warnings": parsed["warnings"], **_sim_dict(sim)}
 
 
 @router.post("/{sim_id}/publish")

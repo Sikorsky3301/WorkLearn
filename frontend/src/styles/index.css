@@ -45,7 +45,7 @@
   }
 
   .card {
-    @apply bg-white border border-border rounded-lg p-6;
+    @apply bg-white dark:bg-slate-900 border border-border dark:border-slate-800 rounded-lg p-6;
   }
 
   /* Soft "floating" elevation — border-less, shadow-only depth (see the
@@ -61,7 +61,7 @@
   }
 
   .input {
-    @apply w-full bg-white border border-border rounded px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition-colors;
+    @apply w-full bg-white dark:bg-slate-950 border border-border dark:border-slate-700 rounded px-3 py-2 text-sm text-on-surface dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition-colors;
   }
 
   .section-label {

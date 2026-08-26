@@ -33,15 +33,15 @@ export default function LeftSidebar({ pages, activePageId, onSelectPage, onAddPa
   }
 
   return (
-    <aside className="w-64 shrink-0 border-r border-border bg-white flex flex-col">
-      <div className="flex border-b border-border">
+    <aside className="w-64 shrink-0 border-r border-border dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col">
+      <div className="flex border-b border-border dark:border-slate-800">
         {TABS.map(({ id, label, Icon }) => (
           <button
             key={id}
             onClick={() => setTab(id)}
             className={cn(
               'flex-1 flex flex-col items-center gap-1 py-2.5 text-[10px] font-semibold transition-colors cursor-pointer border-b-2',
-              tab === id ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant hover:text-on-surface'
+              tab === id ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant dark:text-slate-400 hover:text-on-surface dark:hover:text-slate-100'
             )}
           >
             <Icon className="h-4 w-4" /> {label}

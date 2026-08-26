@@ -4,6 +4,7 @@ import QuizTask from './QuizTask'
 import AiRoleplayChatTask from './AiRoleplayChatTask'
 import CrmWorkspaceTask from './CrmWorkspaceTask'
 import CodeSandboxTask from './CodeSandboxTask'
+import MermaidDiagramTask from './MermaidDiagramTask'
 
 // One entry per task `type` — read by both the runtime renderer
 // (GenericStageRenderer) and the future admin builder's task-type palette.
@@ -17,4 +18,5 @@ export const taskTypeRegistry = {
   // "workspace" option when authoring a non-sales simulation.
   crm_workspace: { RendererComponent: CrmWorkspaceTask, label: 'CRM Workspace (Sales)' },
   code_sandbox: { RendererComponent: CodeSandboxTask, label: 'Code Sandbox' },
+  mermaid_diagram: { RendererComponent: MermaidDiagramTask, label: 'Mermaid Diagram' },
 }

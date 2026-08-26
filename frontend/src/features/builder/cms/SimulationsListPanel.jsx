@@ -51,7 +51,7 @@ export default function SimulationsListPanel() {
       <NewSimulationDialog open={newDialogOpen} onOpenChange={setNewDialogOpen} />
 
       {isLoading ? (
-        <div className="card shadow-sm"><div className="h-40 bg-surface-high rounded animate-pulse" /></div>
+        <div className="card shadow-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800"><div className="h-40 bg-surface-high dark:bg-slate-800 rounded animate-pulse" /></div>
       ) : isError ? (
         // A failed request used to fall through to the SAME empty state as a
         // genuinely empty list — "No simulations found." — so an admin
@@ -75,20 +75,20 @@ export default function SimulationsListPanel() {
           </button>
         </div>
       ) : sims.length === 0 ? (
-        <div className="card shadow-sm text-center py-12">
-          <p className="text-sm text-on-surface-variant">No simulations found.</p>
+        <div className="card shadow-sm text-center py-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+          <p className="text-sm text-on-surface-variant dark:text-slate-400">No simulations found.</p>
         </div>
       ) : (
-        <div className="card shadow-sm p-0 overflow-hidden">
+        <div className="card shadow-sm p-0 overflow-hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
           <table className="w-full text-sm">
-            <thead className="bg-surface-low border-b border-border">
+            <thead className="bg-surface-low dark:bg-slate-800/60 border-b border-border dark:border-slate-800">
               <tr>
                 {['Title', 'Domain', 'Status', 'Tasks', 'Enrollments', 'Updated', ''].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-on-surface-variant">{h}</th>
+                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-on-surface-variant dark:text-slate-400">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-border/60">
+            <tbody className="divide-y divide-border/60 dark:divide-slate-800">
               {pageRows.map((s) => (
                 <SimRow
                   key={s.id} sim={s}
@@ -164,16 +164,16 @@ function SimRow({ sim, onEdit, onDuplicated, deleteSim }) {
   }
 
   return (
-    <tr className="hover:bg-surface-low transition-colors">
-      <td className="px-4 py-3 font-medium text-on-surface">
+    <tr className="hover:bg-surface-low dark:hover:bg-slate-800/60 transition-colors">
+      <td className="px-4 py-3 font-medium text-on-surface dark:text-slate-100">
         <div>{sim.title}</div>
         {sim.status === 'PUBLISHED' && (
-          <div className="text-[11px] text-outline mt-0.5">{scopeLabel(sim)}</div>
+          <div className="text-[11px] text-outline dark:text-slate-500 mt-0.5">{scopeLabel(sim)}</div>
         )}
       </td>
-      <td className="px-4 py-3 text-xs text-on-surface-variant">{sim.domain}</td>
+      <td className="px-4 py-3 text-xs text-on-surface-variant dark:text-slate-400">{sim.domain}</td>
       <td className="px-4 py-3">
-        <span className={`chip text-[10px] ${sim.status === 'PUBLISHED' ? 'bg-emerald-100 text-emerald-700' : 'bg-surface-high text-on-surface-variant'}`}>
+        <span className={`chip text-[10px] ${sim.status === 'PUBLISHED' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-surface-high text-on-surface-variant dark:bg-slate-800 dark:text-slate-300'}`}>
           {sim.status}
         </span>
       </td>
