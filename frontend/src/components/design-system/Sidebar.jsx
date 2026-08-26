@@ -1,15 +1,24 @@
 import { useState, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
-import { ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { ChevronsLeft, ChevronsRight, ExternalLink } from 'lucide-react'
+import { openAuthedTab } from '../../lib/tabHandoff'
 import { cn } from '../../lib/cn'
 
 const STORAGE_KEY = 'wl-portal-sidebar-collapsed'
 
 /**
  * Generic left nav for a PortalShell. `sections`:
- *   [{ label?: string, items: [{ label, icon: LucideIcon, to, end?, badge? }] }]
+ *   [{ label?: string, items: [{ label, icon: LucideIcon, to, end?, badge?, newTab? }] }]
  * Optional `brand` replaces the default title/subtitle header (e.g. tenant logo).
  * Collapses to an icon-only rail; preference persists in localStorage.
+ *
+ * `newTab` opens the destination in its own browser tab instead of navigating
+ * this one. It is for full-screen tools that are a long working session rather
+ * than a page of the portal — the Sim Builder, which an author keeps open
+ * beside the students list, and which owns its whole viewport. It uses
+ * openAuthedTab so the new tab arrives with a session even in the race where
+ * localStorage has not been observed yet (see lib/tabHandoff.js), and it is
+ * marked with an icon so nothing opens a tab without saying so first.
  */
 export default function Sidebar({ title, subtitle, brand, sections, footer }) {
   const [collapsed, setCollapsed] = useState(() => {
@@ -75,6 +84,23 @@ export default function Sidebar({ title, subtitle, brand, sections, footer }) {
             )}
             <div className="space-y-0.5">
               {section.items.map((item) => (
+                item.newTab ? (
+                  <button
+                    key={item.to}
+                    type="button"
+                    onClick={() => openAuthedTab(item.to)}
+                    title={collapsed ? `${item.label} — opens in a new tab` : 'Opens in a new tab'}
+                    className={cn(
+                      'w-full flex items-center rounded-lg text-sm font-medium transition-colors cursor-pointer',
+                      collapsed ? 'justify-center px-0 py-2' : 'gap-2.5 px-2.5 py-1.5',
+                      'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100'
+                    )}
+                  >
+                    {item.icon && <item.icon className="h-4 w-4 shrink-0" />}
+                    {!collapsed && <span className="truncate">{item.label}</span>}
+                    {!collapsed && <ExternalLink className="ml-auto h-3 w-3 shrink-0 opacity-50" />}
+                  </button>
+                ) : (
                 <NavLink
                   key={item.to}
                   to={item.to}
@@ -98,6 +124,7 @@ export default function Sidebar({ title, subtitle, brand, sections, footer }) {
                     </span>
                   )}
                 </NavLink>
+                )
               ))}
             </div>
           </div>

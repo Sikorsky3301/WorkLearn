@@ -23,8 +23,13 @@ function UniAvatar({ name, logoUrl }) {
   )
 }
 
-function partnerHost(code) {
-  return `http://${String(code).toLowerCase()}.localhost:5173`
+// The partner sign-in URL comes from the API (`login_url`), which builds it
+// from the deployment's own frontend_url. It used to be hardcoded here as
+// `http://{code}.localhost:5173` — so the link an admin copied and emailed to
+// a university was a localhost address in production. The fallback below is
+// only for a row served by an older backend.
+function partnerHost(u) {
+  return u.login_url || `${window.location.origin.replace('//', `//${String(u.code).toLowerCase()}.`)}`
 }
 
 export default function UniversitiesTable({ onProvision }) {
@@ -42,7 +47,7 @@ export default function UniversitiesTable({ onProvision }) {
   )
 
   const copyHost = async (u) => {
-    const url = partnerHost(u.code)
+    const url = partnerHost(u)
     try {
       await navigator.clipboard.writeText(url)
       setCopied(u.id)
@@ -124,8 +129,8 @@ export default function UniversitiesTable({ onProvision }) {
         <span className="font-mono text-xs">{u.code}</span>
       ),
     },
-    { key: 'students', header: 'Students' },
-    { key: 'mentors', header: 'Teachers' },
+    { key: 'students', header: 'Students', align: 'right', render: (u) => <span className="tabular-nums">{u.students}</span> },
+    { key: 'mentors', header: 'Teachers', align: 'right', render: (u) => <span className="tabular-nums">{u.mentors}</span> },
     {
       key: 'host', header: 'Partner host', render: (u) => (
         u.is_default ? (
@@ -138,7 +143,7 @@ export default function UniversitiesTable({ onProvision }) {
             title="Copy partner host URL"
           >
             {copied === u.id ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-            {String(u.code).toLowerCase()}.localhost:5173
+            {partnerHost(u).replace(/^https?:\/\//, '')}
           </button>
         )
       ),
@@ -149,7 +154,7 @@ export default function UniversitiesTable({ onProvision }) {
       ),
     },
     {
-      key: 'actions', header: '', render: (u) => (
+      key: 'actions', header: '', sortable: false, align: 'right', render: (u) => (
         <div className="flex items-center gap-2 justify-end">
           {!u.is_default && (
             <>

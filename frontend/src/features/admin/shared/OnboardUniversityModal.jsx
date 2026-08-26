@@ -33,7 +33,9 @@ export default function OnboardUniversityModal({ onClose }) {
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
   const codePreview = (form.code || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '')
-  const hostPreview = codePreview ? `${codePreview}.localhost:5173` : '{code}.localhost:5173'
+  // Preview the real deployment host, not a hardcoded dev one.
+  const appHost = typeof window === 'undefined' ? '' : window.location.host
+  const hostPreview = `${codePreview || '{code}'}.${appHost}`
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -81,7 +83,7 @@ export default function OnboardUniversityModal({ onClose }) {
               <strong>{done.university?.name}</strong> onboarded. University Admin: {done.admin?.email}
             </p>
             <p className="text-xs text-slate-600 dark:text-slate-400">
-              Partner login host: <code className="font-mono text-primary">{done.login_host || `http://${done.university?.code}.localhost:5173`}</code>
+              Partner login host: <code className="font-mono text-primary">{done.login_host}</code>
             </p>
             <p className="text-xs text-slate-500">University Admin signs in at that host via Admin sign-in (`/admin`), then lands in the University Admin portal.</p>
             <button type="button" onClick={onClose} className="btn-primary w-full py-2.5 text-sm">Done</button>

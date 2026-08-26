@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from fastapi import HTTPException
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, inspect as sa_inspect
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -36,8 +36,6 @@ def assert_can_mutate_project(token: dict, project: SimBuilderProject) -> None:
 
 def scope_payload(sim: Simulation) -> dict:
     """Serialize publish targeting without triggering async lazy-loads."""
-    from sqlalchemy import inspect as sa_inspect
-
     insp = sa_inspect(sim)
     if "university_links" in insp.unloaded:
         links = []
@@ -117,16 +115,29 @@ async def apply_publish_scope_for_actor(
 
 
 def sim_visible_to_university(sim: Simulation, university_id: int | None) -> bool:
+    """Pure predicate — does no IO, so it is safe to call from a sync context.
+
+    That is why `university_links` is read through the inspection API rather
+    than with a plain getattr: on an async session, touching an unloaded
+    relationship raises MissingGreenlet rather than returning None, and a
+    getattr default cannot catch it. Callers are responsible for loading the
+    relationship first (assert_sim_visible_to_tenant does; the eager
+    selectinload in published_sims_for_university does).
+
+    An unloaded relationship here means "not visible" rather than a crash: the
+    scoped case cannot be answered without the links, and refusing is the safe
+    direction for a visibility check.
+    """
     if sim.status != SimulationStatus.PUBLISHED:
         return False
     if getattr(sim, "available_to_all_universities", True):
         return True
     if university_id is None:
         return False
-    links = getattr(sim, "university_links", None)
-    if links is not None:
-        return any(link.university_id == university_id for link in links)
-    return False
+    if "university_links" in sa_inspect(sim).unloaded:
+        return False
+    links = sim.university_links or []
+    return any(link.university_id == university_id for link in links)
 
 
 async def published_sims_for_university(
@@ -148,8 +159,24 @@ async def assert_sim_visible_to_tenant(
     sim: Simulation,
     university_id: int | None,
 ) -> None:
-    # Ensure links loaded
-    if not hasattr(sim, "university_links") or sim.university_links is None:
+    # Load `university_links` if this instance does not have it yet.
+    #
+    # The check MUST use the inspection API, not hasattr(). On an async
+    # session, touching an unloaded relationship attribute triggers a lazy load
+    # with no greenlet to run it in, and SQLAlchemy raises MissingGreenlet —
+    # which is NOT an AttributeError, so hasattr() does not swallow it. The
+    # guard written to avoid the load was therefore the thing performing it,
+    # and every route that called this returned a 500:
+    #
+    #     GET /api/simulations/{slug}/onboarding
+    #     POST /api/simulations/{slug}/enroll
+    #     POST /api/simulations/{slug}/onboarding/accept
+    #
+    # i.e. the entire path between the overview page and a simulation opening.
+    #
+    # `scope_payload` a few lines above already does it this way; the two are
+    # now consistent.
+    if "university_links" in sa_inspect(sim).unloaded:
         await db.refresh(sim, attribute_names=["university_links"])
     if not sim_visible_to_university(sim, university_id):
         raise HTTPException(404, "Simulation not found")

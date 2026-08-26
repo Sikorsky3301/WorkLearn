@@ -1,4 +1,5 @@
 """Resolve university tenant from request hostname."""
+import ipaddress
 from fastapi import Header, HTTPException, Request
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,9 +19,34 @@ def extract_partner_subdomain(host: str | None) -> str | None:
     """Return partner subdomain label, or None for the teaching-academy (main) host."""
     if not host:
         return None
-    host = host.split(":")[0].strip().lower()
-    if not host or host in ("localhost", "127.0.0.1", "::1"):
+    host = host.strip().lower()
+
+    # Strip the port. An IPv6 literal keeps its brackets here — naively
+    # splitting "[::1]:5173" on the first ":" truncates it to "[", so the
+    # bracket form is handled before falling back to a plain split.
+    if host.startswith("["):
+        host = host.split("]")[0] + "]"
+    else:
+        host = host.split(":")[0]
+
+    if not host or host in ("localhost", "127.0.0.1", "::1", "[::1]"):
         return None
+
+    # An IP literal is never a partner subdomain host — it's how the SAME
+    # apex site is reached from another device on the network, not a
+    # different tenant.
+    #
+    # Without this check, opening the app at http://192.168.0.214:5173 split
+    # "192.168.0.214" on "." into four labels and read "192" as a partner
+    # subdomain — so logging in from any device on the LAN failed with
+    # "Unknown university subdomain: 192" instead of reaching the ordinary
+    # teaching-academy login every other host on this same machine gets.
+    bare = host[1:-1] if host.startswith("[") and host.endswith("]") else host
+    try:
+        ipaddress.ip_address(bare)
+        return None
+    except ValueError:
+        pass
 
     parts = host.split(".")
     # iitd.localhost

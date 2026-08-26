@@ -105,7 +105,7 @@ export default function SimulationCompleteScreen({ simulation, taskCount, slug }
         )}
 
         <button
-          onClick={() => navigate('/simulations')}
+          onClick={() => navigate('/learn/simulations')}
           className="mt-6 text-xs text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
         >
           ← Back to simulations

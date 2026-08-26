@@ -149,7 +149,7 @@ export default function GenericSimOverview() {
       <div className="bg-gradient-to-b from-[#0b0f14] via-[#0f1720] to-[#0b0f14] text-white">
         <div className="max-w-container mx-auto px-6 pt-6 pb-16">
           <button
-            onClick={() => navigate('/simulations')}
+            onClick={() => navigate('/learn/simulations')}
             className="flex items-center gap-1.5 text-sm text-white/60 hover:text-white transition-colors mb-7 cursor-pointer"
           >
             <ArrowLeft className="h-4 w-4" /> Simulations

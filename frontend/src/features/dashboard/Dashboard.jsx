@@ -93,7 +93,7 @@ export default function Dashboard() {
               <p className="text-xs text-on-surface-variant leading-relaxed mb-4">
                 Enroll in a job simulation and your manager will assign your first task.
               </p>
-              <button className="btn-primary text-xs px-4 py-2" onClick={() => navigate('/simulations')}>
+              <button className="btn-primary text-xs px-4 py-2" onClick={() => navigate('/learn/simulations')}>
                 Browse simulations →
               </button>
             </div>
@@ -116,7 +116,7 @@ export default function Dashboard() {
               </p>
             </div>
             <button
-              onClick={() => navigate('/simulations')}
+              onClick={() => navigate('/learn/simulations')}
               className="text-xs font-semibold text-primary hover:underline shrink-0 cursor-pointer"
             >
               View all →

@@ -17,17 +17,22 @@ async def run_submission(
     input_files: dict[str, bytes | str] | None = None,
     image: str | None = None,
     submission_filename: str = "submission.py",
+    timeout: int | None = None,
 ) -> SandboxResult:
     """
     Runs `code` as `submission_filename` inside a locked-down sandbox.
     `input_files` are written into the workspace before execution starts
     (e.g. {"dataset.csv": csv_bytes}) so the student's code can read them.
     `image` overrides the default (Python) sandbox image, e.g. for the
-    frontend sandbox. The caller is responsible for reading back any
+    frontend sandbox. `timeout` overrides settings.sandbox_timeout_seconds —
+    the practice playground uses a shorter one because somebody is sitting
+    there watching it run. The caller is responsible for reading back any
     output.* files from result.workdir and MUST clean up the workdir when
     done (see cleanup()).
     """
-    return await get_runner().run_submission(code, input_files, image, submission_filename)
+    return await get_runner().run_submission(
+        code, input_files, image, submission_filename, timeout,
+    )
 
 
 def read_output(result: SandboxResult, filename: str) -> bytes | None:

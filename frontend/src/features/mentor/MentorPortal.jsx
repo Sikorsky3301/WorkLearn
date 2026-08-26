@@ -34,7 +34,7 @@ export default function MentorPortal() {
         label: 'CMS',
         items: [
           { label: 'Simulations', icon: Blocks, to: '/mentor/simulations' },
-          { label: 'Sim Builder', icon: Wand2, to: '/mentor/sim-builder' },
+          { label: 'Sim Builder', icon: Wand2, to: '/mentor/content/sim-builder', newTab: true },
         ],
       })
     }

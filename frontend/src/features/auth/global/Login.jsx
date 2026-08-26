@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Eye, EyeOff } from 'lucide-react'
 import { MultiStepLoader } from '../../../components/ui/multi-step-loader'
@@ -83,7 +83,7 @@ function GoogleIcon() {
 export default function Login() {
   const navigate                  = useNavigate()
   const queryClient               = useQueryClient()
-  const { loginDirect, register } = useAuth()
+  const { loginDirect, register, setAuthTransition } = useAuth()
 
   const [mode,     setMode]     = useState('signin') // 'signin' | 'signup'
   const [name,     setName]     = useState('')
@@ -148,6 +148,11 @@ export default function Login() {
     else if (result.role === ROLES.TEACHER) to = '/mentor'
     else warmUp()
 
+    // Order matters. GuestOnlyRoute redirects a signed-in user away from this
+    // page, and by now `user` is already set — so the flag has to go up before
+    // the loader does, or the guard unmounts us first and the loader never
+    // renders. Cleared in the loader's onComplete, once we have navigated.
+    setAuthTransition(true)
     setDestination(to)
   }
 
@@ -157,7 +162,13 @@ export default function Login() {
         loadingStates={mode === 'signin' ? SIGN_IN_STATES : SIGN_UP_STATES}
         loading={destination !== null}
         duration={620}
-        onComplete={() => navigate(destination, { replace: true })}
+        onComplete={() => {
+          navigate(destination, { replace: true })
+          // Stand the guard back up. Doing it after navigate() means a Back
+          // press onto /login is bounced again, which is the behaviour the
+          // guard exists for.
+          setAuthTransition(false)
+        }}
       />
 
       {/* ── Left: form — its own scroll container, so a tall signup form
@@ -308,13 +319,6 @@ export default function Login() {
                 </button>
               </>
             )}
-          </p>
-
-          <p className="text-center text-xs text-on-surface-variant mt-2">
-            Joining through a university?{' '}
-            <Link to="/university/login" className="text-primary font-semibold hover:underline">
-              University Login →
-            </Link>
           </p>
         </div>
       </div>

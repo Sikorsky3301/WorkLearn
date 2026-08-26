@@ -13,7 +13,7 @@ export default function Toolbar({
   return (
     <header className="h-16 border-b border-border bg-white flex items-center gap-3 px-4 shrink-0">
       <button
-        onClick={() => navigate(`${cmsBase}/sim-builder`)}
+        onClick={() => navigate(`${cmsBase}/content/sim-builder/projects`)}
         title="Back to Sim Builder projects"
         className="flex items-center gap-2 shrink-0 cursor-pointer group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-lg px-1 -mx-1"
       >

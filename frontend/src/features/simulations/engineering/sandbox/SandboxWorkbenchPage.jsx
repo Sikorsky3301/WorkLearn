@@ -12,6 +12,7 @@ import { defineWorkLearnThemes } from '../../shared/monacoThemes'
 import { describeSubmitError } from './submitError'
 import SandboxAiPanel from './SandboxAiPanel'
 import PostTaskAssessment from './PostTaskAssessment'
+import TaskCompleteDialog from './TaskCompleteDialog'
 import HelpDrawer from './HelpDrawer'
 import SplitHandle, { usePersistentSize, useElementSize, maxForPane } from './SplitHandle'
 import EditorSettingsPanel from './EditorSettingsPanel'
@@ -120,6 +121,26 @@ export default function SandboxWorkbenchPage() {
   // PostTaskAssessment. `assessmentOpen` is separate from `graded` so closing
   // it doesn't undo the graded state, and so it can be reopened.
   const [assessmentOpen, setAssessmentOpen] = useState(false)
+  // The score lands here first. A graded submit used to open the quiz
+  // immediately, which meant the work itself was never acknowledged and there
+  // was no way back to the editor without answering five questions.
+  const [completeOpen, setCompleteOpen] = useState(false)
+
+  // Minimum time the boot screen stays up, in THIS tab.
+  //
+  // This is the tab the student is actually looking at: window.open moves
+  // focus here, so the overlay on the task page they came from is painting on
+  // a background tab where nobody can see it. Whatever is shown during the
+  // wait has to be shown HERE.
+  //
+  // A floor rather than a duration — the task often resolves from cache in
+  // under 100ms, and a boot screen that appears and vanishes inside one blink
+  // reads as a flicker rather than as opening something.
+  const [booting, setBooting] = useState(true)
+  useEffect(() => {
+    const t = setTimeout(() => setBooting(false), BOOT_MIN_MS)
+    return () => clearTimeout(t)
+  }, [])
   // Set when the assessment is being used as a gate on Next rather than as the
   // optional check that pops up on grading — it changes the footer's wording
   // and what happens on a pass.
@@ -188,6 +209,10 @@ export default function SandboxWorkbenchPage() {
 
   const submitSandbox = useSubmitSandbox(enrollment?.id, index)
 
+  // Prose, not code: nothing is executed, an LLM judge reads what was written.
+  // Everything below that says "code" has to say something else.
+  const isTextTask = task?.config?.submission_mode === 'text'
+
   // Load starter code when the task arrives or changes. Keyed on task_index so
   // navigating between tasks in this same tab resets the editor.
   useEffect(() => {
@@ -195,6 +220,7 @@ export default function SandboxWorkbenchPage() {
     setCode(task.config?.starter_code ?? '')
     setResult(null)
     setGraded(false)
+    setCompleteOpen(false)
     setAssessmentOpen(false)
     setAssessmentIsGate(false)
     setAssessmentScore(null)
@@ -213,11 +239,20 @@ export default function SandboxWorkbenchPage() {
     if (!enrollment?.id || submitSandbox.isPending) return
     setIsSubmit(!dryRun)
     try {
-      const res = await submitSandbox.mutateAsync({ code, dry_run: dryRun })
+      // A text task is judged from `text`, a code task is run from `code`, and
+      // the server reads exactly one of them. Sending `code` for the Executive
+      // Brief is what made it fail with "text is required for this task" on
+      // every submission — the last graded step of the simulation could not be
+      // completed at all.
+      const payload = isTextTask
+        ? { text: code, dry_run: dryRun }
+        : { code, dry_run: dryRun }
+      const res = await submitSandbox.mutateAsync(payload)
       setResult(res)
       if (!dryRun) {
         setGraded(true)
-        setAssessmentOpen(true)
+        // The completion dialog, not the quiz. It offers the quiz.
+        setCompleteOpen(true)
         // Tell the tab that opened this one. It has no other way to learn that
         // a score changed — see lib/simChannel.js.
         postSimEvent({
@@ -230,10 +265,10 @@ export default function SandboxWorkbenchPage() {
     } catch {
       // Surfaced through submitSandbox.isError below.
     }
-  }, [code, enrollment?.id, submitSandbox, slug, index])
+  }, [code, enrollment?.id, submitSandbox, slug, index, isTextTask])
 
-  if (isLoading || loadingEnrollment) {
-    return <FullScreenNotice title="Opening your sandbox…" />
+  if (isLoading || loadingEnrollment || booting) {
+    return <SandboxBooting taskTitle={task?.title} />
   }
 
   // No session and no handoff: a bookmarked or pasted URL. Say so plainly
@@ -446,21 +481,23 @@ export default function SandboxWorkbenchPage() {
                 </button>
                 <button
                   onClick={() => setCode(task.config?.starter_code ?? '')}
-                  title="Reset to starter code"
+                  title={isTextTask ? 'Clear and start again' : 'Reset to starter code'}
                   className="p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200"
                 >
                   <RotateCcw className="h-4 w-4" />
                 </button>
-                <button
-                  onClick={() => execute(true)}
-                  disabled={submitSandbox.isPending}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600 px-3.5 py-2 text-xs font-bold text-slate-200 transition-colors hover:bg-slate-800 disabled:opacity-50"
-                >
-                  {submitSandbox.isPending && !isSubmit
-                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    : <Play className="h-3.5 w-3.5" />}
-                  Run code
-                </button>
+                {!isTextTask && (
+                  <button
+                    onClick={() => execute(true)}
+                    disabled={submitSandbox.isPending}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600 px-3.5 py-2 text-xs font-bold text-slate-200 transition-colors hover:bg-slate-800 disabled:opacity-50"
+                  >
+                    {submitSandbox.isPending && !isSubmit
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      : <Play className="h-3.5 w-3.5" />}
+                    Run code
+                  </button>
+                )}
                 <button
                   onClick={() => execute(false)}
                   disabled={submitSandbox.isPending}
@@ -469,7 +506,7 @@ export default function SandboxWorkbenchPage() {
                   {submitSandbox.isPending && isSubmit
                     ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     : <Send className="h-3.5 w-3.5" />}
-                  Submit answer
+                  {isTextTask ? 'Submit brief' : 'Submit answer'}
                 </button>
               </div>
             </div>
@@ -484,7 +521,25 @@ export default function SandboxWorkbenchPage() {
                 onMount={registerAutocomplete}
                 value={code}
                 onChange={(v) => setCode(v ?? '')}
-                options={monacoOptions(settings)}
+                options={
+                  isTextTask
+                    ? {
+                        ...monacoOptions(settings),
+                        // Written for a person, not a parser.
+                        wordWrap: 'on',
+                        lineNumbers: 'off',
+                        folding: false,
+                        renderLineHighlight: 'none',
+                        occurrencesHighlight: 'off',
+                        matchBrackets: 'never',
+                        quickSuggestions: false,
+                        fontFamily: 'Inter, system-ui, sans-serif',
+                        fontSize: Math.max(14, settings.fontSize ?? 14),
+                        lineHeight: 1.7,
+                        padding: { top: 20, bottom: 20 },
+                      }
+                    : monacoOptions(settings)
+                }
               />
 
               <SandboxAiPanel
@@ -601,6 +656,18 @@ export default function SandboxWorkbenchPage() {
         )}
       </footer>
 
+      <TaskCompleteDialog
+        open={completeOpen}
+        score={result?.score}
+        xpAwarded={result?.xp_awarded}
+        skillsAwarded={result?.skills_awarded}
+        taskTitle={task.title}
+        passMark={ASSESSMENT_PASS_MARK}
+        quizTaken={assessmentScore != null || task.quizScore != null}
+        onTakeQuiz={() => { setCompleteOpen(false); setAssessmentOpen(true) }}
+        onClose={() => setCompleteOpen(false)}
+      />
+
       {assessmentOpen && enrollment?.id && (
         <PostTaskAssessment
           enrollmentId={enrollment.id}
@@ -638,6 +705,28 @@ export default function SandboxWorkbenchPage() {
     </div>
   )
 }
+
+const BOOT_MIN_MS = 2000
+
+/** What the student sees while the sandbox tab comes up.
+ *
+ * Dark, because the editor it hands over to is a code surface and a white
+ * flash between the two is the most jarring thing in the sequence. */
+function SandboxBooting({ taskTitle }) {
+  return (
+    <div className="flex h-screen flex-col items-center justify-center bg-[#0b0f14]" role="status" aria-live="polite">
+      <div className="cube-loader" />
+      <p className="mt-8 font-display text-base font-extrabold text-white">
+        Opening your sandbox
+      </p>
+      {taskTitle && (
+        <p className="mt-1 max-w-xs text-center text-sm text-white/55">{taskTitle}</p>
+      )}
+      <p className="mt-6 text-xs text-white/35">Loading the editor and your files</p>
+    </div>
+  )
+}
+
 
 function FullScreenNotice({ title, body, action }) {
   return (

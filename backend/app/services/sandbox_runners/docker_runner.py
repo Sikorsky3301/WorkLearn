@@ -79,13 +79,16 @@ async def run_submission(
     input_files: dict[str, bytes | str] | None = None,
     image: str | None = None,
     submission_filename: str = "submission.py",
+    timeout: int | None = None,
 ) -> SandboxResult:
     """
     Runs `code` as `submission_filename` inside a locked-down container.
     `input_files` are written into the workspace before the container starts
     (e.g. {"dataset.csv": csv_bytes}) so the student's code can read them.
     `image` overrides settings.sandbox_image for this call (e.g. the
-    frontend sandbox image). The caller is responsible for reading back any
+    frontend sandbox image). `timeout` overrides
+    settings.sandbox_timeout_seconds — the practice playground uses a shorter
+    one because somebody is sitting there watching it. The caller is responsible for reading back any
     output.* files from result.workdir and MUST clean up the workdir when
     done (see cleanup()).
     """
@@ -118,7 +121,7 @@ async def run_submission(
         # subprocess.run doesn't touch asyncio's transport machinery at all,
         # so it works under any event loop.
         stdout_b, stderr_b, exit_code, timed_out = await asyncio.to_thread(
-            _run_docker, docker_args, settings.sandbox_timeout_seconds
+            _run_docker, docker_args, timeout or settings.sandbox_timeout_seconds
         )
 
         return SandboxResult(

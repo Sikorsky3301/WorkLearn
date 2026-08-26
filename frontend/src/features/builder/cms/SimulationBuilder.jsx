@@ -23,13 +23,29 @@ const BLANK_SIM = {
   onboarding_xp_award: 0,
 }
 
-/** Standalone admin page (not nested in SuperAdmin's sidebar chrome — the
- * builder wants full width and is a long-lived editing session, so it gets
- * its own route/URL) for creating/editing one simulation: Metadata /
- * Onboarding / Stages (drag-and-drop) / Preview, in a full-width
- * toolbar+canvas layout. Distinct from the separate "Sim Builder" visual
- * canvas tool (src/features/builder/sim-builder/) — this is the structured,
- * form-driven builder. */
+/** SUPERSEDED — no route reaches this file any more.
+ *
+ * This was the simulation builder, mounted at /admin/simulations/:id. It has
+ * been replaced by src/features/builder/studio/ (SimStudioPage.jsx), which
+ * lives at /admin/content/sim-builder/:id and can author the format the
+ * platform actually ships — weeks as pages, per-task explainers, mini
+ * assessments, a final assessment, and grading picked from the real registry.
+ * None of that was possible here.
+ *
+ * The old URL redirects (see app/router/LegacyBuilderRedirect.jsx), so nothing
+ * is broken by this file being unreachable. It is left in place only so the
+ * move can be reviewed against what it replaced.
+ *
+ * DO NOT ADD FEATURES HERE. Edit the studio instead — anything written in this
+ * file is invisible to every user.
+ *
+ * Its subtree — tabs/StagesTab.jsx, tabs/PreviewTab.jsx and the whole stages/
+ * directory except TaskLivePreviewPane.jsx and stages/editor/{fields,
+ * type-editors}/ — is reachable only from here and is equally dead. Four
+ * things in this folder are still LIVE and imported by the studio or the admin
+ * catalogue: tabs/MetadataTab.jsx, tabs/ManagerOnboardingTab.jsx,
+ * shared/taskTypeMeta.js, SimulationsListPanel.jsx (plus the per-type editors
+ * the studio reuses). Deleting this tree means keeping those. */
 export default function SimulationBuilder() {
   const { id } = useParams()
   const navigate = useNavigate()

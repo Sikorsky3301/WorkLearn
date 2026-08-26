@@ -25,6 +25,9 @@ from app.cms_templates import TEMPLATES
 from app.services.sim_view import build_simulation_public_dict
 from app.services import sandbox
 from app.services.graders import declarative_rules
+from app.services.graders.registry import DATASET_REGISTRY, GRADER_REGISTRY
+from app.services.dataset import seed_from_enrollment
+from app.core.config import settings
 from app.services.audit import log_action, resolve_actor_info
 from app.services.simulation_lookup import get_simulation as lookup_simulation
 from app.services.simulation_scope import (
@@ -421,38 +424,175 @@ async def _get_task_or_404(sim: Simulation, task_id: int, db: AsyncSession) -> S
     return task
 
 
+# Preview runs are not scoped to an enrollment, and the dataset generator is
+# seeded from one. So a preview gets its own deterministic seed derived from
+# the task itself: the same task always previews against the same data, two
+# tasks preview against different data, and no student's dataset is reused.
+def _preview_seed(sim: Simulation, task: SimulationTask) -> int:
+    return seed_from_enrollment(f"cms-preview-{sim.id}-{task.task_index}")
+
+
 @router.post("/{sim_id}/tasks/{task_id}/preview-run-sandbox")
 async def preview_run_sandbox(
     sim_id: str, task_id: int, body: PreviewRunSandboxBody,
     db: AsyncSession = Depends(get_db), token: dict = Depends(require_cms_access()),
 ):
+    """Run one submission against a task exactly the way a student's would be.
+
+    This used to refuse anything that was not `declarative_rules`, which is
+    every task in both shipped simulations — so the builder's live preview said
+    "requires a real enrollment" on the only tasks anyone actually wanted to
+    preview, and an author had no way to check their starter code, their
+    filenames or their grader wiring without enrolling as a student.
+
+    All three real grading paths are supported now, each mirroring its
+    counterpart in api/v1/simulations/sandbox.py:
+
+      * registered_grader + dataset_key   generate the dataset from a preview
+                                          seed, run the code, grade against a
+                                          reference recomputed from that same
+                                          dataframe
+      * registered_grader, no dataset     the frontend family: inject the
+                                          hidden Jest spec, run in the frontend
+                                          image, grade the Jest report
+      * declarative_rules                 unchanged
+      * submission_mode == "text"         no container at all; the LLM judge
+                                          reads the submitted text
+
+    ONE DELIBERATE DIFFERENCE from the student path: a chained task (one whose
+    input is normally the artifact a previous task produced) is previewed
+    against the RAW generated dataset, because there is no enrollment and so no
+    previous artifact to chain from. The response says so in
+    `details.preview_note` rather than letting an author read a low score as a
+    broken task.
+    """
     sim = await _get_sim_or_404(sim_id, db)
     assert_can_mutate_simulation(token, sim)
     task = await _get_task_or_404(sim, task_id, db)
     if task.type != "code_sandbox":
         raise HTTPException(400, "Only code_sandbox tasks support preview runs")
-    config = task.config
-    if config.get("grading_strategy") != "declarative_rules":
-        raise HTTPException(400, "Interactive preview only supports declarative-rules sandbox tasks — registered-grader tasks require a real enrollment")
     if not body.code.strip():
         raise HTTPException(400, "code is required")
 
+    config = task.config or {}
+    strategy = config.get("grading_strategy", "declarative_rules")
+    grader_key = config.get("grader_key")
+    notes: list[str] = []
+
+    # ── text submissions never touch a container ─────────────────────────────
+    if config.get("submission_mode") == "text":
+        if strategy != "registered_grader" or grader_key not in GRADER_REGISTRY:
+            raise HTTPException(400, "This text task has no registered grader to preview against.")
+        grade_fn = GRADER_REGISTRY[grader_key]
+        grade_result = await grade_fn(body.code, {})
+        grade_result.setdefault("details", {})["preview_note"] = (
+            "Graded by the same judge a student's submission goes to."
+        )
+        return grade_result
+
     input_name = config.get("input_filename") or "submission.py"
     output_name = config.get("output_filename") or "output.json"
-    input_files = dict(config.get("static_input_files") or {})
-    result = await sandbox.run_submission(
-        body.code, input_files=input_files, image=config.get("docker_image"), submission_filename=input_name,
-    )
+
+    if strategy == "registered_grader":
+        if grader_key not in GRADER_REGISTRY:
+            raise HTTPException(
+                400,
+                f"No grader is registered under {grader_key!r}. Pick one from the list on the "
+                "Grading tab — a key that is not registered fails for every student at submit.",
+            )
+        grade_fn = GRADER_REGISTRY[grader_key]
+        dataset_key = config.get("dataset_key")
+
+        if dataset_key:
+            if dataset_key not in DATASET_REGISTRY:
+                raise HTTPException(400, f"No dataset generator is registered under {dataset_key!r}.")
+            generate_dataset, compute_reference = DATASET_REGISTRY[dataset_key]
+            df = generate_dataset(_preview_seed(sim, task))
+            # `input_filename` means something DIFFERENT on a dataset-backed
+            # task: it names the DATA file mounted into the workspace, not the
+            # file the student's code is saved as. The student path leaves
+            # submission_filename at its default for exactly this reason —
+            # overriding it here saved the code as "dataset.csv" and the
+            # container's entrypoint then reported "No submission.py found".
+            input_files = {input_name: df.to_csv(index=False).encode("utf-8")}
+            submission_filename = None
+            image = config.get("docker_image")
+            reference = compute_reference(task.task_index, df)
+            if task.task_index != 1 and not config.get("use_raw_dataset"):
+                notes.append(
+                    "Previewing against the RAW generated dataset. A student reaches this task with "
+                    "the file the previous task produced, so their input may differ."
+                )
+        else:
+            # The frontend family: no dataset, a hidden Jest spec instead.
+            from app.services.frontend_specs import FRONTEND_TEST_SPECS
+
+            spec = FRONTEND_TEST_SPECS.get(task.task_index)
+            if spec is None:
+                raise HTTPException(
+                    400,
+                    f"{grader_key!r} needs a hidden test spec, and none is registered for task "
+                    f"{task.task_index}. Preview is not available for this task.",
+                )
+            input_files = {"submission.test.js": spec}
+            # Here `input_filename` DOES name the student's own file
+            # (submission.html / submission.jsx), matching the student path.
+            submission_filename = input_name
+            image = config.get("docker_image") or settings.sandbox_image_frontend
+            reference = None
+    else:
+        grade_fn = None
+        input_files = dict(config.get("static_input_files") or {})
+        submission_filename = input_name
+        image = config.get("docker_image")
+        reference = None
+
+    try:
+        result = await sandbox.run_submission(
+            body.code, input_files=input_files, image=image,
+            **({"submission_filename": submission_filename} if submission_filename else {}),
+        )
+    except Exception as exc:  # noqa: BLE001 — infrastructure, not the submission
+        raise HTTPException(
+            503,
+            f"The code sandbox could not start ({type(exc).__name__}: {exc}). "
+            "This is a server-side problem, not the task.",
+        ) from exc
     try:
         output_bytes = sandbox.read_output(result, output_name)
         stdout, stderr, timed_out = result.stdout, result.stderr, result.timed_out
     finally:
         sandbox.cleanup(result.workdir)
 
-    grade_result = declarative_rules.evaluate(output_bytes, config.get("rules") or [])
-    grade_result["details"]["stdout"] = stdout[-2000:]
-    grade_result["details"]["stderr"] = stderr[-2000:]
-    grade_result["details"]["timed_out"] = timed_out
+    # A runner that never started the container comes back "successfully" with
+    # the daemon's own error on stderr and no output file. Reported as a score
+    # it reads as "your code is wrong", which is the one thing it is not — so
+    # say what actually happened instead of grading a run that never ran.
+    if output_bytes is None and result.exit_code not in (0, None) and (
+        "docker" in stderr.lower() or "daemon" in stderr.lower() or "cannot find the file" in stderr.lower()
+    ):
+        raise HTTPException(
+            503,
+            "The code sandbox could not start, so nothing was run. This is a server-side "
+            f"problem, not the task: {stderr.strip()[:400]}",
+        )
+
+    if grade_fn is not None:
+        grade_result = grade_fn(output_bytes, reference)
+    else:
+        grade_result = declarative_rules.evaluate(output_bytes, config.get("rules") or [])
+
+    details = grade_result.setdefault("details", {})
+    details["stdout"] = stdout[-2000:]
+    details["stderr"] = stderr[-2000:]
+    details["timed_out"] = timed_out
+    if output_bytes is None:
+        notes.append(
+            f"Your code did not write {output_name}. The grader reads that file and nothing else, "
+            "so a student in this position scores zero however good their code is."
+        )
+    if notes:
+        details["preview_note"] = " ".join(notes)
     return grade_result
 
 

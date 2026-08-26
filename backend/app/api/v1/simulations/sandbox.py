@@ -82,16 +82,45 @@ def _is_da_job_sim_family(config: dict) -> bool:
     return (config.get("grader_key") or "").startswith("da_job_sim.")
 
 
-def _resolve_input_csv(enrollment_id: int, task_id: int) -> bytes:
-    """The exact dataset.csv bytes this task's sandbox will see — the raw
-    seeded dataset for Task 1, or the student's own Task 1 cleaned output for 2-4.
-    da_job_sim family only."""
-    prior_output = artifacts.load_artifact(enrollment_id, 1, "output.csv") if task_id > 1 else None
+# The task whose output.csv becomes the input for everything downstream. Task
+# 1 is "Clean the Data"; every later analysis works from what the student
+# actually produced there, so their cleaning decisions carry real consequences.
+CLEANING_TASK_INDEX = 1
+
+
+def _wants_raw_dataset(config: dict) -> bool:
+    """Some tasks must see the ORIGINAL file, not the cleaned one.
+
+    The Data Quality Report is the case: it asks the student to quantify what
+    was wrong with the raw extract — how many duplicate ids, how many
+    unparseable dates. Handing it the cleaned output would make every honest
+    answer zero, and the grader (which compares against a reference computed
+    from the raw dataframe) would fail a student who did exactly the right
+    thing.
+    """
+    return bool(config.get("use_raw_dataset"))
+
+
+def _raw_dataset_csv(enrollment_id: int) -> bytes:
+    generate_dataset, _ = DATASET_REGISTRY["da_job_sim.lumen_orders"]
+    return generate_dataset(seed_from_enrollment(enrollment_id)).to_csv(index=False).encode("utf-8")
+
+
+def _resolve_input_csv(enrollment_id: int, task_id: int, config: dict | None = None) -> bytes:
+    """The exact dataset.csv bytes this task's sandbox will see.
+
+    Raw seeded dataset for the cleaning task itself and for any task that opts
+    into `use_raw_dataset`; otherwise the student's own cleaned output from the
+    cleaning task, falling back to raw if they have not produced one yet.
+    da_job_sim family only.
+    """
+    if task_id == CLEANING_TASK_INDEX or _wants_raw_dataset(config or {}):
+        return _raw_dataset_csv(enrollment_id)
+
+    prior_output = artifacts.load_artifact(enrollment_id, CLEANING_TASK_INDEX, "output.csv")
     if prior_output is not None:
         return prior_output
-    generate_dataset, _ = DATASET_REGISTRY["da_job_sim.lumen_orders"]
-    seed = seed_from_enrollment(enrollment_id)
-    return generate_dataset(seed).to_csv(index=False).encode("utf-8")
+    return _raw_dataset_csv(enrollment_id)
 
 
 def _csv_file_entry(name: str, csv_bytes: bytes) -> dict:
@@ -158,7 +187,7 @@ async def list_files(
     files = [{"name": "submission.py", "kind": "python", "editable": True}]
 
     try:
-        input_bytes = _resolve_input_csv(enrollment_id, task_id)
+        input_bytes = _resolve_input_csv(enrollment_id, task_id, config)
         files.append(_csv_file_entry("dataset.csv", input_bytes))
     except Exception:
         # dataset not ready yet — submission.py is still usable
@@ -185,7 +214,7 @@ async def _resolve_csv_by_name(enrollment_id: int, task_id: int, filename: str, 
     have no CSV files, so any filename here 404s via the fallback below)."""
     if filename == "dataset.csv":
         try:
-            return _resolve_input_csv(enrollment_id, task_id)
+            return _resolve_input_csv(enrollment_id, task_id, config)
         except Exception:
             logger.info("dataset.csv requested but not ready for enrollment=%s task=%s", enrollment_id, task_id)
             raise HTTPException(404, "dataset.csv is not ready yet")
@@ -283,7 +312,7 @@ async def _submit_da_job_sim_family(enrollment_id: int, task_id: int, body: Subm
 
     # Tasks 2-4 all analyze the CLEANED dataset — i.e. the student's own
     # Task 1 output — never the raw one.
-    input_bytes = _resolve_input_csv(enrollment_id, task_id)
+    input_bytes = _resolve_input_csv(enrollment_id, task_id, config)
 
     if body.output_csv:
         # Student uploaded a pre-made output file instead of writing code —

@@ -1,0 +1,133 @@
+%% WorkLearn — how grading actually works.
+%% ·
+%% Every node names the file and line it lives at. Read off the code, not from
+%% memory. Render in any Mermaid viewer, or paste into https://mermaid.live
+%% ·
+%% THE ONE RULE that explains most of the design: printed output is NEVER
+%% graded. stdout/stderr go back to the student for debugging only; the score
+%% comes from the FILE the container left in /workspace.
+%% See sandboxes/python/entrypoint.py.
+%% ·
+%% NOTE for editors: a comment line that is exactly "%%" with nothing after it
+%% is parsed as the start of a %%{directive}%% and breaks the whole file. Put
+%% something after every one — that is why these read "%% ·".
+
+flowchart TB
+
+    %% ═══════════════════ 1 · ROUTE AND DISPATCH ═══════════════════
+    Student([Student presses<br/>Run or Submit]) --> Route
+
+    Route["<b>POST</b> /api/sandbox/{enrollment}/tasks/{task}/submit<br/><i>sandbox.py:384</i>"]
+    Route --> Own{"Enrollment owned<br/>by this user?<br/><i>:58</i>"}
+    Own -- no --> Err["<b>404</b>"]
+    Own -- yes --> Strategy
+
+    Strategy{"config.grading_strategy<br/><i>:394</i>"}
+    Strategy -- "neither" --> Err
+    Strategy -- "declarative_rules" --> PC
+    Strategy -- "registered_grader" --> Family
+
+    Family{"grader_key starts<br/>'da_job_sim.' ?<br/><i>:78</i>"}
+    Family -- yes --> PA
+    Family -- no --> PB
+
+    %% ═══════════════════ 2 · THE THREE PATHS ═══════════════════
+    subgraph Paths [" "]
+        direction LR
+
+        subgraph PA ["<b>A · Data Analyst</b> — Python + CSV &nbsp; <i>:260</i>"]
+            direction TB
+            Seed["seed = sha256(enrollment_id)<br/><i>dataset.py:39</i><br/><b>per-student dataset</b>"]
+            Seed --> Ref["Reference solution recomputed<br/>server-side from that seed"]
+            Seed --> Chain{"task > 1 and a Task 1<br/>artifact exists?"}
+            Chain -- yes --> Prior["Input = the student's OWN<br/>Task 1 output.csv<br/><i>_resolve_input_csv :85</i>"]
+            Chain -- no --> Fresh["Input = the raw seeded dataset"]
+            Text["<i>submission_mode = text</i><br/>Task 5 brief → LLM judge<br/><i>graders/task5_brief.py</i><br/>the only async grader"]
+        end
+
+        subgraph PB ["<b>B · Frontend</b> — JS/HTML/React + Jest &nbsp; <i>:320</i>"]
+            direction TB
+            Spec["Inject the HIDDEN Jest spec<br/>as submission.test.js<br/><i>frontend_specs.py</i>"]
+            Spec --> SpecNote["Safe only because the container<br/>lives ~45s and has no shell"]
+        end
+
+        subgraph PC ["<b>C · Declarative rules</b> — CMS-authored &nbsp; <i>:355</i>"]
+            direction TB
+            Rules["Evaluate the artifact against<br/>rules authored in the builder"]
+            Rules --> RulesNote["No seeded dataset, no reference.<br/><b>Lower rigor</b> — the builder<br/>UI says so"]
+        end
+    end
+
+    Prior --> Container
+    Fresh --> Container
+    SpecNote --> Container
+    RulesNote --> Container
+    Text --> Finalize
+
+    %% ═══════════════════ 3 · THE SANDBOX ═══════════════════
+    subgraph SB ["<b>THE SANDBOX</b> · one throwaway container per submission &nbsp; <i>sandbox_runners/docker_runner.py</i>"]
+        direction TB
+        Container["docker run --rm &nbsp;<b>--network=none</b><br/>--memory=512m &nbsp; --cpus=1.0 &nbsp; --pids-limit=64<br/>--cap-drop=ALL &nbsp; --security-opt=no-new-privileges<br/>-v workdir:/workspace &nbsp; timeout 45s"]
+        Container --> Exec["entrypoint runs the student's file<br/><i>sandboxes/python/entrypoint.py</i> · <i>sandboxes/frontend/entrypoint.js</i>"]
+        Exec --> Wrote["student code writes<br/>/workspace/output.csv | output.json"]
+    end
+
+    %% ═══════════════════ 4 · THE TRUST BOUNDARY ═══════════════════
+    Wrote --> Trust{{"<b>TRUST BOUNDARY</b><br/><i>sandbox.read_output()</i>"}}
+
+    Trust -- "the file" --> Artifact["output.* &nbsp;→&nbsp; <b>GRADED</b>"]
+    Trust -- "the streams" --> Streams["stdout / stderr &nbsp;→&nbsp; <b>NEVER GRADED</b><br/>last 2000 chars, shown to the<br/>student for debugging only"]
+
+    %% ═══════════════════ 5 · THE GRADER ═══════════════════
+    Artifact --> Grader["<b>GRADER_REGISTRY[grader_key]</b><br/><i>graders/registry.py</i><br/>runs in the FastAPI process,<br/><b>never</b> in the container"]
+
+    Grader --> Checks["emits checks[] — id · label · points · pass<br/>numbers compared to the reference<br/>within a 2–15% tolerance<br/><i>graders/task1_cleaning.py … task4_ab_test.py</i><br/><i>graders/frontend_tasks.py</i>"]
+
+    Checks --> Finalize["<b>finalize(checks, details)</b><br/><i>graders/__init__.py:52</i><br/>score = sum(points where pass)<br/><b>every score in the product<br/>comes out of this one function</b>"]
+
+    %% ═══════════════════ 6 · RUN vs SUBMIT ═══════════════════
+    Finalize --> DryRun{"body.dry_run ?<br/><i>sandbox.py:412</i>"}
+
+    DryRun -- "yes · Run" --> Preview["Score + checks returned.<br/><b>Nothing persisted</b> — no artifact,<br/>no XP, no completion. Run stays<br/>free and repeatable."]
+
+    DryRun -- "no · Submit" --> Persist["<b>artifacts.save_artifact()</b> — so Task 1 can feed Task 2<br/><b>award_task_completion()</b> <i>skill_engine.py</i> — XP + skills, <b>paid once</b><br/><b>finalize_if_complete()</b> — last task → COMPLETED → certificate"]
+
+    Preview --> Done([Score + checks<br/>rendered in ConsolePane])
+    Persist --> Done
+
+    %% ═══════════════════ 7 · ASSESSMENTS (separate system) ═══════════════════
+    Done -.->|"passing the task<br/>unlocks its quiz"| AsGet
+
+    subgraph AS ["<b>SEPARATE SYSTEM</b> · quizzes and assessments &nbsp; <i>api/v1/simulations/assessments.py</i>"]
+        direction TB
+        AsGet["<b>GET</b> .../assessment<br/>serves index · options · question<br/><b>the answers are stripped</b><br/><i>task_types.py secret_config_keys</i>"]
+        AsGet --> AsPost["<b>POST</b> .../assessment <i>:116</i>"]
+        AsPost --> AsGate{"task graded yet?<br/><i>:165</i>"}
+        AsGate -- "no, and not standalone" --> As409["<b>409</b> — submit the task<br/>before taking its assessment"]
+        AsGate -- yes --> AsScore["score = correct / total × 100 <i>:150</i><br/>pass mark: mini <b>80</b> · final <b>70</b><br/>explanations revealed <b>only now</b>"]
+    end
+
+    AsScore -.->|"passing gates<br/>the next task"| Route
+
+    %% ═══════════════════ WHY IT CANNOT BE GAMED ═══════════════════
+    subgraph DEF ["<b>WHY IT CANNOT BE GAMED</b>"]
+        direction LR
+        D1["The grader never runs<br/>in the student's container"]
+        D2["The reference is always<br/>recomputed from the seed,<br/>never stored"]
+        D3["Per-candidate dataset —<br/>copying another student's<br/>answer scores zero"]
+        D4["Artifact-only grading —<br/>print('score: 100')<br/>does nothing"]
+        D5["No network in the<br/>container — nothing<br/>to call out to"]
+    end
+
+    %% ═══════════════════ STYLING ═══════════════════
+    classDef entry  fill:#312E81,stroke:#312E81,color:#ffffff
+    classDef bad    fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef good   fill:#d1fae5,stroke:#059669,color:#064e3b
+    classDef key    fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef step   fill:#eef2ff,stroke:#6366f1,color:#1e1b4b
+
+    class Student,Done entry
+    class Err,As409,Streams,RulesNote bad
+    class Artifact,Seed,Ref,D1,D2,D3,D4,D5 good
+    class Trust,Finalize,Container key
+    class Route,Grader,Checks,Persist,AsGet step

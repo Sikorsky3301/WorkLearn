@@ -1,4 +1,5 @@
-from datetime import date, datetime, timezone
+from datetime import datetime, timedelta, timezone
+from urllib.parse import urlsplit, urlunsplit
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,12 +15,48 @@ from app.models.feature_flags import FeatureFlagOverride
 from app.api.v1.simulations.enrollments import JOURNEY_BADGE_KEY
 from app.core.permissions import require_permission, require_roles
 from app.core.auth import token_user_id, hash_password
+from app.core.config import settings
 from app.services.audit import log_action, resolve_actor_info
 from app.schemas.university import UniversityOnboardBody, UniversityUpdateBody
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 EXCLUDED_ROLE_IDS = (ROLE_IDS[RoleSlug.ADMIN], ROLE_IDS[RoleSlug.SUPER_ADMIN])
+
+# The admin users table is the one screen that has to stay usable on a platform
+# with thousands of accounts. 100 was the hard cap AND the whole answer: the
+# route returned a bare list with no total, so the table paginated 100 rows
+# client-side and an admin had no way to know the other 900 existed.
+DEFAULT_USER_PAGE = 50
+MAX_USER_PAGE = 200
+
+
+def utc_day_start() -> datetime:
+    """Midnight UTC today.
+
+    NOT `datetime.combine(date.today(), ...).replace(tzinfo=utc)`, which is
+    what this used to be: `date.today()` is the SERVER'S LOCAL date, and
+    stamping it with UTC shifts the window by the machine's offset. On an
+    IST box (UTC+5:30) that put the start of "today" in the FUTURE every night
+    between 00:00 and 05:30 local, so "Active Today" read 0 for five and a half
+    hours a day — the same local-date-vs-UTC bug the analytics endpoint had.
+    """
+    return datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def tenant_login_url(code: str) -> str:
+    """Where a partner university's users sign in.
+
+    Built from `settings.frontend_url` rather than hardcoded. It used to be
+    f"http://{code}.localhost:5173" — in the backend AND in two places in the
+    admin UI — so the "partner login host" an admin copies and emails to a
+    university was a localhost address in production.
+    """
+    parts = urlsplit(settings.frontend_url)
+    host = parts.hostname or "localhost"
+    port = f":{parts.port}" if parts.port else ""
+    return urlunsplit((parts.scheme or "http", f"{str(code).lower()}.{host}{port}", "", "", ""))
+
 ORG_USER_ROLE_IDS = (ROLE_IDS[RoleSlug.STUDENT], ROLE_IDS[RoleSlug.TEACHER])
 
 
@@ -45,8 +82,12 @@ def _user_row_out(u: User, enroll_count: int, cms_access: bool = False) -> dict:
         "is_active": u.is_active, "suspended_at": u.suspended_at.isoformat() if u.suspended_at else None,
         "enrollments": enroll_count,
         "cms_access": cms_access if u.role == RoleSlug.TEACHER else False,
-        "joined": u.created_at.strftime("%b %d"),
-        "last_active": u.last_seen_at.strftime("%b %d") if u.last_seen_at else "—",
+        # ISO, not "%b %d". The pre-formatted strings carried no YEAR - a row
+        # reading "Aug 23" could be this year or three years ago - and being
+        # strings they could not be sorted or compared by the table at all.
+        # Formatting is the UI's job; this serves the value.
+        "joined_at": u.created_at.isoformat() if u.created_at else None,
+        "last_active_at": u.last_seen_at.isoformat() if u.last_seen_at else None,
     }
 
 
@@ -70,9 +111,21 @@ async def admin_stats(db: AsyncSession = Depends(get_db), token: dict = Depends(
     )
     uni_count = uni_res.scalar() or 0
 
-    today_start = datetime.combine(date.today(), datetime.min.time()).replace(tzinfo=timezone.utc)
+    today_start = utc_day_start()
     active_res = await db.execute(select(func.count()).select_from(User).where(User.last_seen_at >= today_start))
     active_today = active_res.scalar() or 0
+
+    week_start = today_start - timedelta(days=7)
+    active_week_res = await db.execute(select(func.count()).select_from(User).where(User.last_seen_at >= week_start))
+    active_week = active_week_res.scalar() or 0
+
+    suspended_res = await db.execute(
+        select(func.count()).select_from(User).where(User.is_active == False)  # noqa: E712
+    )
+    suspended = suspended_res.scalar() or 0
+
+    enrollments_res = await db.execute(select(func.count()).select_from(Enrollment))
+    enrollments = enrollments_res.scalar() or 0
 
     certs_res = await db.execute(select(func.count()).select_from(Enrollment).where(Enrollment.status == EnrollmentStatus.COMPLETED))
     certs = certs_res.scalar() or 0
@@ -95,52 +148,63 @@ async def admin_stats(db: AsyncSession = Depends(get_db), token: dict = Depends(
         "total_users": total_users,
         "universities": uni_count,
         "active_today": active_today,
+        "active_this_week": active_week,
+        "suspended_users": suspended,
+        "enrollments": enrollments,
         "certificates": certs,
         "direct_users": direct_count,
         "university_students": uni_stu_count,
+        # Stated so the UI can label the window honestly instead of saying
+        # "today" and meaning something else.
+        "window_start_utc": today_start.isoformat(),
     }
 
 
 @router.get("/universities")
 async def admin_universities(
     db: AsyncSession = Depends(get_db),
-    token: dict = Depends(require_roles(RoleSlug.ADMIN)),
+    token: dict = Depends(require_roles(RoleSlug.ADMIN, RoleSlug.SUPER_ADMIN)),
 ):
-    """Platform Admin only — list partner + academy universities."""
-    result = await db.execute(select(University).order_by(University.name))
-    universities = result.scalars().all()
-    out = []
-    for uni in universities:
-        student_res = await db.execute(
-            select(func.count()).select_from(User).where(
-                User.role_id == ROLE_IDS[RoleSlug.STUDENT],
-                User.university_id == uni.id,
-            )
+    """Platform Admin only - list partner + academy universities.
+
+    Counts come from two grouped aggregates rather than two queries per row:
+    the old version issued 2N+1 queries for N universities.
+    """
+    universities = (await db.execute(select(University).order_by(University.name))).scalars().all()
+
+    def _counts_for(role_slug):
+        return (
+            select(User.university_id, func.count())
+            .where(User.role_id == ROLE_IDS[role_slug], User.university_id.isnot(None))
+            .group_by(User.university_id)
         )
-        mentor_res = await db.execute(
-            select(func.count()).select_from(User).where(
-                User.role_id == ROLE_IDS[RoleSlug.TEACHER],
-                User.university_id == uni.id,
-            )
-        )
-        out.append({
+
+    students = dict((await db.execute(_counts_for(RoleSlug.STUDENT))).all())
+    mentors = dict((await db.execute(_counts_for(RoleSlug.TEACHER))).all())
+
+    return [
+        {
             "id": uni.id,
             "code": uni.code,
             "name": uni.name,
             "logo_url": uni.logo_url,
-            "students": student_res.scalar() or 0,
-            "mentors": mentor_res.scalar() or 0,
+            "students": students.get(uni.id, 0),
+            "mentors": mentors.get(uni.id, 0),
             "status": "active",
             "is_default": uni.is_default,
-        })
-    return out
+            # Served, not built in the browser - the admin UI had its own
+            # hardcoded copy of the localhost URL in two places.
+            "login_url": None if uni.is_default else tenant_login_url(uni.code),
+        }
+        for uni in universities
+    ]
 
 
 @router.post("/universities/onboard")
 async def onboard_university(
     body: UniversityOnboardBody,
     db: AsyncSession = Depends(get_db),
-    token: dict = Depends(require_roles(RoleSlug.ADMIN)),
+    token: dict = Depends(require_roles(RoleSlug.ADMIN, RoleSlug.SUPER_ADMIN)),
 ):
     """Platform Admin only — create partner university + first university_admin."""
     existing_code = await db.execute(
@@ -198,7 +262,7 @@ async def onboard_university(
             "id": admin_user.id, "name": admin_user.name, "email": admin_user.email,
             "role": RoleSlug.UNIVERSITY_ADMIN, "university_id": uni.id,
         },
-        "login_host": f"http://{uni.code}.localhost:5173",
+        "login_host": tenant_login_url(uni.code),
     }
 
 
@@ -207,7 +271,7 @@ async def update_university(
     university_id: int,
     body: UniversityUpdateBody,
     db: AsyncSession = Depends(get_db),
-    token: dict = Depends(require_roles(RoleSlug.ADMIN)),
+    token: dict = Depends(require_roles(RoleSlug.ADMIN, RoleSlug.SUPER_ADMIN)),
 ):
     """Platform Admin only — rename university / update logo (code is immutable)."""
     result = await db.execute(select(University).where(University.id == university_id))
@@ -250,36 +314,93 @@ async def update_university(
 
 @router.get("/users")
 async def admin_users(
-    role: str = None, search: str = "", limit: int = 100,
+    role: str = None, search: str = "", scope: str = "",
+    limit: int = DEFAULT_USER_PAGE, offset: int = 0,
     db: AsyncSession = Depends(get_db),
     token: dict = Depends(require_roles(RoleSlug.ADMIN, RoleSlug.UNIVERSITY_ADMIN, RoleSlug.SUPER_ADMIN)),
 ):
+    """One page of users, plus the total the page was taken from.
+
+    THREE THINGS THIS FIXES
+
+    1. It used to return a bare list capped at 100 with no total. The table
+       then paginated those 100 client-side, so on a platform with a thousand
+       accounts an admin saw the newest hundred and had no way to know the rest
+       existed - the pager said "1-10 of 100" and looked complete.
+
+    2. `role` was validated with `if role and role in ROLE_IDS`, which SILENTLY
+       IGNORED anything unrecognised. SuperAdmin's "Direct Users" page passes
+       role="DIRECT_USER", which is not a role slug, so that page listed every
+       user on the platform - students and teachers from every partner
+       university - under a heading saying otherwise. Unknown values are now a
+       400, and "direct vs partner" is what it always meant: `scope`.
+
+    3. Enrollment counts were one COUNT query PER USER - 101 round trips for a
+       100-row page, on a query the table re-issued on every keystroke. Now one
+       grouped aggregate.
+    """
     actor = await _load_actor(db, token)
+    limit = max(1, min(limit, MAX_USER_PAGE))
+    offset = max(0, offset)
 
     if actor.role == RoleSlug.UNIVERSITY_ADMIN:
         if not actor.university_id:
             raise HTTPException(400, "University admin has no university assigned")
-        q = select(User).where(
+        base = select(User).where(
             User.university_id == actor.university_id,
             User.role_id.in_(ORG_USER_ROLE_IDS),
         )
     else:
-        # Platform Admin / Super Admin — global non-platform-admin accounts
-        q = select(User).where(User.role_id.notin_(EXCLUDED_ROLE_IDS))
+        # Platform Admin / Super Admin - global non-platform-admin accounts
+        base = select(User).where(User.role_id.notin_(EXCLUDED_ROLE_IDS))
 
-    if role and role in ROLE_IDS:
+    if role:
+        if role not in ROLE_IDS:
+            raise HTTPException(
+                400,
+                f"Unknown role {role!r}. Expected one of: {', '.join(ROLE_IDS)}. "
+                "Use scope=direct or scope=partner to split by tenant.",
+            )
         if actor.role == RoleSlug.UNIVERSITY_ADMIN and ROLE_IDS[role] not in ORG_USER_ROLE_IDS:
             raise HTTPException(403, "University Admin may only list students and teachers")
-        q = q.where(User.role_id == ROLE_IDS[role])
-    if search:
-        q = q.where(
-            User.name.ilike(f"%{search}%") |
-            User.email.ilike(f"%{search}%") |
-            User.roll_no.ilike(f"%{search}%")
+        base = base.where(User.role_id == ROLE_IDS[role])
+
+    if scope:
+        if scope not in ("direct", "partner"):
+            raise HTTPException(400, f"Unknown scope {scope!r}. Expected 'direct' or 'partner'.")
+        if actor.role == RoleSlug.UNIVERSITY_ADMIN:
+            raise HTTPException(403, "University Admin sees only their own university")
+        # "Direct" means signed up straight to the platform - the default
+        # (academy) tenant. Same definition admin_stats has always used.
+        base = base.join(University, User.university_id == University.id).where(
+            University.is_default == (scope == "direct")
         )
-    q = q.options(selectinload(User.university), selectinload(User.role_row)).order_by(User.created_at.desc()).limit(limit)
-    result = await db.execute(q)
-    users = result.scalars().all()
+
+    if search:
+        term = f"%{search.strip()}%"
+        base = base.where(
+            User.name.ilike(term) | User.email.ilike(term) | User.roll_no.ilike(term)
+        )
+
+    total = (await db.execute(select(func.count()).select_from(base.subquery()))).scalar() or 0
+
+    q = (
+        base.options(selectinload(User.university), selectinload(User.role_row))
+        .order_by(User.created_at.desc(), User.id.desc())
+        .limit(limit).offset(offset)
+    )
+    users = (await db.execute(q)).scalars().all()
+    user_ids = [u.id for u in users]
+
+    # One aggregate for the whole page, not one query per row.
+    counts: dict[int, int] = {}
+    if user_ids:
+        rows = await db.execute(
+            select(Enrollment.user_id, func.count())
+            .where(Enrollment.user_id.in_(user_ids))
+            .group_by(Enrollment.user_id)
+        )
+        counts = dict(rows.all())
 
     teacher_ids = [str(u.id) for u in users if u.role == RoleSlug.TEACHER]
     cms_on: set[str] = set()
@@ -294,11 +415,15 @@ async def admin_users(
         )
         cms_on = {o.scope_value for o in ov_res.scalars().all()}
 
-    out = []
-    for u in users:
-        enroll_res = await db.execute(select(func.count()).select_from(Enrollment).where(Enrollment.user_id == u.id))
-        out.append(_user_row_out(u, enroll_res.scalar() or 0, cms_access=str(u.id) in cms_on))
-    return out
+    return {
+        "users": [
+            _user_row_out(u, counts.get(u.id, 0), cms_access=str(u.id) in cms_on)
+            for u in users
+        ],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 class CmsAccessBody(BaseModel):
@@ -355,6 +480,7 @@ async def set_teacher_cms_access(
 
 @router.get("/activity")
 async def admin_activity(limit: int = 20, db: AsyncSession = Depends(get_db), token: dict = Depends(require_permission("activity.view_feed"))):
+    limit = max(1, min(limit, 200))
     result = await db.execute(
         select(XpLedger, User.name)
         .join(User, User.id == XpLedger.user_id)

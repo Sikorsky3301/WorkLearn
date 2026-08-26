@@ -43,13 +43,16 @@ const SuperAdminPortal = lazy(() => import('../../features/superadmin/SuperAdmin
 const AdminPortal       = lazy(() => import('../../features/admin/portal/AdminPortal'))
 const UniversityAdminPortal = lazy(() => import('../../features/university-admin/UniversityAdminPortal'))
 const MentorPortal = lazy(() => import('../../features/mentor/MentorPortal'))
-import SimulationBuilder    from '../../features/builder/cms/SimulationBuilder'
+import StudioHome          from '../../features/builder/studio/StudioHome'
+import SimStudioPage        from '../../features/builder/studio/SimStudioPage'
 import SimBuilderListPage   from '../../features/builder/sim-builder/SimBuilderListPage'
 import SimBuilderEditor     from '../../features/builder/sim-builder/SimBuilderEditor'
+import LegacyBuilderRedirect from './LegacyBuilderRedirect'
 import SimulationsPage      from '../../features/admin/portal/pages/SimulationsPage'
 import OnboardingWizard     from '../../features/onboarding/OnboardingWizard'
 import Dashboard            from '../../features/dashboard/Dashboard'
 import SimulationWorkspace  from '../../features/simulations/SimulationWorkspace'
+import LearnHub              from '../../features/learn/LearnHub'
 import GenericSimOverview   from '../../features/simulations/generic/GenericSimOverview'
 import GenericSimShell      from '../../features/simulations/generic/GenericSimShell'
 import { EngineeringRoadmapRoute, EngineeringTaskRoute } from '../../features/simulations/engineering/EngineeringRoutes'
@@ -58,6 +61,8 @@ import Portfolio            from '../../features/users/portfolio/Portfolio'
 import CareerTwin           from '../../features/ai-mentor/CareerTwin'
 import SkillGPS             from '../../features/skill-gps/SkillGPS'
 import Analytics            from '../../features/analytics/Analytics'
+import SandboxCatalogue    from '../../features/sandboxes/SandboxCatalogue'
+import SandboxPlayground   from '../../features/sandboxes/SandboxPlayground'
 import Settings             from '../../features/users/settings/Settings'
 import EvaluationResult     from '../../features/simulations/EvaluationResult'
 import Community            from '../../features/community/Community'
@@ -80,8 +85,13 @@ import MiraResults from '../../features/mira/MiraResults'
 // `/roadmap` and `/task/:n` — which are just as much "in the simulation" as
 // the shell itself. Without them in the pattern the marketing footer renders
 // underneath both.
+//
+// `/learn` (and everything under it) is footerless for a different reason: it
+// has its own persistent left sidebar reaching the full height below the
+// Navbar, and the marketing footer showing up beneath that sidebar's dark
+// background reads as a rendering bug rather than the end of a page.
 const FOOTERLESS_ROUTES = ['/mira/session']
-const FOOTERLESS_PATTERN = /^\/simulations\/[^/]+(\/(roadmap|task\/\d+))?$/
+const FOOTERLESS_PATTERN = /^\/simulations\/[^/]+(\/(roadmap|task\/\d+))?$|^\/learn(\/.*)?$/
 
 function MainLayout() {
   const location = useLocation()
@@ -151,10 +161,21 @@ export default function AppRouter() {
           ranks routes by specificity regardless of declaration order, so
           these always win over the portal's own `/*` wildcard for their
           exact paths — see AdminPortal.jsx's docblock. */}
+      {/* The catalogue: publish, unpublish, unenrol, delete. BUILDING a
+          simulation is a different job and lives under /content/sim-builder. */}
       <Route path="/admin/simulations" element={<RequireCmsAccess><RedirectTeacherAwayFromAdminCms><SimulationsPage /></RedirectTeacherAwayFromAdminCms></RequireCmsAccess>} />
-      <Route path="/admin/simulations/:id" element={<RequireCmsAccess><RedirectTeacherAwayFromAdminCms><SimulationBuilder /></RedirectTeacherAwayFromAdminCms></RequireCmsAccess>} />
-      <Route path="/admin/sim-builder" element={<RequireCmsAccess><RedirectTeacherAwayFromAdminCms><SimBuilderListPage /></RedirectTeacherAwayFromAdminCms></RequireCmsAccess>} />
-      <Route path="/admin/sim-builder/:id" element={<RequireCmsAccess><RedirectTeacherAwayFromAdminCms><SimBuilderEditor /></RedirectTeacherAwayFromAdminCms></RequireCmsAccess>} />
+
+      {/* Sim Builder — opened in its own tab from the Content nav. The static
+          `projects` segment outranks `:id` regardless of declaration order. */}
+      <Route path="/admin/content/sim-builder" element={<RequireCmsAccess><RedirectTeacherAwayFromAdminCms><StudioHome /></RedirectTeacherAwayFromAdminCms></RequireCmsAccess>} />
+      <Route path="/admin/content/sim-builder/projects" element={<RequireCmsAccess><RedirectTeacherAwayFromAdminCms><SimBuilderListPage /></RedirectTeacherAwayFromAdminCms></RequireCmsAccess>} />
+      <Route path="/admin/content/sim-builder/projects/:id" element={<RequireCmsAccess><RedirectTeacherAwayFromAdminCms><SimBuilderEditor /></RedirectTeacherAwayFromAdminCms></RequireCmsAccess>} />
+      <Route path="/admin/content/sim-builder/:id" element={<RequireCmsAccess><RedirectTeacherAwayFromAdminCms><SimStudioPage /></RedirectTeacherAwayFromAdminCms></RequireCmsAccess>} />
+
+      {/* Where the builder used to live. See LegacyBuilderRedirect.jsx. */}
+      <Route path="/admin/simulations/:id" element={<LegacyBuilderRedirect to={(p) => `/admin/content/sim-builder/${p.id}`} />} />
+      <Route path="/admin/sim-builder" element={<Navigate to="/admin/content/sim-builder" replace />} />
+      <Route path="/admin/sim-builder/:id" element={<LegacyBuilderRedirect to={(p) => `/admin/content/sim-builder/projects/${p.id}`} />} />
       <Route
         path="/admin/*"
         element={
@@ -180,9 +201,13 @@ export default function AppRouter() {
 
       {/* Teacher CMS — mentor-prefixed (not /admin). Ranked above /mentor/*. */}
       <Route path="/mentor/simulations" element={<RequireCmsAccess><SimulationsPage /></RequireCmsAccess>} />
-      <Route path="/mentor/simulations/:id" element={<RequireCmsAccess><SimulationBuilder /></RequireCmsAccess>} />
-      <Route path="/mentor/sim-builder" element={<RequireCmsAccess><SimBuilderListPage /></RequireCmsAccess>} />
-      <Route path="/mentor/sim-builder/:id" element={<RequireCmsAccess><SimBuilderEditor /></RequireCmsAccess>} />
+      <Route path="/mentor/content/sim-builder" element={<RequireCmsAccess><StudioHome /></RequireCmsAccess>} />
+      <Route path="/mentor/content/sim-builder/projects" element={<RequireCmsAccess><SimBuilderListPage /></RequireCmsAccess>} />
+      <Route path="/mentor/content/sim-builder/projects/:id" element={<RequireCmsAccess><SimBuilderEditor /></RequireCmsAccess>} />
+      <Route path="/mentor/content/sim-builder/:id" element={<RequireCmsAccess><SimStudioPage /></RequireCmsAccess>} />
+      <Route path="/mentor/simulations/:id" element={<LegacyBuilderRedirect to={(p) => `/mentor/content/sim-builder/${p.id}`} />} />
+      <Route path="/mentor/sim-builder" element={<Navigate to="/mentor/content/sim-builder" replace />} />
+      <Route path="/mentor/sim-builder/:id" element={<LegacyBuilderRedirect to={(p) => `/mentor/content/sim-builder/projects/${p.id}`} />} />
 
       {/* Mentor (teacher) portal */}
       <Route
@@ -208,8 +233,9 @@ export default function AppRouter() {
         <Route element={<MainLayout />}>
           <Route path="/dashboard"               element={<Dashboard />} />
           <Route path="/simulations"                element={<SimulationWorkspace />} />
+          <Route path="/learn/*"                   element={<LearnHub />} />
           <Route path="/simulations/:slug/overview" element={<GenericSimOverview />} />
-          {/* Engineering-only surfaces (see engineering/lib/isEngineeringSim).
+          {/* Workbench surfaces — see engineering/lib/hasWorkbenchExperience.
               Both redirect to the shell for any other simulation. */}
           <Route path="/simulations/:slug/roadmap"  element={<EngineeringRoadmapRoute />} />
           <Route path="/simulations/:slug/task/:taskIndex" element={<EngineeringTaskRoute />} />
@@ -219,6 +245,11 @@ export default function AppRouter() {
           <Route path="/ai-mentor/chat"          element={<Navigate to="/ai-mentor" replace />} />
           <Route path="/skill-gps"               element={<SkillGPS />} />
           <Route path="/analytics"               element={<Analytics />} />
+          {/* Practice sandboxes — no task, no grading, nothing saved. The
+              catalogue is served by the backend (playground.py) so it lists
+              exactly the container images that are actually built. */}
+          <Route path="/sandboxes"               element={<SandboxCatalogue />} />
+          <Route path="/sandboxes/:key"          element={<SandboxPlayground />} />
           <Route element={<MiraLayout />}>
             <Route path="/mira"                  element={<MiraHero />} />
             <Route path="/mira/setup"            element={<MiraSetup />} />

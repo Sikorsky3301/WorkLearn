@@ -16,7 +16,7 @@ import NotificationBell from './NotificationBell'
 // for the one item (Help & Support) that isn't a page in this app.
 const PROFILE_MENU_ITEMS = [
   { label: 'Profile', icon: User, to: '/portfolio' },
-  { label: 'My Learning', icon: GraduationCap, to: '/simulations?filter=enrolled' },
+  { label: 'My Learning', icon: GraduationCap, to: '/learn/simulations?filter=enrolled' },
   { label: 'Account Settings', icon: SlidersHorizontal, to: '/settings' },
 ]
 
@@ -88,7 +88,11 @@ export default function Navbar() {
   const xpInLvl = xp % 500
   const xpPct   = Math.round((xpInLvl / 500) * 100)
 
-  const isSimActive = location.pathname.startsWith('/simulations')
+  // "Learn" now covers two route trees: the browse-all page it always did
+  // (/simulations) and the new hub (/learn/*, which Job Simulations lives
+  // under today). Checking only the first left the black active pill dark
+  // for every tab in the hub except by accident.
+  const isSimActive = location.pathname.startsWith('/simulations') || location.pathname.startsWith('/learn')
 
   // Profile dropdown: close on outside click
   useEffect(() => {
@@ -128,11 +132,19 @@ export default function Navbar() {
     navigate('/login')
   }
 
+  // The active item is SOLID BLACK, not tinted indigo on a pale wash.
+  //
+  // The old treatment — primary text on `bg-surface-low` — was the same pale
+  // grey the hover state uses, so at a glance "where am I" and "what is under
+  // my cursor" looked identical, and neither read as strongly as the XP badge
+  // beside them. A filled dark chip is unambiguous at any glance, and it is
+  // the one place on this bar that carries a solid fill.
+  const NAV_ACTIVE = 'bg-on-surface text-white font-semibold shadow-sm'
+  const NAV_IDLE = 'text-on-surface-variant hover:text-on-surface hover:bg-surface-low'
+
   const navLink = ({ isActive }) =>
-    `px-2.5 py-1.5 rounded text-sm font-medium transition-colors ${
-      isActive
-        ? 'text-primary font-semibold bg-surface-low'
-        : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-low'
+    `rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+      isActive ? NAV_ACTIVE : NAV_IDLE
     }`
 
   return (
@@ -159,21 +171,20 @@ export default function Navbar() {
         <nav className="flex items-center gap-0.5">
           <NavLink to="/dashboard" className={navLink}>Dashboard</NavLink>
 
-          {/* Simulations hover dropdown */}
+          {/* "Learn" hover dropdown — the nav label; the route (/simulations),
+              component names and menu content underneath are unchanged. */}
           <div
             className="relative"
             onMouseEnter={openSim}
             onMouseLeave={closeSim}
           >
             <button
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded text-sm font-medium transition-colors ${
-                isSimActive
-                  ? 'text-primary font-semibold bg-surface-low'
-                  : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-low'
+              className={`flex items-center gap-1 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                isSimActive ? NAV_ACTIVE : NAV_IDLE
               }`}
-              onClick={() => { navigate('/simulations'); setSimOpen(false) }}
+              onClick={() => { navigate('/learn'); setSimOpen(false) }}
             >
-              Simulations
+              Learn
               <svg
                 width="11" height="11" viewBox="0 0 24 24" fill="none"
                 stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
@@ -209,7 +220,7 @@ export default function Navbar() {
                           return (
                             <button
                               key={domain}
-                              onClick={() => { navigate(`/simulations?domain=${encodeURIComponent(domain)}`); setSimOpen(false) }}
+                              onClick={() => { navigate(`/learn/simulations?domain=${encodeURIComponent(domain)}`); setSimOpen(false) }}
                               className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-surface-low transition-colors text-left group"
                             >
                               <Icon className="h-5 w-5 text-primary shrink-0 mt-0.5" />
@@ -278,7 +289,7 @@ export default function Navbar() {
                   </div>
 
                   <button
-                    onClick={() => { navigate('/simulations'); setSimOpen(false) }}
+                    onClick={() => { navigate('/learn/simulations'); setSimOpen(false) }}
                     className="w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold text-primary bg-surface-low hover:bg-surface-container transition-colors border-t border-border"
                   >
                     View all simulations
@@ -296,6 +307,7 @@ export default function Navbar() {
           <NavLink to="/mira" className={navLink}>MIRA</NavLink>
           <NavLink to="/analytics" className={navLink}>Analytics</NavLink>
           <NavLink to="/portfolio" className={navLink}>Portfolio</NavLink>
+          <NavLink to="/sandboxes" className={navLink}>Sandbox</NavLink>
         </nav>
 
         {/* Right */}

@@ -45,6 +45,29 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["assessments"])
 
+# What a FINAL assessment gets when nobody authored a duration.
+#
+# Untimed is the right default for a five-question check taken straight after a
+# task. It is the wrong default for a closing exam that issues a certificate:
+# an exam with no clock is an open-book exam whatever the rules say, and the
+# proctored runner needs a number to count down from. 90 seconds a question is
+# roughly what the mixed recall/judgement banks in both shipped simulations
+# need at a steady pace.
+DEFAULT_SECONDS_PER_QUESTION = 90
+MIN_FINAL_MINUTES = 10
+
+
+def assessment_duration_minutes(task, assessment: dict) -> int:
+    """Minutes allowed for this assessment. 0 means untimed."""
+    authored = assessment.get("duration_minutes") or (task.config or {}).get("duration_minutes") or 0
+    if authored:
+        return int(authored)
+    if not (task.config or {}).get("is_final_assessment"):
+        return 0
+    count = len(assessment.get("questions") or [])
+    return max(MIN_FINAL_MINUTES, round(count * DEFAULT_SECONDS_PER_QUESTION / 60))
+
+
 
 class AssessmentSubmission(BaseModel):
     # One entry per question, in order. None means "left blank", which is
@@ -103,6 +126,11 @@ async def get_assessment(
         "title": assessment.get("title") or task.title,
         "description": assessment.get("description", ""),
         "pass_mark": assessment.get("pass_mark", 0),
+        # 0 = untimed. The proctored runner shows a countdown and auto-submits
+        # when it reaches zero; an untimed assessment shows neither.
+        "duration_minutes": assessment_duration_minutes(task, assessment),
+        "is_final": bool((task.config or {}).get("is_final_assessment")),
+        "xp_award": task.xp_award,
         "questions": [
             {"index": i, "question": q["question"], "options": q["options"]}
             for i, q in enumerate(assessment["questions"])

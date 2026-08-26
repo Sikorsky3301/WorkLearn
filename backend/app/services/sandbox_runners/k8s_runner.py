@@ -167,10 +167,12 @@ async def run_submission(
     input_files: dict[str, bytes | str] | None = None,
     image: str | None = None,
     submission_filename: str = "submission.py",
+    timeout: int | None = None,
 ) -> SandboxResult:
     """
     Same contract as docker_runner.run_submission: caller reads output.* from
-    result.workdir and MUST call cleanup() when done. `image` overrides
+    result.workdir and MUST call cleanup() when done, and `timeout` overrides
+    settings.sandbox_timeout_seconds for the execution phase. `image` overrides
     settings.sandbox_image for this call (e.g. the frontend sandbox image).
     """
     resolved_image = image or settings.sandbox_image
@@ -215,8 +217,13 @@ async def run_submission(
             )
 
         # Phase B — execution budget, mirrors the docker runner's 15s that
-        # measures run time, not scheduling.
-        deadline = time.monotonic() + settings.sandbox_timeout_seconds
+        # measures run time, not scheduling. `timeout` overrides the configured
+        # default for callers that want a shorter one (the practice playground
+        # does — see api/v1/simulations/playground.py). The Job's own
+        # activeDeadlineSeconds above stays on the configured value: it is a
+        # backstop for a runner that dies mid-poll, so it must never be the
+        # tighter of the two.
+        deadline = time.monotonic() + (timeout or settings.sandbox_timeout_seconds)
         while pod.status.phase not in ("Succeeded", "Failed"):
             if time.monotonic() >= deadline:
                 await _delete_job(job_name)

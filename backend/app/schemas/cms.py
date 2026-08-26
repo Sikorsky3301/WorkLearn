@@ -39,6 +39,11 @@ class AssessmentConfig(BaseModel):
     title: str = ""
     description: str = ""
     pass_mark: int = Field(0, ge=0, le=100)
+    # How long the student gets, once they start. 0 means untimed, which is
+    # right for the five-question check after a task and wrong for a closing
+    # exam — see DEFAULT_MINUTES_PER_QUESTION in the assessments route for what
+    # a final falls back to when an author has not set one.
+    duration_minutes: int = Field(0, ge=0, le=480)
     questions: list[AssessmentQuestion] = Field(default_factory=list)
 
 
@@ -131,6 +136,7 @@ class QuizConfig(TaskConfigBase):
     is_final_assessment: bool = False
     question_count: int = 0
     pass_mark: int = Field(0, ge=0, le=100)
+    duration_minutes: int = Field(0, ge=0, le=480)
 
 
 class RoleplayPersona(BaseModel):
@@ -206,6 +212,18 @@ class CodeSandboxConfig(TaskConfigBase):
     # registered_grader strategy
     grader_key: str | None = None
     dataset_key: str | None = None
+    # Hand this task the ORIGINAL generated dataset rather than the artifact
+    # the previous task produced. Read by _wants_raw_dataset in
+    # api/v1/simulations/sandbox.py.
+    #
+    # It is declared here because it MUST be: this model is the whitelist that
+    # validate_task_config round-trips every save through, and pydantic drops
+    # what it does not know. While this key was missing, opening a task that
+    # used it in the builder and pressing Save silently deleted it — and the
+    # task then graded against the student's own cleaned output, turning every
+    # correct answer into a zero. Any config key the runtime reads belongs in
+    # a schema, not only in a template. See tests/unit/test_cms_schemas.py.
+    use_raw_dataset: bool = False
     # declarative_rules strategy
     static_input_files: dict[str, str] = Field(default_factory=dict)
     # Points are NOT required to sum to 100 at save time (allows saving a

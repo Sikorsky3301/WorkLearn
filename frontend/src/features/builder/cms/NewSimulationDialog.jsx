@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { openAuthedTab } from '../../../lib/tabHandoff'
 import { FilePlus, Sparkles, ArrowLeft, Loader2 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../../components/ui/shadcn/dialog'
 import { useSimulationTemplates, useCreateSimulationFromTemplate } from '../../../hooks'
@@ -42,7 +43,7 @@ export default function NewSimulationDialog({ open, onOpenChange }) {
     createFromTemplate.mutate(
       { templateKey: picked.key, id: id.trim(), title: title.trim() || undefined },
       {
-        onSuccess: (res) => { handleOpenChange(false); navigate(`${cmsBase}/simulations/${res.id}`) },
+        onSuccess: (res) => { handleOpenChange(false); openAuthedTab(`${cmsBase}/content/sim-builder/${res.id}`) },
         onError: (e) => setError(e?.message || 'Could not create — that id may already exist.'),
       }
     )
@@ -93,7 +94,7 @@ export default function NewSimulationDialog({ open, onOpenChange }) {
         ) : (
           <div className="grid grid-cols-2 gap-3">
             <button
-              onClick={() => { handleOpenChange(false); navigate(`${cmsBase}/simulations/new`) }}
+              onClick={() => { handleOpenChange(false); navigate(`${cmsBase}/content/sim-builder`) }}
               className="text-left rounded-xl border border-dashed border-border hover:border-primary/50 hover:bg-surface-low transition-colors p-4 cursor-pointer"
             >
               <FilePlus className="h-5 w-5 text-on-surface-variant mb-2" />

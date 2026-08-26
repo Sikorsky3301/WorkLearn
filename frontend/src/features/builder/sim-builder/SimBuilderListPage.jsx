@@ -72,7 +72,7 @@ export default function SimBuilderListPage() {
               </thead>
               <tbody className="divide-y divide-border/60">
                 {pageRows.map((p) => (
-                  <ProjectRow key={p.id} project={p} onOpen={() => navigate(`${cmsBase}/sim-builder/${p.id}`)} />
+                  <ProjectRow key={p.id} project={p} onOpen={() => navigate(`${cmsBase}/content/sim-builder/projects/${p.id}`)} />
                 ))}
               </tbody>
             </table>
@@ -143,7 +143,7 @@ function NewProjectDialog({ open, onOpenChange, cmsBase = '/admin' }) {
     createProject.mutate(
       { title: title.trim() },
       {
-        onSuccess: (project) => { handleOpenChange(false); navigate(`${cmsBase}/sim-builder/${project.id}`) },
+        onSuccess: (project) => { handleOpenChange(false); navigate(`${cmsBase}/content/sim-builder/projects/${project.id}`) },
         onError: (e) => toast.error(e?.message || 'Could not create project'),
       }
     )

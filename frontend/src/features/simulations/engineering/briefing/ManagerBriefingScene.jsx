@@ -7,8 +7,8 @@ import { TextGenerateEffect } from '../../../../components/ui/text-generate-effe
 // The manager hands you the task.
 //
 // A full-screen scene rather than an inline bubble: the point is that work
-// arrives from a person, not from a page. It plays once per task (see
-// useBriefingSeen) and is always skippable.
+// arrives from a person, not from a page. It plays whenever a task is started
+// (see useBriefingSeen) and is always skippable.
 //
 // The words are `task.briefing` — the CMS field that is already written in the
 // manager's voice and already feeds the floating chat widget's greeting. No

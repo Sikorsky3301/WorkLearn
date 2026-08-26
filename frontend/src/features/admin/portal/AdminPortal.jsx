@@ -23,9 +23,16 @@ import ConfigurationPage from './pages/ConfigurationPage'
 // every underlying endpoint regardless of what the nav shows). SUPER_ADMIN's
 // hasPermission always returns true, so they see every item too.
 //
-// "Sim Builder" links to a sibling top-level route (/admin/sim-builder*, see
-// App.jsx) rather than an internal <Route> below — it's a standalone
-// full-screen tool with its own header, not part of this portal's shell.
+// "Sim Builder" links to a sibling top-level route
+// (/admin/content/sim-builder*, see AppRouter.jsx) rather than an internal
+// <Route> below — it's a standalone full-screen tool with its own header, not
+// part of this portal's shell. `newTab: true` opens it in its own browser tab:
+// building a simulation is a long working session that owns the whole viewport,
+// and an author wants the portal still sitting where they left it.
+//
+// "Simulations" is the CATALOGUE — publish, unpublish, unenrol, delete. It no
+// longer opens the editor inline; its Edit action opens the builder in a tab
+// too, so there is one place a simulation is built.
 const SECTIONS = [
   { items: [{ label: 'Overview', icon: LayoutDashboard, to: '/admin', end: true, need: null }] },
   {
@@ -39,7 +46,7 @@ const SECTIONS = [
     label: 'Content',
     items: [
       { label: 'Simulations', icon: Blocks, to: '/admin/simulations', need: 'simulations.view' },
-      { label: 'Sim Builder', icon: Wand2, to: '/admin/sim-builder', need: 'simulations.view' },
+      { label: 'Sim Builder', icon: Wand2, to: '/admin/content/sim-builder', need: 'simulations.view', newTab: true },
     ],
   },
   {

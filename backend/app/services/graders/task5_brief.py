@@ -8,7 +8,25 @@ import re
 from app.services.graders import score_from_checks, to_native
 from app.ai.services.llm import generate
 
-REQUIRED_SECTIONS = ["revenue", "recommendation"]
+# Word-family patterns, not literal substrings.
+#
+# This used to be `all(kw in lower for kw in ["revenue", "recommendation"])`,
+# so a brief that said "I recommend pausing the programme" — better prose than
+# "My recommendation is to pause the programme" — failed the check for
+# covering a recommendation. It measured which part of speech a student
+# reached for, not whether they made a call.
+REQUIRED_SECTIONS = {
+    "revenue": r"\brevenues?\b",
+    "a recommendation": r"\brecommend(?:s|ed|ing|ation|ations)?\b",
+}
+
+# The task tells the student "one page, <= 400 words" and "exactly 3
+# prioritized recommendations" in both what_to_submit and success_criteria.
+# The grader checked neither: it enforced an 80-word MINIMUM nobody was told
+# about and no maximum at all, so following the stated brief as tightly as
+# possible was punished and ignoring the length limit entirely cost nothing.
+MIN_WORDS = 80
+MAX_WORDS = 400
 
 JUDGE_PROMPT = """\
 You are grading a junior data analyst's executive brief for a business review.
@@ -31,14 +49,19 @@ async def grade(text: str | None, reference: dict) -> dict:
     text = (text or "").strip()
 
     word_count = len(text.split())
-    length_ok = word_count >= 80
-    checks.append({"id": "length", "label": "Brief has enough substance (80+ words)", "points": 15, "pass": length_ok})
+    length_ok = MIN_WORDS <= word_count <= MAX_WORDS
+    checks.append({
+        "id": "length",
+        "label": f"One page: between {MIN_WORDS} and {MAX_WORDS} words (yours: {word_count})",
+        "points": 15,
+        "pass": length_ok,
+    })
 
     lower = text.lower()
     mentions_numbers = bool(re.search(r"\d", text))
     checks.append({"id": "has_numbers", "label": "References concrete numbers", "points": 15, "pass": mentions_numbers})
 
-    sections_ok = all(kw in lower for kw in REQUIRED_SECTIONS)
+    sections_ok = all(re.search(pattern, lower) for pattern in REQUIRED_SECTIONS.values())
     checks.append({"id": "sections", "label": "Covers revenue performance and a recommendation", "points": 15, "pass": sections_ok})
 
     justification = ""

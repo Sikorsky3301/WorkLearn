@@ -36,9 +36,21 @@ CATEGORY_FIXES = {
 }
 
 
-def seed_from_enrollment(enrollment_id: str) -> int:
-    """Deterministic 32-bit seed derived from an enrollment id."""
-    digest = hashlib.sha256(enrollment_id.encode()).hexdigest()
+def seed_from_enrollment(enrollment_id: str | int) -> int:
+    """Deterministic 32-bit seed derived from an enrollment id.
+
+    Accepts int as well as str because BOTH call sites pass the route's
+    `enrollment_id: int`. The str-only annotation was not enforced at runtime,
+    so `.encode()` raised AttributeError on every call — silently swallowed by
+    a bare `except` on the file-listing path (dataset.csv just vanished from
+    the Explorer) and NOT caught on the submit path, where it was the third
+    statement and turned every DA submission into a 500.
+
+    artifacts.py:25 already normalises the same id the same way; the two must
+    agree, since a seed that differs between them would hand a student one
+    dataset and grade them against another.
+    """
+    digest = hashlib.sha256(str(enrollment_id).encode()).hexdigest()
     return int(digest[:8], 16)
 
 
@@ -152,53 +164,182 @@ def _clean_reference(df: pd.DataFrame) -> pd.DataFrame:
     return d
 
 
+# ── Reference solutions ──────────────────────────────────────────────────────
+#
+# One builder per task, registered in TASK_REFERENCES below by task_index —
+# the ONE place the numbering lives. The simulation grew from 5 tasks to 9 and
+# every reference had to move, which is exactly the edit a chain of
+# `if task_id == 3` makes dangerous. Renumber here, once.
+#
+# Every builder recomputes from the dataframe on each call. Nothing is cached
+# and nothing is stored, which is what makes the answers unreachable: they are
+# derived at grade time from a seed only the server holds.
+
+
+def _revenue(d: pd.DataFrame) -> pd.Series:
+    """Net revenue per row — the single definition every builder uses, so a
+    student's number cannot be right for one task and wrong for another
+    because two references disagreed about what revenue means."""
+    return d['quantity'] * d['unit_price'] * (1 - d['discount_pct'].fillna(0))
+
+
+def _billable(d: pd.DataFrame) -> pd.DataFrame:
+    """Rows that represent money coming in: returns and $0 promos excluded.
+    Matches the starter template's methodology, so a textbook-correct
+    submission agrees with the reference."""
+    return d[(d['quantity'] > 0) & (d['unit_price'] > 0)].copy()
+
+
+def _ref_cleaning(df: pd.DataFrame, cleaned: pd.DataFrame) -> dict:
+    return {
+        "row_count_range": (len(df) - N_DUPES - 5, len(df) - N_DUPES + 5),
+        "max_discount_pct": 1.0,
+        "known_category_fixes": CATEGORY_FIXES,
+        "categories_valid": set(CATEGORIES),
+    }
+
+
+def _ref_quality(df: pd.DataFrame, cleaned: pd.DataFrame) -> dict:
+    """Task 2 — the profile of the RAW file, before any cleaning.
+
+    Deliberately computed from `df`, not `cleaned`: the point of the task is to
+    quantify the mess that was there. A student who profiled their own cleaned
+    output would report zeros for everything and score nothing, which is the
+    correct outcome — the brief says "the raw file".
+    """
+    parsed = pd.to_datetime(df['order_date'], errors='coerce', format='mixed')
+    return {
+        "total_rows": int(len(df)),
+        "duplicate_order_ids": int(len(df) - df['order_id'].nunique()),
+        "unparseable_dates": int(parsed.isna().sum()),
+        "negative_quantity_rows": int((df['quantity'] < 0).sum()),
+        "zero_price_rows": int((df['unit_price'] == 0).sum()),
+        "discount_over_one_rows": int((df['discount_pct'] > 1).sum()),
+        "missing_channel_rows": int(df['channel'].isna().sum()),
+        "distinct_categories_raw": int(df['product_category'].nunique()),
+    }
+
+
+def _ref_kpis(df: pd.DataFrame, cleaned: pd.DataFrame) -> dict:
+    rev_df = _billable(cleaned)
+    rev_df['net_revenue'] = _revenue(rev_df)
+    total_revenue = float(rev_df['net_revenue'].sum())
+    order_count = int(rev_df['order_id'].nunique())
+    by_channel = rev_df.groupby('channel')['net_revenue'].sum().to_dict()
+    by_category = rev_df.groupby('product_category')['net_revenue'].sum().to_dict()
+    return {
+        "total_revenue": total_revenue,
+        "order_count": order_count,
+        "aov": total_revenue / order_count if order_count else 0,
+        "by_channel": {k: float(v) for k, v in by_channel.items() if k},
+        "by_category": {k: float(v) for k, v in by_category.items()},
+    }
+
+
+def _ref_channel_country(df: pd.DataFrame, cleaned: pd.DataFrame) -> dict:
+    """Task 4 — where the money comes from, by market and by channel.
+
+    `country` contains 'ZZ', which is not a country code. It is left IN the
+    reference on purpose: noticing it is part of the task, and a reference that
+    quietly dropped it would fail the students who did notice.
+    """
+    rev_df = _billable(cleaned)
+    rev_df['net_revenue'] = _revenue(rev_df)
+
+    by_country = rev_df.groupby('country')['net_revenue'].sum()
+    orders_per_channel = rev_df.groupby('channel')['order_id'].nunique()
+    revenue_per_channel = rev_df.groupby('channel')['net_revenue'].sum()
+    aov_by_channel = (revenue_per_channel / orders_per_channel.replace(0, 1)).dropna()
+
+    return {
+        "by_country": {k: float(v) for k, v in by_country.to_dict().items() if k},
+        "aov_by_channel": {k: float(v) for k, v in aov_by_channel.to_dict().items() if k},
+        "top_country": str(by_country.idxmax()),
+        "invalid_country_code": "ZZ",
+        "invalid_country_rows": int((rev_df['country'] == 'ZZ').sum()),
+    }
+
+
+def _ref_monthly(df: pd.DataFrame, cleaned: pd.DataFrame) -> dict:
+    """Task 5 — the trend, and the growth between consecutive months."""
+    rev_df = _billable(cleaned)
+    rev_df['net_revenue'] = _revenue(rev_df)
+    rev_df['parsed'] = pd.to_datetime(rev_df['order_date'], errors='coerce', format='mixed')
+    dated = rev_df.dropna(subset=['parsed'])
+
+    by_month = dated.groupby(dated['parsed'].dt.to_period('M').astype(str))['net_revenue'].sum().sort_index()
+    growth = by_month.pct_change().dropna()
+    return {
+        "by_month": {k: float(v) for k, v in by_month.to_dict().items()},
+        "month_count": int(len(by_month)),
+        "best_month": str(by_month.idxmax()),
+        "worst_month": str(by_month.idxmin()),
+        "avg_mom_growth": float(growth.mean()) if len(growth) else 0.0,
+    }
+
+
+def _ref_rfm(df: pd.DataFrame, cleaned: pd.DataFrame) -> dict:
+    cust = cleaned.assign(revenue=_revenue(cleaned)).groupby('customer_id').agg(
+        frequency=('order_id', 'count'), monetary=('revenue', 'sum')
+    )
+    cust = cust[cust.index != '']
+    return {
+        "customer_count": int(len(cust)),
+        "total_monetary": float(cust['monetary'].sum()),
+    }
+
+
+def _ref_cohort(df: pd.DataFrame, cleaned: pd.DataFrame) -> dict:
+    """Task 7 — do customers come back?
+
+    Blank customer_ids are excluded: several hundred rows carry one, and
+    treating them as a single customer would invent a spectacularly loyal buyer
+    who does not exist. The brief states that exclusion so the student makes
+    the same call knowingly rather than by accident.
+    """
+    rev_df = _billable(cleaned)
+    rev_df['parsed'] = pd.to_datetime(rev_df['order_date'], errors='coerce', format='mixed')
+    named = rev_df[(rev_df['customer_id'] != '') & rev_df['parsed'].notna()]
+
+    per_customer = named.groupby('customer_id').agg(
+        orders=('order_id', 'nunique'), first_order=('parsed', 'min'),
+    )
+    total = int(len(per_customer))
+    repeat = int((per_customer['orders'] > 1).sum())
+    cohorts = per_customer['first_order'].dt.to_period('M').astype(str).value_counts().sort_index()
+    return {
+        "customer_count": total,
+        "repeat_customers": repeat,
+        "one_time_customers": total - repeat,
+        "repeat_rate": float(repeat / total) if total else 0.0,
+        "cohort_sizes": {k: int(v) for k, v in cohorts.to_dict().items()},
+        "cohort_count": int(len(cohorts)),
+    }
+
+
+def _ref_ab(df: pd.DataFrame, cleaned: pd.DataFrame) -> dict:
+    exp = cleaned[cleaned['experiment_group'].isin(['control', 'variant'])]
+    by_group = exp.assign(revenue=_revenue(exp)).groupby('experiment_group')['revenue'].mean().to_dict()
+    return {"mean_revenue_by_group": {k: float(v) for k, v in by_group.items()}}
+
+
+# task_index -> reference builder. Task 9 (text brief, LLM-judged) and task 10
+# (quiz) need no reference and are deliberately absent.
+TASK_REFERENCES = {
+    1: _ref_cleaning,
+    2: _ref_quality,
+    3: _ref_kpis,
+    4: _ref_channel_country,
+    5: _ref_monthly,
+    6: _ref_rfm,
+    7: _ref_cohort,
+    8: _ref_ab,
+}
+
+
 def compute_reference_solution(task_id: int, df: pd.DataFrame) -> dict:
     """Ground-truth answers used by graders to check a student's output."""
-    cleaned = _clean_reference(df)
-
-    if task_id == 1:
-        return {
-            "row_count_range": (len(df) - N_DUPES - 5, len(df) - N_DUPES + 5),
-            "max_discount_pct": 1.0,
-            "known_category_fixes": CATEGORY_FIXES,
-            "categories_valid": set(CATEGORIES),
-        }
-
-    if task_id == 2:
-        # Matches the starter template's methodology exactly: returns and $0
-        # promo rows are EXCLUDED (not just zeroed) before computing KPIs, so
-        # the reference agrees with a textbook-correct student submission.
-        rev_df = cleaned[(cleaned['quantity'] > 0) & (cleaned['unit_price'] > 0)].copy()
-        rev_df['net_revenue'] = rev_df['quantity'] * rev_df['unit_price'] * (1 - rev_df['discount_pct'])
-        total_revenue = float(rev_df['net_revenue'].sum())
-        order_count = int(rev_df['order_id'].nunique())
-        aov = total_revenue / order_count if order_count else 0
-        by_channel = rev_df.groupby('channel')['net_revenue'].sum().to_dict()
-        by_category = rev_df.groupby('product_category')['net_revenue'].sum().to_dict()
-        return {
-            "total_revenue": total_revenue,
-            "order_count": order_count,
-            "aov": aov,
-            "by_channel": {k: float(v) for k, v in by_channel.items() if k},
-            "by_category": {k: float(v) for k, v in by_category.items()},
-        }
-
-    if task_id == 3:
-        # RFM reference: bucket counts by simple tercile split
-        revenue = cleaned.eval('quantity * unit_price * (1 - discount_pct)')
-        cust = cleaned.assign(revenue=revenue).groupby('customer_id').agg(
-            frequency=('order_id', 'count'), monetary=('revenue', 'sum')
-        )
-        cust = cust[cust.index != '']
-        return {
-            "customer_count": int(len(cust)),
-            "total_monetary": float(cust['monetary'].sum()),
-        }
-
-    if task_id == 4:
-        exp = cleaned[cleaned['experiment_group'].isin(['control', 'variant'])]
-        revenue = exp.eval('quantity * unit_price * (1 - discount_pct)')
-        by_group = exp.assign(revenue=revenue).groupby('experiment_group')['revenue'].mean().to_dict()
-        return {"mean_revenue_by_group": {k: float(v) for k, v in by_group.items()}}
-
-    return {}
+    builder = TASK_REFERENCES.get(task_id)
+    if builder is None:
+        return {}
+    return builder(df, _clean_reference(df))

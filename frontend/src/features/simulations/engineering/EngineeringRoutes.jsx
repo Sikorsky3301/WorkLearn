@@ -1,6 +1,6 @@
 import { Navigate, useParams } from 'react-router-dom'
 import { useSimulationFull } from '../../../hooks'
-import { isEngineeringSim } from './lib/isEngineeringSim'
+import { hasWorkbenchExperience } from './lib/hasWorkbenchExperience'
 import RoadmapPage from './roadmap/RoadmapPage'
 import EngineeringTaskPage from './task/EngineeringTaskPage'
 
@@ -25,7 +25,7 @@ function EngineeringGate({ children }) {
   if (!data?.simulation) {
     return <div className="mx-auto max-w-4xl px-6 py-20 text-sm text-on-surface-variant">Simulation not found.</div>
   }
-  if (!isEngineeringSim(data.simulation)) {
+  if (!hasWorkbenchExperience(data.simulation)) {
     return <Navigate to={`/simulations/${slug}`} replace />
   }
   return children

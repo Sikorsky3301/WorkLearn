@@ -91,19 +91,39 @@ export async function downloadProvisionTemplate() {
   URL.revokeObjectURL(url)
 }
 
-export function useAdminUsers(role = '', search = '') {
+/**
+ * One page of users, straight from the server.
+ *
+ * Paging is SERVER-side now. It used to ask for a bare list capped at 100 and
+ * page it in the browser, so on a platform with a thousand accounts an admin
+ * saw the newest hundred, the pager read "1-10 of 100", and nothing said the
+ * other nine hundred existed.
+ *
+ * `keepPreviousData` keeps the current page on screen while the next one
+ * loads, so paging and typing do not flash the table back to its skeleton.
+ *
+ * Returns `{ users, total, limit, offset }`.
+ */
+export function useAdminUsers({ role = '', search = '', scope = '', limit = 50, offset = 0 } = {}) {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })
+  if (role) params.set('role', role)
+  if (scope) params.set('scope', scope)
+  if (search) params.set('search', search)
+
   return useQuery({
-    queryKey: ['admin-users', role, search],
-    queryFn: () => api.get(`/api/admin/users?role=${role}&search=${encodeURIComponent(search)}`),
+    queryKey: ['admin-users', role, scope, search, limit, offset],
+    queryFn: () => api.get(`/api/admin/users?${params.toString()}`),
     staleTime: 30_000,
+    placeholderData: (prev) => prev,
   })
 }
 
-export function useAdminActivity() {
+export function useAdminActivity(limit = 20) {
   return useQuery({
-    queryKey: ['admin-activity'],
-    queryFn: () => api.get('/api/admin/activity'),
+    queryKey: ['admin-activity', limit],
+    queryFn: () => api.get(`/api/admin/activity?limit=${limit}`),
     staleTime: 15_000,
+    placeholderData: (prev) => prev,
   })
 }
 

@@ -87,7 +87,7 @@ export default function SkillGPS() {
       </header>
 
       {gapData.length === 0 ? (
-        <EmptyState onStart={() => navigate('/simulations')} />
+        <EmptyState onStart={() => navigate('/learn/simulations')} />
       ) : (
         <div className="space-y-5">
           <MetricStrip
@@ -121,7 +121,7 @@ export default function SkillGPS() {
                 rungs={data?.track_progress}
                 onSelect={setTargetRole}
               />
-              <NextActions targetRole={targetRole} onStart={() => navigate('/simulations')} />
+              <NextActions targetRole={targetRole} onStart={() => navigate('/learn/simulations')} />
             </aside>
           </div>
         </div>

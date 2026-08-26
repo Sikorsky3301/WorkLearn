@@ -2014,3 +2014,1003 @@ NOTE      The XP figures on this page are inflated by the re-submit
           stands.
 
 ================================================================================
+
+--------------------------------------------------------------------------------
+ 31. DATA ANALYST SIM — WORKBENCH UI + PYTHON SANDBOX + FULL CONTENT
+--------------------------------------------------------------------------------
+ASKED     Give the Junior Data Analyst sim the UI treatment the Frontend
+          Developer sim got, and add Python sandbox + grading. Content scope
+          confirmed as the FULL treatment. Sales sim explicitly out of scope.
+
+THE BLOCKER, FIRST — DA SUBMISSIONS HAD BEEN 500ing THE WHOLE TIME
+
+  app/services/dataset.py declared seed_from_enrollment(enrollment_id: str)
+  and called .encode() on it. BOTH call sites pass the route's
+  `enrollment_id: int`.
+
+      >>> seed_from_enrollment(17)
+      AttributeError: 'int' object has no attribute 'encode'
+
+  sandbox.py:93 swallowed it in a bare except (dataset.csv silently vanished
+  from the Explorer). sandbox.py:281 did NOT — it is the third statement of
+  the DA submit path, so every DA submission and dry-run returned HTTP 500.
+  Nobody could complete a single DA task.
+
+  artifacts.py:25 already carried the fix for the identical int/str bug on the
+  same id. The two must agree — a seed that differed between them would hand a
+  student one dataset and grade them against another. Fixed to str(id) with
+  that note at the call site.
+
+  MEASURED AFTER THE FIX — every model solution through REAL Docker:
+      task 1  score=100  checks 6/6
+      task 2  score=100  checks 6/6
+      task 3  score=100  checks 5/5
+      task 4  score=100  checks 4/4
+      task 5  score= 79  checks 4/4   (LLM-judged brief)
+  One line. From "every submission 500s" to 5/5 grading.
+
+WHAT DID **NOT** NEED BUILDING (surveyed before writing anything)
+
+  The Python sandbox already existed and worked:
+      sandboxes/python/Dockerfile     pandas/numpy/scipy/statsmodels, non-root,
+                                      matplotlib forced to Agg
+      worklearn-sandbox-python:latest built and present
+      5 DA graders + DATASET_REGISTRY  registered and correct
+      SandboxWorkbenchPage             MONACO_LANGUAGE already maps 'python'
+      ConsolePane                      already generic over checks[]
+      DA tasks                         already carried week=1,1,2,2,2 and
+                                       language='python'
+
+  So the "add a Python sandbox" half was one bug fix and one gate change, not
+  a build. Worth stating plainly rather than claiming to have built it.
+
+THE GATE — isEngineeringSim → hasWorkbenchExperience
+
+  The whole workbench experience was behind ONE domain check. Renamed and
+  widened to a set, with the reasoning recorded in the file: the experience is
+  about the SHAPE of a simulation (roadmap + code tasks + a graded artifact),
+  not its subject. DA is exactly that shape; it just writes Python against a
+  CSV instead of JavaScript against a DOM.
+
+      WORKBENCH_DOMAINS = {'Engineering', 'Data Analytics'}
+
+  Sales deliberately excluded — its tasks are roleplay and CRM data entry,
+  with no artifact for a workbench to show. Confirmed with the user.
+
+  Two call sites (EngineeringRoutes, GenericSimShell) + a router comment. That
+  is the entire structural change: DA now gets the roadmap, the redesigned task
+  page, the manager briefing and the full-screen sandbox.
+
+CONTENT — THE ACTUAL BULK OF THE WORK
+
+  New package app/cms_templates/data_analytics/, deliberately NOT a full
+  template. The Engineering package owns every field of its tasks; the DA
+  tasks already have correct briefings, hints and — critically — grader config
+  that is the only part of this sim verified end-to-end against Docker. A
+  wholesale rewrite would risk that to gain nothing. So the package supplies
+  only what was missing:
+
+    explainers.py    5 explainers, ~1,100 lines. Same two-level contract as
+                     Engineering: every step has `plain` (assumes nothing) and
+                     `deeper` (the trade-off a senior analyst would name).
+                     29 steps, 20 concepts, 26 contract items, 25 mistakes.
+                     Each `contract` block mirrors the REAL grader point sums —
+                     a contract that drifts from the grader is worse than none,
+                     because it teaches the wrong target.
+
+    assessments.py   5 mini banks x 5 questions (pass 80) + a 40-question
+                     final (pass 70). Every question carries an explanation,
+                     served only after grading.
+
+    __init__.py      + FINAL_TASK — task 6, type quiz, appended not replacing.
+
+  sync_da_content.py (new, dry-run by default) applies explainer + assessment
+  to tasks 1-5 and creates task 6. Touches nothing else. Reassigns task.config
+  rather than mutating it, because SQLAlchemy does not track in-place edits to
+  a JSON column — a mutation would print a change and write nothing.
+  APPLIED: 6 rows. Re-running reports 0.
+
+MY OWN CONTENT HAD A REAL FLAW, AND MY OWN TEST CAUGHT IT
+
+  test_the_correct_answer_is_not_always_in_the_same_place failed on first run:
+
+      mini 2: [1,1,1,1,1]   mini 3: [1,1,1,1,1]   mini 5: [1,1,1,1,1]
+      final : 36 of 40 answers at index 1
+
+  Authored by hand, I had unconsciously put the right answer second almost
+  every time. A student who never reads an option passes by always choosing
+  the second one — the assessment would have measured nothing.
+
+  Fixed with _spread(), which rotates each question's options by an amount
+  derived from the question text: deterministic (the same bank always renders
+  identically, so a stored answer stays valid) but with no learnable pattern,
+  unlike cycling 0,1,2,3. Now:
+
+      mini 1: [0,1,0,1,1]  mini 2: [1,1,3,3,0]  mini 3: [2,2,1,3,1]
+      mini 4: [2,1,3,3,1]  mini 5: [2,0,3,3,0]
+      final : {0:11, 1:10, 2:10, 3:9}
+
+  Documented at the function with what it is guarding against, and the one
+  case where it must NOT be used (options that reference each other).
+
+VERIFIED  DA grading, real Docker, model solutions   5/5 tasks graded
+          public /simulations/da-job-sim/full        6 tasks, explainers
+                                                     present, weeks 1/1/2/2/2/2
+          '"correct"' in the public payload          False
+          '"explanation"' in the public payload      False
+          GET .../tasks/1/assessment                 200, question keys are
+                                                     [index, options, question]
+                                                     — no answers
+          POST final, all correct                    200 score=100 passed=True
+          POST final, all wrong                      200 score=0  passed=False
+          POST mini with no completion               409 "Submit the task
+                                                     before taking its
+                                                     assessment"
+          sync_da_content.py re-run                  0 changes (idempotent)
+          pytest                                     361 passed (was 190; +171)
+          vitest                                     137 passed / 24 files
+          npm run build                              clean
+
+NEW TESTS tests/unit/test_da_template.py (171)
+          Coverage, five-questions-per-bank, the shared pass mark, question
+          answerability (distinct options, `correct` in range), every question
+          explains itself, answer-position spread, explainer completeness,
+          every step teaching at BOTH levels, every concept defined AND
+          motivated, contract items stating a requirement, every grader still
+          registered, every code task naming its output artifact in the
+          contract, and a structural answer-key leak walk over the stripped
+          payload for all six tasks.
+
+DATABASE   Test runs wrote real progress for user 8 on enrollment 26 —
+HYGIENE    5 TaskCompletions, 440 XP, 11 UserSkill rows, then a further 220 XP
+           and 4 skills from the final-assessment POST. ALL reverted: XP back
+           to 1970, skills back to the 11 they were, enrollment reset to
+           ENROLLED / current_task_idx=0. Verified after.
+
+FILES      backend/app/services/dataset.py                    (the seed fix)
+           backend/app/cms_templates/data_analytics/__init__.py     (new)
+           backend/app/cms_templates/data_analytics/explainers.py   (new)
+           backend/app/cms_templates/data_analytics/assessments.py  (new)
+           backend/sync_da_content.py                               (new)
+           backend/tests/unit/test_da_template.py                   (new, 171)
+           frontend/.../engineering/lib/hasWorkbenchExperience.js
+               (renamed from isEngineeringSim.js)
+           frontend/.../engineering/EngineeringRoutes.jsx
+           frontend/.../generic/GenericSimShell.jsx
+           frontend/src/app/router/AppRouter.jsx
+
+NOT DONE, DELIBERATELY
+           · Task 5's LLM judge scores its own model answer 79/100. User said
+             leave it.
+           · The Sales sim is untouched and stays on the generic runtime.
+           · features/simulations/da-job-sim/JupyterPlayground.jsx is now
+             unreachable for enrolled students (the gate routes past it) but
+             was NOT deleted — it is still the fallback for any other
+             dataset-backed sim on the generic runtime. Worth removing once
+             nothing else can reach it.
+
+================================================================================
+
+--------------------------------------------------------------------------------
+ 32. SIMULATIONS WOULD NOT OPEN AFTER THE OVERVIEW PAGE
+--------------------------------------------------------------------------------
+REPORTED  Clicking through from a simulation's overview page did nothing —
+          for every simulation, not just the DA one.
+
+FOUND     backend/logs/backend.log, one grep:
+
+            sqlalchemy.exc.MissingGreenlet: greenlet_spawn has not been
+            called; can't call await_only() here.
+            File ".../app/services/simulation_scope.py", line 152,
+              in assert_sim_visible_to_tenant
+
+          The guard was:
+
+            if not hasattr(sim, "university_links") or sim.university_links is None:
+                await db.refresh(sim, attribute_names=["university_links"])
+
+          On an async session, touching an UNLOADED relationship attribute
+          triggers a lazy load with no greenlet to run it in, and SQLAlchemy
+          raises MissingGreenlet. That is not an AttributeError, so hasattr()
+          does NOT swallow it.
+
+          The guard written to AVOID the load was the thing performing it, and
+          it raised on every call. Reproduced directly:
+
+            university_links unloaded?  True
+            hasattr(...)             -> RAISES MissingGreenlet
+
+          assert_sim_visible_to_tenant runs on exactly three routes:
+
+            GET  /api/simulations/{slug}/onboarding
+            POST /api/simulations/{slug}/enroll
+            POST /api/simulations/{slug}/onboarding/accept
+
+          which is the entire path between the overview page and a simulation
+          opening. Every sim, every student, 500.
+
+WHERE IT CAME FROM
+          simulation_scope.py arrived in the origin/main merge (entry 33's
+          conflicts). My verification after that merge exercised
+          /api/simulations (the list) and /api/skill-gps — neither calls this —
+          so the suites and my smoke tests were all green over a dead path.
+          The lesson is specific: after merging a file that adds a shared
+          helper, test the ROUTES that call it, not the ones that happen to be
+          nearby.
+
+FIXED     Both readers now use the inspection API instead of attribute access:
+
+            if "university_links" in sa_inspect(sim).unloaded:
+                await db.refresh(sim, attribute_names=["university_links"])
+
+          `scope_payload`, ten lines above in the same file, was ALREADY doing
+          it correctly — the file disagreed with itself. Its local
+          `from sqlalchemy import inspect` was hoisted to the module so both
+          share one import.
+
+          sim_visible_to_university had the same latent trap via
+          `getattr(sim, "university_links", None)` — a getattr default cannot
+          catch MissingGreenlet either. It now checks `unloaded` first and
+          treats an unloaded relationship as "not visible": the scoped case
+          cannot be answered without the links, and refusing is the safe
+          direction for a visibility check. Its docstring now states that it
+          performs no IO, which is the property that makes it callable from
+          sync code at all.
+
+          Swept for the same pattern elsewhere: no other hasattr() on a
+          relationship anywhere in app/, and the only two remaining reads of
+          .university_links both sit behind an `unloaded` check.
+
+VERIFIED  in-process, all three sims:
+            da-job-sim         onboarding 200  full 200  enroll 200
+            frontend-dev-sim   onboarding 200  full 200  enroll 200
+            sales-crm-sim      onboarding 200  full 200  enroll 200
+          against the RUNNING dev server on :3001 (the one that was failing):
+            all three  onboarding=200  full=200
+          pytest  373 passed (was 361; +12)
+
+NEW TESTS tests/unit/test_simulation_scope.py (12)
+          Sync tests on detached instances, which reproduces the "attribute is
+          not loaded" state without a database. Pins that neither
+          sim_visible_to_university nor scope_payload touches an unloaded
+          relationship, that available_to_all short-circuits before the links
+          are needed at all, and the visibility rules themselves (unpublished
+          never visible — parametrised over the enum so a new status is
+          covered automatically; scoped visible only to a linked university;
+          no tenant means not visible). One test asserts the FIXTURE really is
+          unloaded, so the others cannot start passing for the wrong reason if
+          the model is ever changed to eager-load.
+
+FILES     backend/app/services/simulation_scope.py
+          backend/tests/unit/test_simulation_scope.py            (new, 12)
+
+
+--------------------------------------------------------------------------------
+ 33. DA SIM -> THREE WEEKS OF THREE · SANDBOX SECTION · NAVBAR ACTIVE STATE
+--------------------------------------------------------------------------------
+ASKED     (1) Restructure the Data Analyst sim to 3 tasks x 3 weeks with a mini
+          assessment per task and a final at the end, same as the Frontend sim.
+          (2) A Sandbox section in the navbar listing the sandboxes we have.
+          (3) A black active indicator on the navbar. Mid-turn: put Sandbox
+          last, and make the active pill bean-shaped rather than boxy.
+
+-- 1 · DATA ANALYST: 5 TASKS IN 2 WEEKS  ->  9 TASKS IN 3 WEEKS ----------------
+
+  FOUR NEW TASKS, each with a real grader verified against real Docker:
+
+    2  Data Quality Report      count every defect in the RAW extract
+    4  Channel & Country        revenue by market, AOV by channel, and the
+                                'ZZ' sentinel that is not a country
+    5  Monthly Trend & Growth   revenue by month, month-on-month growth
+    7  Cohort Retention         repeat rate, cohorts by first-purchase month
+
+  FINAL LAYOUT
+    week 1   1 Clean the Data · 2 Data Quality Report · 3 Sales Report
+    week 2   4 Channel & Country · 5 Monthly Trend · 6 RFM Segmentation
+    week 3   7 Cohort Retention · 8 A/B Test · 9 Executive Brief
+    week 4   10 Final Assessment (40 questions)
+
+  The arc is deliberate: trust the file, then describe it; find where the money
+  comes from; decide and say it. Nine mini assessments, one per task.
+
+  DATASET WORK
+    dataset.py's reference solutions were a chain of `if task_id == 3`, which
+    is exactly the wrong shape for a renumbering. Rewritten as one builder per
+    task behind TASK_REFERENCES {index: builder} — the numbering now lives in
+    one dict. Added four builders, and pulled the revenue formula into a single
+    _revenue() so two tasks can never disagree about what revenue means.
+
+  A REAL DESIGN CONFLICT THE VERIFICATION FOUND
+    _resolve_input_csv hands every task after the first the student's CLEANED
+    Task 1 output. The Data Quality Report needs the RAW file — profiling a
+    cleaned file honestly reports zero of everything, and the grader (which
+    compares against a reference computed from the raw frame) would then fail
+    a student who did exactly the right thing.
+
+    Added a `use_raw_dataset` config flag, threaded through all three call
+    sites (file listing, row preview, submit). Task 2 sets it; nothing else
+    does.
+
+  MY OWN REMAP HAD A BUG, AND CHECKING THE OUTPUT CAUGHT IT
+    Renaming the explainer keys with sequential string replaces, ascending:
+
+        replace `2: {` -> `3: {`     (Sales Report is now key 3)
+        replace `3: {` -> `6: {`     matches the one JUST written
+
+    Sales Report and RFM ended up swapped. Found by printing each index beside
+    its outcome text rather than trusting the edit. Fixed by line number. The
+    assessments were remapped DESCENDING, were checked, and were correct —
+    which is the whole reason descending avoids the collision.
+
+  THE DRY RUN WAS ALSO LYING
+    sync_da_content.py re-read the database after the renumber phase. On a dry
+    run nothing has been written, so it reported against the OLD numbering and
+    announced "task 2: Data Quality Report already present" — it was seeing the
+    old task 2, Sales Report. A preview that describes a state the apply will
+    not produce is worse than no preview. It now projects the post-renumber
+    layout in memory.
+
+  RENUMBERING WITHOUT COLLIDING
+    (simulation_id, task_index) is effectively unique and the moves overlap —
+    2->3 while a 3 still exists. The script parks every task at a NEGATIVE
+    index first, then lands them, so no ordering assumption is needed.
+
+  VERIFIED  verify_da_grading.py (new) — model solution AND starter through
+            real Docker, for every new task:
+                task 2  solution 100 / starter 10   (raw input)
+                task 4  solution 100 / starter 10   (cleaned input)
+                task 5  solution 100 / starter 10   (cleaned input)
+                task 7  solution 100 / starter 10   (cleaned input)
+            Both halves matter: a solution that cannot reach 100 is an
+            unpassable task, and a starter that already scores 100 is a task
+            that asks for nothing.
+
+            Then all nine through the LIVE submit route:
+                1 Clean 100 · 2 Quality 100 · 3 Sales 100 · 4 Channel 100
+                5 Monthly 100 · 6 RFM 100 · 7 Cohort 100 · 8 A/B 100
+                9 Brief 79 (LLM judge)          average 98
+
+            The first verify run scored tasks 4 and 5 at 50 and 25 — because
+            the script fed RAW data where the real flow feeds CLEANED. That was
+            the script being wrong, not the graders, and fixing the script
+            rather than loosening the graders is the only honest direction.
+
+-- 2 · SANDBOX SECTION --------------------------------------------------------
+
+  Not just a catalogue page — the sandboxes actually run.
+
+  backend/app/api/v1/simulations/playground.py (new)
+      GET  /api/playground/sandboxes        the catalogue
+      GET  /api/playground/sandboxes/{key}  + starter code
+      POST /api/playground/run              runs it
+
+      Same container as the graded path — same image, --network=none, same
+      caps — with no grading, no persistence and no dataset seeding. A practice
+      sandbox easier to escape than the graded one would be the obvious way in.
+
+  THE CATALOGUE IS SERVED, NOT HARDCODED
+      Which sandboxes exist is a property of which images are BUILT, and only
+      the backend knows that. Python, JavaScript and React are real and listed
+      available. SQL is listed `available: false` — no image exists — and the
+      card shows "Not available yet" instead of a button that would 503. Same
+      honest-preview treatment the Navbar already gives its future domains.
+      Every package list is read off the real Dockerfile.
+
+  THREE THINGS THE IMAGES FORCED
+      · Each entrypoint looks for ONE exact filename — submission.py for
+        Python, submission.test.js for the frontend image — and prints
+        "No submission.py found" for anything else, which reads as a student
+        error and is not one. `filename` is not free choice; that is now
+        stated at the config.
+      · Jest does not put console.log on stdout. It buffers it and re-prints
+        it to STDERR inside a "Console" block interleaved with file locations.
+        Left alone, a student pressing Run in the JavaScript sandbox saw an
+        empty pane — which is exactly what happened on the first wiring.
+        _split_jest_console() parses it back out.
+      · Jest also refuses a file with no test. For React that is no
+        imposition; for plain JS it would be, so a no-op test is appended when
+        the code declares none. Top-level code still runs, because Jest
+        executes a module's top level on load.
+
+  A SHORTER TIMEOUT, THREADED PROPERLY
+      Practice runs are interactive — somebody is watching — so 20s, not the
+      graded path's 45. `timeout` added to the facade AND both runners rather
+      than special-casing docker: k8s applies it to the execution phase only,
+      leaving the Job's activeDeadlineSeconds on the configured value, since
+      that is a backstop and must never be the tighter of the two.
+
+  VERIFIED  python      200  1.5s  printed the DataFrame
+            javascript  200  3.6s  { Email: 208.5, Social: 210.75 }
+            react       200  3.4s  PASS
+            sql         409  "The SQL sandbox isn't available yet."
+            python 1/0  ->  ZeroDivisionError surfaced in stderr
+
+-- 3 · NAVBAR -----------------------------------------------------------------
+
+  The active item was primary text on `bg-surface-low` — the SAME pale grey the
+  hover state uses. "Where am I" and "what is under my cursor" looked identical.
+  Now a solid dark fill, the only one on the bar.
+
+  Per the mid-turn note: Sandbox moved to the END of the row, and the pill is
+  `rounded-full`. The radius is on BOTH states, not just the active one —
+  otherwise the shape changes under the cursor and hover reads as a different
+  kind of thing.
+
+VERIFIED  pytest  441 passed (was 373; +68)
+          vitest  137 passed / 24 files
+          build   clean
+          public DA payload: 10 tasks, correct weeks, no answer keys
+
+DATABASE  Test runs wrote 760 XP and 11 skill rows for user 8 across two full
+HYGIENE   passes of the sim. All reverted — xp back to 1970, skills back to the
+          11 they were, enrollment reset, artifacts removed. --reset-progress
+          cleared the DA completions, which the renumbering would otherwise
+          have mismapped (TaskCompletion.task_id holds the task_index).
+
+FILES     backend/app/services/dataset.py                    (references rewritten)
+          backend/app/services/graders/da_new_tasks.py             (new, 4 graders)
+          backend/app/services/graders/registry.py
+          backend/app/api/v1/simulations/sandbox.py          (use_raw_dataset)
+          backend/app/api/v1/simulations/playground.py             (new)
+          backend/app/services/sandbox.py                    (timeout)
+          backend/app/services/sandbox_runners/{docker,k8s}_runner.py
+          backend/app/main.py
+          backend/app/cms_templates/data_analytics/{__init__,explainers,
+              assessments,new_tasks,starters}.py
+          backend/sync_da_content.py                         (rewritten)
+          backend/verify_da_grading.py                             (new)
+          backend/tests/unit/test_da_template.py
+          frontend/src/components/Navbar.jsx
+          frontend/src/hooks/{playground.js,index.js}
+          frontend/src/features/sandboxes/{SandboxCatalogue,SandboxPlayground}.jsx
+          frontend/src/app/router/AppRouter.jsx
+
+STILL OPEN
+          · Task 9's LLM judge scores its own model answer 79/100. Left alone
+            on your instruction.
+          · No SQL sandbox image exists. The card says so rather than
+            pretending; building one is a separate piece of work.
+
+================================================================================
+
+--------------------------------------------------------------------------------
+ 34. SANDBOX CATALOGUE — REAL TECH LOGOS, ONE CARD PER TECHNOLOGY
+--------------------------------------------------------------------------------
+ASKED     Use the existing tech logos and add a sandbox for every tech.
+
+WHAT WAS THERE
+          Four cards with lucide glyphs — a generic terminal, a database, a
+          pair of braces. Meanwhile seventeen real brand marks already sat in
+          frontend/public/images/tech/, used by the hero strip and by
+          TechYouWillUse. Two icon vocabularies for the same technologies.
+
+DONE      The catalogue is now one card per technology, seventeen of them, each
+          carrying its own mark.
+
+          `logo` is served BY THE BACKEND alongside name/runtime/packages, not
+          mapped in the page. A second tech-to-logo table in the frontend is
+          exactly what drifts the first time a sandbox is renamed — and the
+          catalogue was made server-driven in the first place for that reason.
+
+          Available first. A grid opening with fourteen "not available yet"
+          cards buries the three that work; the ordering IS the answer to
+          "what can I use right now".
+
+          An unbuilt sandbox gets its own logo at 35% opacity rather than a
+          different icon, so the row still reads as one kind of thing.
+
+HONEST ABOUT WHAT DOES NOT EXIST
+          Three run for real (Python, JavaScript, React). The other fourteen
+          have no container image, are marked available: false, and show
+          "Not available yet" instead of a button that would 503.
+
+          Their `summary` says what the sandbox WOULD be, in one true sentence.
+          No capability list and no package list is invented for an image that
+          does not exist — two lines of genuine intent beat six of
+          plausible-sounding filler, and a test now enforces that an
+          unavailable entry advertises no packages at all.
+
+          Several summaries name the actual blocker rather than being vague:
+          Hugging Face and Perplexity both need weights or an index baked into
+          the image, because the no-network rule means nothing can be fetched
+          at run time.
+
+TWO SQL CARDS, MADE TO DIFFER
+          "SQL" and "SQLite" side by side read as the same thing listed twice.
+          The first is now named PostgreSQL — the dialect the platform itself
+          runs, so a student learning it learns the one the product speaks —
+          and SQLite is described as the single-file counterpart. Different
+          engines, different cards, visibly so.
+
+VERIFIED  17 sandboxes, 3 runnable
+          every logo path resolves to a real file in frontend/public
+          'image' still withheld from the list response
+          run python / javascript / react -> 200, stdout '2'
+          pytest 505 passed (was 441; +64)
+          vitest 137 passed · build clean
+
+NEW TESTS tests/unit/test_playground.py (64)
+          Every logo points at a file that exists — a missing <img> src fails
+          SILENTLY in a browser, so nothing else would ever catch it. Plus:
+          an available sandbox must have an image the app actually builds, must
+          use a filename one of the entrypoints looks for (any other name
+          prints "No submission.py found", which reads as the student's fault),
+          and must ship a runnable starter. An unavailable one must carry no
+          image and promise no packages. The list response must keep withholding
+          the internal image tag. And the two Jest adaptations are pinned: the
+          no-op test is appended only when none is declared, Python is never
+          rewritten, and console output is recovered from Jest's stderr with
+          its own labels and source locations stripped.
+
+FILES     backend/app/api/v1/simulations/playground.py
+          backend/tests/unit/test_playground.py                    (new, 64)
+          frontend/src/features/sandboxes/SandboxCatalogue.jsx
+
+
+--------------------------------------------------------------------------------
+ 35. LOGIN LOADER · SANDBOX BOOT · EXERCISE RAIL CONTENT · PLAINER QUIZZES
+--------------------------------------------------------------------------------
+ASKED     A little loading when opening a sandbox; fix the loader not showing
+          on sign-in; more content on the sandbox exercise panel for the DA
+          sim; and make the quizzes easier and understandable.
+
+-- THE SIGN-IN LOADER WAS NEVER BROKEN -----------------------------------------
+
+  MultiStepLoader worked. Login called it correctly. It simply never got to
+  render a single frame.
+
+  GuestOnlyRoute — one of the guards that arrived in the origin/main merge —
+  bounces a signed-in user off /login. Signing in sets `user`, and the guard
+  redirected on that very same commit, unmounting the login page before its
+  loader could paint. So sign-in looked like an abrupt jump with no feedback,
+  and the loader looked broken while being perfectly fine.
+
+  The guard is right about its actual job — Back onto a live session should
+  bounce. It is wrong about the person who JUST signed in on that form: they
+  are mid-navigation, not stranded.
+
+  FIX  `authTransition` on AuthContext. The page raises it before starting the
+       loader, the guard stands down while it is set, and the page lowers it in
+       the loader's onComplete — AFTER navigate(), so a later Back press is
+       bounced exactly as before. Cleared on logout too, or a login that errored
+       mid-flight would leave the guard permanently disarmed.
+
+       It lives on the context rather than in the page because the two do not
+       nest — the guard RENDERS the page, so no prop can travel upward.
+
+-- SANDBOX BOOT SCREEN ---------------------------------------------------------
+
+  The catalogue query is cached for 30 minutes, so opening a sandbox from a
+  card was instant and the bare spinner flashed for a frame or not at all — the
+  editor just appeared, which reads as a glitch rather than a transition.
+
+  Now a short boot screen: the sandbox's own logo, "Opening the Python
+  sandbox", the runtime being started, and an indeterminate bar. 1.4s.
+
+  The bar is deliberately indeterminate. Nothing here knows a real percentage,
+  and a bar that claimed one would be lying — Monaco mounting is real work but
+  not measurable work.
+
+-- EXERCISE RAIL: THE CONTENT WAS ALREADY THERE --------------------------------
+
+  Every task carries a full `config.explainer` — situation, concepts, a worked
+  walkthrough with code, the grading contract, the mistakes — and the task page
+  renders all of it. Opening the sandbox threw it away and showed a title, an
+  objective and a bullet list.
+
+  So a student went from a page that EXPLAINED the work to a panel that only
+  LISTED it, at exactly the moment they had to actually do it.
+
+  The rail now renders that same content in collapsible sections:
+
+    header        + "What you're producing" (explainer.outcome) — the single
+                    most useful sentence to have visible while typing, so it
+                    sits in the header rather than behind a toggle
+    The situation   + the manager's briefing
+    Key ideas       term, plain definition, and why it matters
+    How to do it    the walkthrough, OPEN by default — it is what you read
+                    while working. Each step's `deeper` note sits behind a
+                    "Why it works this way" toggle so the beginner path stays
+                    short without the depth being deleted.
+    What the grader checks    the contract, so the target is not a guess
+    Common mistakes
+
+  Everything except the walkthrough starts closed: the rail shares the screen
+  with the editor, and anything not being read should not be taking space.
+
+  This is the shared rail, so the Frontend sim gained it at the same time.
+
+-- QUIZZES: THE DIFFICULTY WAS ACCIDENTAL --------------------------------------
+
+  The first version asked the right things and asked them badly — forty-word
+  questions, four long options separated by a subtle qualifier, and several
+  where two answers were defensible and one merely more so. That measures
+  reading stamina, not whether the task was understood. And these gate the next
+  task, which makes it the worst possible place to be clever.
+
+  All 45 rewritten to one rule set: one short sentence per question, every
+  option under about a dozen words, the right answer following from having DONE
+  the task, and the wrong ones wrong for a reason the student can SEE.
+
+                  questions   avg Q chars   avg option   longest option
+      before             45            88           59              217
+      after              45            58           24               65
+
+  The concepts are unchanged. A student still has to know why a return is
+  flagged rather than deleted, and still has to know a p-value is not the
+  probability the variant works. Only the wall of prose in front of those
+  questions is gone.
+
+  Explanations kept in full — that is the part that teaches, and it is shown
+  only after the attempt.
+
+-- A BUG IN MY OWN SYNC SCRIPT, HIT ON THE SECOND RUN --------------------------
+
+  sync_da_content.py --apply died on a UniqueViolationError trying to CREATE
+  task 2, which already existed.
+
+  Cause: the dry-run fix from entry 33 projects the post-renumber layout in
+  memory. On an ALREADY restructured sim that applies RENUMBER a second time —
+  2 maps to 3, 3 to 6, and so on — leaving index 2 apparently empty, so the
+  next phase tried to create a task that was already there.
+
+  The projection is now guarded on `already_restructured`. The transaction had
+  rolled back cleanly, so nothing was damaged — verified the ten tasks and
+  their weeks before re-running. Re-running now reports zero changes, which is
+  what "safe to re-run" is supposed to mean.
+
+VERIFIED  GET .../tasks/4/assessment -> 200, four short options, no answers
+          in the payload
+          sync_da_content.py re-run -> 0 changes
+          10 tasks, weeks 1/1/1 2/2/2 3/3/3 4 intact
+          pytest 505 passed · vitest 137 passed · build clean
+
+FILES     backend/app/cms_templates/data_analytics/assessments.py  (45 rewritten)
+          backend/sync_da_content.py                        (projection guard)
+          frontend/src/features/auth/AuthContext.jsx        (authTransition)
+          frontend/src/app/router/guards/GuestOnlyRoute.jsx
+          frontend/src/features/auth/global/Login.jsx
+          frontend/src/features/sandboxes/SandboxPlayground.jsx  (boot screen)
+          frontend/src/styles/index.css                     (boot keyframe)
+          frontend/src/features/simulations/engineering/sandbox/ExerciseRail.jsx
+
+NOTE      The 40-question FINAL assessment was left as it is. It is the
+          capstone, it is not a gate on anything, and it is the one place where
+          a longer question is doing real work. Say the word if you want the
+          same treatment applied to it.
+
+================================================================================
+
+--------------------------------------------------------------------------------
+ 36. CUBE LOADER ON SANDBOX OPEN · TASK COMPLETION DIALOG
+--------------------------------------------------------------------------------
+ASKED     Use the supplied CSS cube loader when opening a sandbox from the task
+          page, with a ~2 second buffer. On submit, when the score comes back,
+          show a completion popup — task completed, XP gained — then an option
+          for the mini quiz, and let the student close it, go back to the
+          editor and see what they submitted.
+
+-- THE CUBE LOADER -------------------------------------------------------------
+
+  Added verbatim as `.cube-loader` — only the class name changed, namespaced so
+  it cannot collide with anything else called `.loader`. The geometry, the
+  conic gradient, the 0.6s offset on the second half and the keyframes are
+  exactly as supplied.
+
+  Two notes written at the CSS, because they are the parts that look like
+  typos and are not:
+    · the negative margins are what JOIN the two halves at the seam, and the
+      extra -1px closes the subpixel gap a fractional --_d leaves behind
+    · a prefers-reduced-motion block stops the travel but keeps the loader
+      visible, so the state is still communicated
+
+  It shows in a full-screen overlay over the task page, because the sandbox
+  opens in ANOTHER tab — the page you are looking at otherwise just sits there.
+  The only feedback before was a spinner inside the button, which is easy to
+  miss, and people clicked again and got a second tab. The backdrop takes
+  pointer events, which is the actual fix for that.
+
+  A FLOOR AS WELL AS A CEILING
+  There was already a 5s ceiling on the opening state, cleared early by the
+  SANDBOX_READY event from the new tab. That event often arrives in a few
+  hundred milliseconds, so an overlay tied only to it appears and vanishes
+  inside a blink — a flicker, which is worse than showing nothing.
+
+  Now OPENING_MIN_MS = 2000 as a floor. If SANDBOX_READY lands before the floor
+  elapses it is RECORDED rather than dropped, and the floor timer closes the
+  overlay on its behalf — otherwise the early-ready case would fall through to
+  the full 5s ceiling, which is the opposite of what the event is for.
+
+-- THE COMPLETION DIALOG -------------------------------------------------------
+
+  A graded submit used to open the mini assessment IMMEDIATELY. Two things
+  wrong with that: the work you just finished was never acknowledged — the
+  reward for a passing score was a quiz — and there was no way back to the
+  editor to look at what you had actually submitted without answering five
+  questions first.
+
+  TaskCompleteDialog now takes the landing. It shows:
+    · a score ring that draws itself on mount, so the number reads as a result
+      rather than something that was always there
+    · "Perfect score" at 100, "Task complete" at a pass, "Submitted" below it
+    · +XP and the individual skill points, from the submit response
+    · Take the quiz  (primary)
+    · Back to my code (and a real close button, top right)
+
+  DELIBERATELY NOT A GATE. PostTaskAssessment is still the gate when it opens
+  before the next task — that rule has not moved. This is the celebration, and
+  a celebration you cannot dismiss is a demand. Escape closes it, and focus
+  lands on the CLOSE control rather than the quiz button, so Enter cannot
+  launch a quiz somebody did not ask for.
+
+  XP ONLY WHEN THERE IS SOME
+  Awards are first-completion only (entry 28). A re-submit legitimately pays
+  nothing, and a triumphant "+0 XP" would read as a bug rather than as the rule
+  working — so the block is hidden at zero. Verified both ways against a real
+  submission:
+
+      first submit : score=100  xp_awarded=60  skills={data_cleaning:20, analytics:15}
+      re-submit    : score=100  xp_awarded=0   skills={}
+
+  The failing case is handled too: below the pass mark there is no quiz button
+  at all, the copy says how many points are needed, and the button reads "Keep
+  working" — the checks and the code are still on screen behind it.
+
+-- ONE MISPLACED EDIT, CAUGHT BEFORE IT SHIPPED --------------------------------
+
+  My first attempt mounted the overlay with a regex for the page's `return (`
+  and hit the WRONG one — the `if (!task)` early return, where `task` is null,
+  so `task.title` would have thrown on any bad task index. Spotted by reading
+  the patched file rather than trusting the match, reverted, and placed against
+  the real return by its exact opening tag.
+
+VERIFIED  first submit  -> xp_awarded 60, skills paid
+          re-submit     -> xp_awarded 0, XP block hidden
+          gate path (goNext) still opens the assessment directly, unchanged
+          pytest 505 passed · vitest 137 passed · build clean
+
+DATABASE  The submission tests wrote 280 XP and three skill rows for user 8.
+HYGIENE   Reverted — xp back to 1970, back to the 11 skills the account had,
+          enrollment reset, artifacts removed.
+
+FILES     frontend/src/styles/index.css                          (.cube-loader)
+          frontend/src/features/simulations/engineering/task/SandboxLaunch.jsx
+          frontend/src/features/simulations/engineering/task/EngineeringTaskPage.jsx
+          frontend/src/features/simulations/engineering/sandbox/TaskCompleteDialog.jsx  (new)
+          frontend/src/features/simulations/engineering/sandbox/SandboxWorkbenchPage.jsx
+
+================================================================================
+
+--------------------------------------------------------------------------------
+ 37. THE CUBE LOADER WAS RENDERING ON A TAB NOBODY WAS LOOKING AT
+--------------------------------------------------------------------------------
+REPORTED  "sandbox loader not working or showing"
+
+FIRST RULED OUT   The CSS. `.cube-loader` is present in the built bundle,
+                  outside any @layer, with its gradient and keyframes intact:
+                    cube-loader{--s: 25px;--_d: calc(.353 * var(--s))...}
+                  So the styling was never the problem.
+
+THE ACTUAL CAUSE  lib/tabHandoff.js: `window.open(path, '_blank')`.
+
+                  The browser moves focus to the NEW tab. I mounted the overlay
+                  on the TASK page — the tab you just left. It rendered
+                  perfectly, on a background tab, where nobody could see it.
+
+                  Meanwhile the tab the student was actually looking at showed:
+
+                      <FullScreenNotice title="Opening your sandbox…" />
+
+                  A line of centred text on a white page. No loader at all.
+
+                  So the loader worked and was invisible, and the place that
+                  needed one had none. Both halves of one mistake: I put the
+                  feedback where the click happened rather than where the
+                  student ends up.
+
+FIXED   SandboxWorkbenchPage now boots with the cube loader, in the tab that
+        has focus. Dark ground (#0b0f14) rather than white, because it hands
+        over to a code editor and a white flash between the two is the most
+        jarring moment in the sequence.
+
+        BOOT_MIN_MS = 2000, as a floor rather than a duration: the task often
+        resolves from cache in under 100ms, and a boot screen that appears and
+        vanishes inside a blink reads as a flicker rather than as opening
+        something.
+
+        It runs once per tab, not per task — navigating between tasks inside an
+        open sandbox keeps the component mounted, so nobody re-boots on every
+        Next.
+
+KEPT    The task-page overlay stays. It is not dead code — it is the correct
+        path whenever focus does NOT move: a blocked popup, a ctrl- or
+        middle-click, or a browser configured to open new tabs in the
+        background. In those cases it is the only feedback there is.
+
+VERIFIED  cube-loader present in dist CSS
+          5 new tests: the overlay renders the .cube-loader element, names the
+          task, announces itself as role="status", and survives a missing title
+          vitest 142 passed (was 137) · build clean
+
+FILES     frontend/src/features/simulations/engineering/sandbox/SandboxWorkbenchPage.jsx
+          frontend/src/features/sandboxes/cubeLoader.test.jsx        (new, 5)
+
+
+--------------------------------------------------------------------------------
+ 38. TASK PAGE REDESIGN — MINIMAL, WITH THE SAME INFORMATION
+--------------------------------------------------------------------------------
+ASKED     "make it minimalist yet rich in information — right now it looks too
+          much info without correctly formatted"
+
+THE DIAGNOSIS
+          The page rendered six blocks — description, concepts, steps, the
+          grading contract, mistakes, further reading — as SIX IDENTICAL CARDS.
+          Each had a bordered box, an emerald header bar and a white-on-green
+          icon tile. All six expanded, stacked on a uniform space-y-5.
+
+          Everything was given the same weight, so nothing had any. Counted
+          against the real Data Analyst content, task 1 put TWENTY-SIX blocks
+          on screen at once before the reader reached a single instruction —
+          and the triage the layout should have done was left to them.
+
+          The complaint was precise: it was not too much information. It was
+          information with no order imposed on it.
+
+WHAT CHANGED — NOTHING WAS CUT
+          The page now states a hierarchy:
+
+            1. THE BRIEF     what this is, what finished looks like, and the
+                             preview. Always open.
+            2. THE STEPS     the spine. Always open, numbered, the only place
+                             code appears.
+            3. REFERENCE     concepts, contract, mistakes, further reading —
+                             four collapsed rows in one bordered group, each
+                             with a COUNT in its header so you can decide
+                             whether to open it without opening it. These are
+                             things you consult, not things you read start to
+                             finish.
+
+          Sections shown at once, measured across all nine DA tasks:
+
+              task 1   26 -> 13        task 5   23 -> 11
+              task 2   26 -> 11        task 6   23 -> 11
+              task 3   25 -> 12        task 7   23 -> 11
+              task 4   23 -> 11        task 8   22 -> 11
+                                       task 9   24 -> 12
+
+          Roughly half, with every word still reachable in one click.
+
+CHROME REMOVED
+          No icon tiles, no coloured header bars, no card borders around prose.
+          A section is now a small-caps label over a hairline rule. Hierarchy
+          is carried by type size and whitespace, which is what leaves the
+          CONTENT as the loudest thing on the page rather than its packaging.
+
+          Step numbers are plain figures in the margin ("01", "02") instead of
+          filled circles. At seven steps a column of coloured badges becomes
+          the most eye-catching element on screen, which is backwards.
+
+          MiniAssessmentCard lost its green header and its filled panel too.
+          Its three states — passed, failed, not taken — now show in a small
+          status dot rather than by tinting the whole card, which had the page
+          changing character depending on your quiz score.
+
+MEASURE
+          The reading column is capped at max-w-3xl. Prose running the full
+          width of a desktop is genuinely hard to track from the end of one
+          line to the start of the next — this is the single biggest
+          readability change here and it costs nothing. The header and the
+          bottom nav stay full width so the page does not read as narrow.
+
+          Outer rhythm went from space-y-5 to space-y-8, and the explainer
+          carries its own space-y-10 internally, so sections are separated by
+          whitespace instead of by yet another border.
+
+KEPT      Both reading levels. `plain` is always visible; `deeper` stays behind
+          a "Why it works this way" toggle per step. That was the point of the
+          two-level authoring contract and none of it moved.
+
+          PlainSteps — the fallback for tasks with no explainer — was restyled
+          to match, so an older simulation does not look like it belongs to a
+          different product.
+
+          Removed a dead `Card` export from TaskExplainer while there: nothing
+          imported it once the cards were gone.
+
+VERIFIED  vitest 142 passed · build clean
+
+FILES     frontend/src/features/simulations/engineering/task/TaskExplainer.jsx  (rewritten)
+          frontend/src/features/simulations/engineering/task/MiniAssessmentCard.jsx
+          frontend/src/features/simulations/engineering/task/EngineeringTaskPage.jsx
+
+
+--------------------------------------------------------------------------------
+ 39. TASK PAGE — REDESIGNED FROM THE GROUND UP (SWISS EDITORIAL)
+--------------------------------------------------------------------------------
+ASKED     "redesign the task page, i don't like the style and design of it, make
+          it look attractive and doesn't look like a real platform task page,
+          redesign it from the ground up"
+
+METHOD    Ran the ui-ux-pro-max skill. Its --design-system pass matched
+          "education" to CHILDREN'S apps and recommended Baloo 2 / Comic Neue
+          on a mint background — wrong for a professional simulation platform
+          for adults, and it would have fought the app's own tokens. Discarded
+          that and queried the style domain directly instead.
+
+          SWISS MODERNISM 2.0 was the right match: strict grid, Inter,
+          mathematical spacing, high contrast, minimal decoration, SINGLE
+          accent. WCAG AAA, Tailwind 10/10, and it aligns with the Inter +
+          indigo the app already ships rather than replacing it.
+
+THE DIAGNOSIS
+          The page was a dark rounded slab — near-black card, white text,
+          breadcrumb, title, a dotted facts sentence, a green pill and a
+          progress bar welded to the bottom edge — sitting on a tinted wash,
+          followed by white cards.
+
+          It looked like a banner because it WAS one: a coloured container with
+          everything dropped inside. That is the single most generic move in
+          product UI, and it is exactly why the page read as a template.
+
+WHAT IT IS NOW — TaskMasthead.jsx (new)
+          No container at all. The page ground carries the type.
+
+            · a 2px rule over a small-caps slug line — how a magazine sets a
+              section head, and it says "a new piece starts here" without a box
+            · the title at 3.5rem with tightened tracking, allowed to be the
+              largest thing on the page by a wide margin. On a page whose job
+              is to make somebody start working, the name of the work should
+              not be competing with a button
+            · the objective as a STANDFIRST: 1.15rem, light weight, short
+              measure — a deck, not a paragraph
+            · the facts as a ruled SPEC TABLE with labels. The old dotted
+              sentence ("HTML & CSS · 50 XP · 4 steps · Scored 100%") made you
+              infer what each number was; now each says so
+            · week progress as a ruled scale, not a filled bar welded to a card
+
+ONE ACCENT, ENFORCED
+          The page carried two: indigo primary AND an emerald family on the
+          rail buttons, the CTA, the mini assessment and the outcome callout.
+          Swiss rule is one. Emerald is gone from the task page entirely
+          (grep: 0 occurrences). Indigo now appears on exactly three things —
+          the live progress marker, the completed state, and the outcome rule.
+
+          · rail buttons: ink on white with a rule; only the ACTIVE one fills
+          · outcome callout: a heavy left rule instead of a tinted panel
+          · footer: a top rule instead of a bordered box for two buttons
+          · page ground: paper white, not a tinted wash — the wash is what made
+            the white cards on it read as a dashboard
+
+THE CTA IS NOW A DECISION, NOT A LINK
+          Was a small green pill floating in the header's top-right. Now the
+          one solid block on an otherwise unfilled page: square (a capsule is
+          the one shape that does not belong on a page built from rules), two
+          lines — the action and "Opens in a new tab" — and placed where
+          reading ENDS rather than in a corner. Hovers to the accent.
+          The compact pill is kept for the sticky bar, where it lives in a 40px
+          strip and has to stay a pill.
+
+STICKY BAR
+          Was near-black, which read as a different product once the page went
+          white. Now paper with a rule — and OPAQUE with a soft shadow, because
+          at bg-white/95 the dark code blocks scrolled straight through it.
+          Caught in a screenshot, not in review.
+
+VERIFIED BY LOOKING, NOT ASSUMING
+          Drove a real browser (reusing the puppeteer-core + Chrome already in
+          the mermaid npx cache — nothing installed) against the running dev
+          server, seeded a session, dismissed the manager briefing that covers
+          a first visit, and screenshotted both simulations at two scroll
+          positions. Three things were only visible that way:
+            · the manager briefing intercepting every screenshot
+            · the week label printed TWICE — once in the slug line, once on the
+              progress row. Now reads "Progress"
+            · the sticky bar bleeding
+
+          vitest 152 passed · build clean
+
+FILES     frontend/src/features/simulations/engineering/task/TaskMasthead.jsx  (new)
+          frontend/src/features/simulations/engineering/task/EngineeringTaskPage.jsx
+          frontend/src/features/simulations/engineering/task/SandboxLaunch.jsx
+          frontend/src/features/simulations/engineering/task/TaskExplainer.jsx
+

@@ -82,7 +82,7 @@ export default function EvaluationResult() {
     <div className="max-w-container mx-auto px-6 py-8">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-on-surface-variant mb-5">
-        <button onClick={() => navigate('/simulations')} className="hover:text-primary">Simulations</button>
+        <button onClick={() => navigate('/learn/simulations')} className="hover:text-primary">Simulations</button>
         <span>/</span>
         <span>{data.simulation}</span>
         <span>/</span>
@@ -96,7 +96,7 @@ export default function EvaluationResult() {
           <p className="text-sm text-on-surface-variant mt-1">Evaluated by {data.evaluator} · Submitted {data.submittedAt}</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => navigate('/simulations')} className="btn-secondary text-xs px-4 py-2">← Back to Workspace</button>
+          <button onClick={() => navigate('/learn/simulations')} className="btn-secondary text-xs px-4 py-2">← Back to Workspace</button>
           <button onClick={() => setShowResubmit(true)} className="btn-primary text-xs px-4 py-2">Re-submit Improved Version</button>
         </div>
       </div>
@@ -231,7 +231,7 @@ export default function EvaluationResult() {
                   <p className="text-xs font-semibold text-on-surface">Discuss with AI Mentor</p>
                   <p className="text-xs text-on-surface-variant">Book a session to work through your weak areas</p>
                 </button>
-                <button onClick={() => navigate('/simulations')} className="w-full text-left p-2.5 bg-surface-low rounded-lg border border-border hover:border-primary transition-colors">
+                <button onClick={() => navigate('/learn/simulations')} className="w-full text-left p-2.5 bg-surface-low rounded-lg border border-border hover:border-primary transition-colors">
                   <p className="text-xs font-semibold text-on-surface">Revisit the Job Simulation</p>
                   <p className="text-xs text-on-surface-variant">Review your tasks and retry weaker areas</p>
                 </button>

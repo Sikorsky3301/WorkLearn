@@ -1,17 +1,18 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams, Navigate } from 'react-router-dom'
-import {
-  ArrowLeft, ArrowRight, Sparkles, Briefcase, CircleCheck,
-} from 'lucide-react'
+import { ArrowLeft, ArrowRight, Sparkles, Briefcase } from 'lucide-react'
 import { useSimulationFull, useEnrollment } from '../../../../hooks'
 import { buildRoadmap, TASK_STATUS } from '../lib/roadmapModel'
 import { useBriefingSeen } from '../briefing/useBriefingSeen'
 import ManagerBriefingScene from '../briefing/ManagerBriefingScene'
-import { useSandboxLauncher, useLiveTaskResult, SandboxButton } from './SandboxLaunch'
+import {
+  useSandboxLauncher, useLiveTaskResult, SandboxButton, SandboxOpeningOverlay,
+} from './SandboxLaunch'
 import { useScrolledPast, useNavbarHeight } from '../../generic/StickyOverviewBar'
 import TaskMentorPanel from './TaskMentorPanel'
 import ManagerPanel, { useManagerUnreadCount } from './ManagerPanel'
-import TaskExplainer from './TaskExplainer'
+import TaskExplainer, { TaskReference } from './TaskExplainer'
+import TaskMasthead from './TaskMasthead'
 import MiniAssessmentCard from './MiniAssessmentCard'
 import { ASSESSMENT_PASS_MARK, hasPassedAssessment, weekCompletion } from '../lib/assessment'
 import WeekCompleteScene from '../assessment/WeekCompleteScene'
@@ -26,22 +27,31 @@ import ReferenceDataPanel from '../../generic/ReferenceDataPanel'
 // both reading levels. `what_to_do` is still the fallback for any task that
 // predates the explainer, so an older simulation doesn't render an empty page.
 //
+// ── THE LAYOUT, AND WHY IT IS ONE COLUMN ───────────────────────────────────
+//
+// This was a two-column workspace: the prose capped at a readable measure on
+// the left, and the reference material — concepts, the grading contract, the
+// mistakes — pinned in the column that cap freed up. It was a reasonable
+// answer to "half a desktop viewport is doing nothing", and it cost more than
+// it returned: two scroll regions, a sticky sub-column, and a layout that
+// silently became something else whenever the manager or mentor rail opened.
+//
+// It is now one column, centred, capped. The reference sits under the steps as
+// the third and last section, closed. Empty margin either side of a task brief
+// is not a layout failure — it is what makes the brief look like the only
+// thing being asked of you, which on this page is true.
+//
 // Deliberately NOT here:
 //   • Hints and the model solution — they belong in the sandbox, beside the
 //     editor where you're actually stuck.
 //   • "What you'll hand in" — the sandbox submits the file for you, so a
 //     section explaining the upload described something that doesn't happen.
-//   • "How your work is marked" — the contract block inside the explainer says
+//   • "How your work is marked" — the contract block inside the reference says
 //     what the checks look for, in the place where you're deciding what to
 //     name things. A separate marking section repeated it at a distance.
 //   • The manager's briefing and the replay button — the briefing scene plays
 //     it, and the manager panel keeps every brief. Three copies of the same
 //     paragraph on one page was two too many.
-
-/** A dot separator for the header's facts line. */
-function Dot() {
-  return <span aria-hidden="true" className="text-white/20">·</span>
-}
 
 // What the student is about to write, in words rather than a config key.
 const LANGUAGE_META = {
@@ -52,20 +62,24 @@ const LANGUAGE_META = {
   text: 'Written answer',
 }
 
-function RailButton({ icon: Icon, label, shortLabel, badge = 0, active, onClick }) {
+/** Manager / mentor. Icon-first and short-labelled: these open a panel, they
+ *  are not the action of the page, and the old full-sentence label ("Priya,
+ *  your manager") gave one of them more visual weight than the button that
+ *  starts the work. The full name still rides along as the tooltip. */
+function RailButton({ icon: Icon, label, title, badge = 0, active, onClick }) {
   return (
     <button
       onClick={onClick}
       aria-pressed={active}
-      className={`relative inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-bold transition-colors ${
+      title={title || label}
+      className={`relative inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-[0.8rem] font-bold transition-colors ${
         active
-          ? 'border-emerald-600 bg-emerald-600 text-white'
-          : 'border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100'
+          ? 'border-primary bg-primary text-white'
+          : 'border-border bg-white text-on-surface-variant hover:border-outline-variant hover:text-on-surface'
       }`}
     >
       <Icon className="h-4 w-4 shrink-0" />
-      <span className="hidden sm:inline">{label}</span>
-      <span className="sm:hidden">{shortLabel}</span>
+      {label}
       {badge > 0 && (
         <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[0.6rem] font-bold text-white">
           {badge > 9 ? '9+' : badge}
@@ -76,21 +90,23 @@ function RailButton({ icon: Icon, label, shortLabel, badge = 0, active, onClick 
 }
 
 /** Fallback for a task with no `explainer` — older simulations, or one an
- *  admin built in the CMS without filling the richer content in. */
+ *  admin built in the CMS without filling the richer content in. Same step
+ *  cards as TaskExplainer, so a thin task still looks like it belongs to this
+ *  page rather than to an older one. */
 function PlainSteps({ steps }) {
   if (!steps?.length) return null
   return (
-    <section className="border border-border bg-white">
-      <header className="border-b border-emerald-200 bg-emerald-50 px-5 py-3.5 sm:px-6">
-        <h2 className="font-display text-base font-extrabold text-emerald-900">What to build</h2>
-      </header>
-      <ol className="space-y-4 p-5 sm:p-6">
+    <section>
+      <h2 className="mb-5 font-display text-[1.05rem] font-extrabold text-on-surface">
+        What to build · {steps.length} steps
+      </h2>
+      <ol className="space-y-3">
         {steps.map((step, i) => (
-          <li key={i} className="flex gap-4">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
-              {i + 1}
+          <li key={i} className="flex gap-3.5 rounded-xl border border-border bg-white p-5">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 font-display text-[0.78rem] font-extrabold tabular-nums text-primary">
+              {String(i + 1).padStart(2, '0')}
             </span>
-            <span className="pt-0.5 text-[0.95rem] leading-relaxed text-on-surface">{step}</span>
+            <span className="pt-1.5 text-[0.95rem] leading-relaxed text-on-surface">{step}</span>
           </li>
         ))}
       </ol>
@@ -195,18 +211,25 @@ export default function EngineeringTaskPage() {
   const weekDone = weekCompletion(roadmap, index, assessmentScore)
 
   return (
-    <div className="min-h-screen bg-surface-low/50">
+    // A faint tint rather than flat white. Every card on the page is white, and
+    // on a white ground the assignment card and the step rows had no edges —
+    // the borders were doing all the work alone.
+    <div className="min-h-screen bg-surface-low/40">
+      {/* Covers the page while the sandbox opens in another tab. It also
+          swallows clicks for the duration, which is the actual fix for
+          people clicking twice and getting two tabs. */}
+      <SandboxOpeningOverlay open={launcher.opening} taskTitle={task.title} />
       {/* Takes over from the card once it has scrolled away, so the editor is
           never more than one click from wherever you are in the brief. */}
       {task.type === 'code_sandbox' && sandboxOffScreen && !showBriefing && (
         <div
-          className="fixed inset-x-0 z-40 border-b border-white/10 bg-[#0f1720] text-white shadow-lg"
+          className="fixed inset-x-0 z-40 border-b border-border bg-white/95 shadow-[0_1px_12px_rgba(16,24,40,0.08)] backdrop-blur"
           style={{ top: navbarHeight }}
         >
-          <div className="mx-auto flex max-w-5xl items-center gap-4 px-6 py-2.5">
+          <div className="mx-auto flex max-w-4xl items-center gap-4 px-5 py-2.5 sm:px-6">
             <p className="min-w-0 flex-1 truncate text-sm">
-              <span className="font-bold">Task {task.task_index}</span>
-              <span className="ml-2 text-white/50">{task.title}</span>
+              <span className="font-bold text-on-surface">Task {task.task_index}</span>
+              <span className="ml-2 text-on-surface-variant">{task.title}</span>
             </p>
             <SandboxButton
               onClick={launcher.open}
@@ -214,7 +237,7 @@ export default function EngineeringTaskPage() {
               launched={launcher.launched}
               graded={done}
               compact
-              className="bg-emerald-500 text-[#0f1720] hover:bg-emerald-400"
+              className="bg-primary text-white hover:bg-primary-dark"
             />
           </div>
         </div>
@@ -229,179 +252,112 @@ export default function EngineeringTaskPage() {
         />
       )}
 
-      {/* Full width for the task by default. Opening the manager or the mentor
-          splits the page and docks that panel on the right, so neither one
-          means leaving the task — the rail is its own scroll container pinned
-          to the viewport, so it stays put while the task scrolls. */}
+      {/* Opening the manager or the mentor splits the page and docks that panel
+          on the right, so neither one means leaving the task — the rail is its
+          own scroll container pinned to the viewport, so it stays put while the
+          task scrolls. */}
       <div className={`grid ${rail ? 'lg:grid-cols-[minmax(0,1fr)_25rem]' : 'grid-cols-1'}`}>
-        <div className="min-w-0 space-y-5 px-6 py-8 xl:px-10">
+        <div className="min-w-0 px-5 py-8 sm:px-6">
+          <div className="mx-auto w-full max-w-4xl space-y-8">
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <button
-              onClick={() => navigate(`/simulations/${slug}/roadmap`)}
-              className="inline-flex items-center gap-1.5 text-sm font-semibold text-on-surface-variant transition-colors hover:text-primary"
-            >
-              <ArrowLeft className="h-4 w-4" /> Back to roadmap
-            </button>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <button
+                onClick={() => navigate(`/simulations/${slug}/roadmap`)}
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-on-surface-variant transition-colors hover:text-primary"
+              >
+                <ArrowLeft className="h-4 w-4" /> Back to roadmap
+              </button>
 
-            <div className="ml-auto flex items-center gap-2">
-              <RailButton
-                icon={Briefcase}
-                label={manager.name ? `${manager.name.split(' ')[0]}, your manager` : 'Your manager'}
-                shortLabel="Manager"
-                badge={managerUnread}
-                active={rail === 'manager'}
-                onClick={() => toggleRail('manager')}
-              />
-              <RailButton
-                icon={Sparkles}
-                label="Ask your mentor"
-                shortLabel="Mentor"
-                active={rail === 'mentor'}
-                onClick={() => toggleRail('mentor')}
-              />
+              <div className="ml-auto flex items-center gap-2">
+                <RailButton
+                  icon={Briefcase}
+                  label="Manager"
+                  title={manager.name ? `${manager.name}, your manager` : 'Your manager'}
+                  badge={managerUnread}
+                  active={rail === 'manager'}
+                  onClick={() => toggleRail('manager')}
+                />
+                <RailButton
+                  icon={Sparkles}
+                  label="Mentor"
+                  title="Ask your mentor"
+                  active={rail === 'mentor'}
+                  onClick={() => toggleRail('mentor')}
+                />
+              </div>
             </div>
-          </div>
 
-          {/* ── Header ──
-              Rewritten to stop reading as a generated card: the old version
-              stacked a breadcrumb, a big number tile, a title, a subtitle, a
-              row of five chips and a progress bar — every fact given equal
-              weight and its own decoration, which is exactly what makes a
-              layout feel machine-assembled.
-
-              Now there is a clear hierarchy. One line of context, the title,
-              the objective, and a single quiet facts line. The number lives
-              beside the section label as text, not in a tile. The progress bar
-              is a hairline under the whole header rather than a fenced-off
-              panel. Ground is a flat near-black — no indigo, since the page's
-              own accent is a blue-violet and would vanish into it. */}
-          <header ref={setHeaderRef} className="overflow-hidden rounded-2xl bg-[#0f1720] text-white ring-1 ring-white/[0.07]">
-            <div className="p-6 sm:p-8">
-              <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.7rem] font-bold uppercase tracking-[0.14em] text-white/35">
-                <span>{section?.label ?? 'Task'}</span>
-                <span aria-hidden="true" className="text-white/20">/</span>
-                <span>Task {task.task_index}</span>
-                {done && (
-                  <span className="inline-flex items-center gap-1 text-emerald-400">
-                    <CircleCheck className="h-3.5 w-3.5" /> Completed
-                  </span>
-                )}
-              </p>
-
-              {/* Title and the launch button on one row: the button belongs
-                  with the thing it acts on, and giving it its own panel put a
-                  screen of chrome between the header and the actual brief. */}
-              <div className="mt-3 flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
-                <h1 className="min-w-0 font-display text-[1.75rem] font-extrabold leading-[1.15] tracking-tight sm:text-[2.125rem]">
-                  {task.title}
-                </h1>
-
+            {/* ── The assignment card ── */}
+            <div ref={setHeaderRef}>
+              <TaskMasthead
+                task={task}
+                section={section}
+                language={LANGUAGE_META[task.config?.language]}
+                stepCount={stepCount}
+                liveResult={liveResult}
+                done={done}
+              >
                 {task.type === 'code_sandbox' && (
                   <SandboxButton
                     onClick={launcher.open}
                     opening={launcher.opening}
                     launched={launcher.launched}
                     graded={liveResult != null}
-                    className="mt-1 bg-emerald-500 text-[#0f1720] hover:bg-emerald-400"
                   />
                 )}
-              </div>
-
-              {task.objective && (
-                <p className="mt-3 max-w-2xl text-base leading-relaxed text-white/65">
-                  {task.objective}
-                </p>
-              )}
-
-              {/* One line, separated by dots rather than five bordered chips.
-                  These are facts you glance at, not controls. `liveResult`
-                  rather than `task.score` so a grade landing in the sandbox tab
-                  shows up here without a reload. */}
-              <p className="mt-5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-sm text-white/45">
-                {LANGUAGE_META[task.config?.language] && (
-                  <span className="font-semibold text-white/70">{LANGUAGE_META[task.config.language]}</span>
-                )}
-                {task.xp_award > 0 && <><Dot /><span>{task.xp_award} XP</span></>}
-                {stepCount > 0 && <><Dot /><span>{stepCount} steps</span></>}
-                {liveResult?.score != null && (
-                  <><Dot /><span className="text-emerald-400">Scored {liveResult.score}%</span></>
-                )}
-                {liveResult?.quizScore != null && (
-                  <><Dot /><span className="text-emerald-400">Quiz {liveResult.quizScore}%</span></>
-                )}
-                {launcher.launched && !launcher.opening && liveResult == null && (
-                  <><Dot /><span className="text-white/60">Open in another tab</span></>
-                )}
-              </p>
+              </TaskMasthead>
             </div>
 
-            {/* Week progress as a hairline across the full width — present, but
-                not competing with the title for attention. */}
-            {section && section.tasks.length > 1 && (
-              <div className="flex gap-px" title={`${section.completedCount} of ${section.total} done in ${section.label}`}>
-                {section.tasks.map((t) => (
-                  <span
-                    key={t.task_index}
-                    className={`h-1 flex-1 ${
-                      t.task_index === task.task_index
-                        ? 'bg-amber-400'
-                        : t.status === TASK_STATUS.COMPLETE
-                          ? 'bg-emerald-400/60'
-                          : 'bg-white/10'
-                    }`}
-                  />
-                ))}
-              </div>
-            )}
-          </header>
+            {/* ── The task itself: brief, steps, then what you consult ── */}
+            <div className="space-y-10">
+              {explainer ? <TaskExplainer explainer={explainer} /> : <PlainSteps steps={task.what_to_do} />}
+              {explainer && <TaskReference explainer={explainer} />}
+            </div>
 
-          {/* ── The task, both reading levels ── */}
-          {explainer ? <TaskExplainer explainer={explainer} /> : <PlainSteps steps={task.what_to_do} />}
+            <ReferenceDataPanel referenceData={task.reference_data} />
 
-          <ReferenceDataPanel referenceData={task.reference_data} />
-
-          {/* ── The check that follows the work ── */}
-          {done && (
-            <MiniAssessmentCard
-              enrollmentId={enrollment.id}
-              taskIndex={task.task_index}
-              quizScore={task.quizScore}
-              passMark={ASSESSMENT_PASS_MARK}
-              open={assessmentOpen}
-              onOpen={setAssessmentOpen}
-              onScored={(score) => {
-                setAssessmentScore(score)
-                // Fires here too, not only in the sandbox: the assessment can
-                // legitimately be taken from either surface, and a week should
-                // be celebrated wherever it was actually finished.
-                if (weekCompletion(roadmap, index, score)) setWeekSceneOpen(true)
-              }}
-            />
-          )}
-
-          {/* ── Move on ── */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border border-border bg-white p-5">
-            <button
-              onClick={() => navigate(`/simulations/${slug}/roadmap`)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-sm font-semibold text-on-surface-variant transition-colors hover:border-primary hover:text-primary"
-            >
-              <ArrowLeft className="h-4 w-4" /> All tasks
-            </button>
-            {nextTask && done && (
-              <button
-                onClick={() => {
-                  // Same rule as the sandbox: the assessment is the gate, so
-                  // Next opens it rather than skipping past it.
-                  if (assessmentPassed) navigate(`/simulations/${slug}/task/${nextTask.task_index}`)
-                  else setAssessmentOpen(true)
+            {/* ── The check that follows the work ── */}
+            {done && (
+              <MiniAssessmentCard
+                enrollmentId={enrollment.id}
+                taskIndex={task.task_index}
+                quizScore={task.quizScore}
+                passMark={ASSESSMENT_PASS_MARK}
+                open={assessmentOpen}
+                onOpen={setAssessmentOpen}
+                onScored={(score) => {
+                  setAssessmentScore(score)
+                  // Fires here too, not only in the sandbox: the assessment can
+                  // legitimately be taken from either surface, and a week should
+                  // be celebrated wherever it was actually finished.
+                  if (weekCompletion(roadmap, index, score)) setWeekSceneOpen(true)
                 }}
-                className="group inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-primary-dark"
-              >
-                {assessmentPassed ? `Next: ${nextTask.title}` : 'Next — take the quiz'}
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-              </button>
+              />
             )}
+
+            {/* ── Move on ── */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-6">
+              <button
+                onClick={() => navigate(`/simulations/${slug}/roadmap`)}
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-on-surface-variant transition-colors hover:text-primary"
+              >
+                <ArrowLeft className="h-4 w-4" /> All tasks
+              </button>
+              {nextTask && done && (
+                <button
+                  onClick={() => {
+                    // Same rule as the sandbox: the assessment is the gate, so
+                    // Next opens it rather than skipping past it.
+                    if (assessmentPassed) navigate(`/simulations/${slug}/task/${nextTask.task_index}`)
+                    else setAssessmentOpen(true)
+                  }}
+                  className="group inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-primary-dark"
+                >
+                  {assessmentPassed ? `Next: ${nextTask.title}` : 'Next — take the quiz'}
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
 

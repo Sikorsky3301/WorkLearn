@@ -83,7 +83,7 @@ export default function Analytics() {
       </header>
 
       {!hasActivity ? (
-        <EmptyState onStart={() => navigate('/simulations')} />
+        <EmptyState onStart={() => navigate('/learn/simulations')} />
       ) : (
         // Dim while the next period is in flight rather than tearing the page
         // down — the layout is identical between periods, only the numbers move.

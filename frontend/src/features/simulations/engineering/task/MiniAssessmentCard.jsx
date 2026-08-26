@@ -35,18 +35,18 @@ export default function MiniAssessmentCard({
 
   if (open) {
     return (
-      <section ref={ref} className="border border-border bg-white">
-        <header className="border-b border-emerald-200 bg-emerald-50 px-5 py-3.5 sm:px-6">
-          <h2 className="flex items-center gap-2.5 font-display text-base font-extrabold text-emerald-900">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center bg-emerald-600 text-white">
-              <ClipboardCheck className="h-4 w-4" />
-            </span>
+      <section ref={ref} className="rounded-xl border border-border bg-white">
+        {/* Same hairline-label treatment as the rest of the page. The green
+            header bar and its icon tile were the loudest thing on screen for a
+            five-question quiz. */}
+        <header className="border-b border-border px-5 py-4 sm:px-6">
+          <h2 className="flex items-center gap-2 font-display text-[0.95rem] font-extrabold text-on-surface">
+            <ClipboardCheck className="h-4 w-4 text-primary" />
             Mini assessment
           </h2>
-          <p className="mt-1.5 text-sm leading-relaxed text-emerald-800/80">
-            Five questions on what you just built. Score {passMark}% or more to unlock the next task —
-            you can retake it as often as you like, and you&apos;ll see the answers and why
-            they&apos;re right as soon as you submit.
+          <p className="mt-1 text-sm leading-relaxed text-on-surface-variant">
+            Five questions on what you just built. Score {passMark}% to unlock the next task —
+            retake it as often as you like, and you&apos;ll see the answers as soon as you submit.
           </p>
         </header>
         <div className="p-5 sm:p-6">
@@ -70,18 +70,24 @@ export default function MiniAssessmentCard({
     <button
       ref={ref}
       onClick={() => onOpen?.(true)}
-      className="group flex w-full items-center gap-4 border border-emerald-200 bg-emerald-50 px-5 py-4 text-left transition-colors hover:bg-emerald-100 sm:px-6"
+      className="group flex w-full items-center gap-4 rounded-xl border border-border bg-white px-5 py-4 text-left transition-colors hover:border-primary/40 sm:px-6"
     >
-      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white ${
-        passed ? 'bg-emerald-600' : taken ? 'bg-amber-500' : 'bg-emerald-600'
+      {/* Colour is carried by the small status dot, not by a filled panel.
+          Passed, failed and not-yet-taken are three states this row has to
+          show, and tinting the whole card for each made the page change
+          character depending on your quiz score. */}
+      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+        passed ? 'bg-emerald-50 text-emerald-600'
+          : taken ? 'bg-amber-50 text-amber-600'
+            : 'bg-primary/10 text-primary'
       }`}>
-        {passed ? <CheckCircle2 className="h-5 w-5" /> : taken ? <Lock className="h-5 w-5" /> : <ClipboardCheck className="h-5 w-5" />}
+        {passed ? <CheckCircle2 className="h-4 w-4" /> : taken ? <Lock className="h-4 w-4" /> : <ClipboardCheck className="h-4 w-4" />}
       </span>
       <span className="min-w-0">
-        <span className="block font-display text-base font-extrabold text-emerald-900">
+        <span className="block font-display text-[0.95rem] font-extrabold text-on-surface">
           {taken ? `Mini assessment — you scored ${score}%` : 'Mini assessment'}
         </span>
-        <span className="block text-sm leading-relaxed text-emerald-800/80">
+        <span className="block text-sm leading-relaxed text-on-surface-variant">
           {passed
             ? 'Passed. Open it again to review the questions and explanations.'
             : taken
@@ -89,7 +95,7 @@ export default function MiniAssessmentCard({
               : `Five questions on what you just built. Score ${passMark}% to unlock the next task.`}
         </span>
       </span>
-      <ArrowRight className="ml-auto hidden h-5 w-5 shrink-0 text-emerald-700 transition-transform group-hover:translate-x-0.5 sm:block" />
+      <ArrowRight className="ml-auto hidden h-5 w-5 shrink-0 text-on-surface-variant transition-transform group-hover:translate-x-0.5 group-hover:text-primary sm:block" />
     </button>
   )
 }

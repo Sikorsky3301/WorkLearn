@@ -13,9 +13,12 @@ from app.db.database import engine, Base, AsyncSessionLocal
 from app.api.v1.auth import auth
 from app.api.v1.tenant import router as tenant_router
 from app.api.v1.users import profile, certificates
-from app.api.v1.simulations import enrollments, sandbox, agent_messages, assessments
+from app.api.v1.simulations import enrollments, sandbox, agent_messages, assessments, playground
 from app.api.v1.builder import admin_sim_builder
-from app.api.v1.admin import admin, admin_simulations, admin_simulation_templates, admin_uploads, provisioning
+from app.api.v1.admin import (
+    admin, admin_builder_catalog, admin_simulations, admin_simulation_templates,
+    admin_uploads, provisioning,
+)
 from app.api.v1.superadmin import admin_management, feature_flags, platform_analytics, platform_config
 from app.api.v1.analytics import analytics
 from app.api.v1.mentor import mentor
@@ -150,8 +153,10 @@ app.include_router(admin.router)
 app.include_router(provisioning.router)
 app.include_router(mentor.router)
 app.include_router(sandbox.router)
+app.include_router(playground.router)
 app.include_router(admin_simulations.router)
 app.include_router(admin_simulation_templates.router)
+app.include_router(admin_builder_catalog.router)
 app.include_router(sim_runtime.router)
 app.include_router(sandbox_ai.router)
 app.include_router(admin_uploads.router)

@@ -42,9 +42,14 @@ export default function TablePagination({
   onPageChange,
   onPageSizeChange,
   pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
+  alwaysShowCount = false,
 }) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize) || 1)
-  if (totalPages <= 1) return null
+  // The whole footer used to disappear on a single page, taking the row count
+  // with it — so a list of 40 users showed no total anywhere. Now the count
+  // stays and only the pager controls go.
+  if (totalPages <= 1 && !alwaysShowCount) return null
+  const single = totalPages <= 1
 
   const from = (page - 1) * pageSize + 1
   const to = Math.min(page * pageSize, total)
@@ -53,8 +58,9 @@ export default function TablePagination({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 border-t border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/40 text-xs text-slate-500 dark:text-slate-400">
       <p className="tabular-nums">
-        Showing {from}–{to} of {total}
+        {single ? `${total} ${total === 1 ? 'row' : 'rows'}` : `Showing ${from}–${to} of ${total}`}
       </p>
+      {!single && (
       <div className="flex items-center gap-3">
         <label className="flex items-center gap-1.5">
           <span>Rows</span>
@@ -107,6 +113,7 @@ export default function TablePagination({
           </button>
         </div>
       </div>
+      )}
     </div>
   )
 }

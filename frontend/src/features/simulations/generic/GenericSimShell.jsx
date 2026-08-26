@@ -10,7 +10,7 @@ import SimManagerChat from '../SimManagerChat'
 import GenericStageRenderer from './GenericStageRenderer'
 import SimulationCompleteScreen from './SimulationCompleteScreen'
 import { useGenericSimStore } from '../../../app/store/useGenericSimStore'
-import { isEngineeringSim } from '../engineering/lib/isEngineeringSim'
+import { hasWorkbenchExperience } from '../engineering/lib/hasWorkbenchExperience'
 
 // SimManagerChat/genericManagerChatKnowledge.js operate on task.message/
 // whatToDo/whatToSubmit/hints/skills/subject/title — this maps the backend's
@@ -223,7 +223,7 @@ export default function GenericSimShell() {
   // certificate rather than being bounced past it.
   //
   // Everything below this line now serves da-job-sim and sales-crm-sim only.
-  if (isEngineeringSim(simulation)) {
+  if (hasWorkbenchExperience(simulation)) {
     return <Navigate to={`/simulations/${slug}/roadmap`} replace />
   }
 
@@ -232,7 +232,7 @@ export default function GenericSimShell() {
       <header className="sticky top-0 z-40 bg-white border-b border-border">
         <div className="max-w-container mx-auto px-6 h-14 flex items-center gap-4">
           <button
-            onClick={() => navigate('/simulations')}
+            onClick={() => navigate('/learn/simulations')}
             className="flex items-center gap-1.5 text-on-surface-variant hover:text-on-surface transition-colors text-sm font-medium shrink-0"
           >
             <X className="h-4 w-4" /> Exit

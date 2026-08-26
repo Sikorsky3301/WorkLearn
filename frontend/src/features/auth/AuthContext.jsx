@@ -8,12 +8,23 @@ export function AuthProvider({ children }) {
   const [user, setUser]       = useState(null)
   const [loading, setLoading] = useState(true)
 
+  // True while an auth page is running its own post-login transition.
+  //
+  // GuestOnlyRoute bounces a signed-in user off /login, which is right for
+  // someone hitting Back onto a live session and wrong for the person who
+  // just signed in ON that form: setUser() lands, the guard redirects on the
+  // same commit, and the login page unmounts before its own loader has drawn
+  // a single frame. The loader was there the whole time and had no chance to
+  // render.
+  //
+  // While this is set the guard stands down and lets the page navigate when
+  // it is ready. It lives here rather than in the page because the two
+  // components do not nest — the guard renders the page, so props cannot
+  // carry it upward.
+  const [authTransition, setAuthTransition] = useState(false)
+
   // Restore session from stored token on mount
   useEffect(() => {
-    // One-time migration: the token used to live in sessionStorage (per-tab).
-    // Clear any left over there so it can't shadow the localStorage one.
-    sessionStorage.removeItem('wl_token')
-
     const token = getToken()
     if (!token) { setLoading(false); return }
 
@@ -26,23 +37,18 @@ export function AuthProvider({ children }) {
       .finally(() => { clearTimeout(timeout); setLoading(false) })
   }, [])
 
-  // Other tabs share localStorage. Login/logout there should update this tab
-  // without a full reload (`storage` only fires in tabs that did not write).
-  useEffect(() => {
-    const onStorage = (e) => {
-      if (e.key !== 'wl_token') return
-      if (!e.newValue) {
-        setUser(null)
-        return
-      }
-      api.get('/api/auth/me').then(setUser).catch(() => {
-        clearToken()
-        setUser(null)
-      })
-    }
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
-  }, [])
+  // NO cross-tab session sync, deliberately.
+  //
+  // This used to listen for `storage` on the token key and re-fetch /me
+  // whenever another tab wrote one — so signing in as an admin in a second tab
+  // silently reassigned THIS tab to the admin account, mid-session, with no
+  // interaction. That is the other half of why two accounts could not be open
+  // at once, and it is the more surprising half: the tab you were not touching
+  // changed identity underneath you.
+  //
+  // Each tab now owns its session (see getToken in lib/client.js). A login or
+  // logout elsewhere leaves this tab exactly as it was; its own token stays
+  // valid until it expires or this tab signs out.
 
   // Flattening the thrown error to a bare `{ error: message }` lost the two
   // things the form needs to give useful advice: whether the server answered
@@ -99,6 +105,9 @@ export function AuthProvider({ children }) {
   const logout = () => {
     clearToken()
     setUser(null)
+    // Clear it here too: a login that errored after the flag was set
+    // would otherwise leave the guard permanently stood down.
+    setAuthTransition(false)
   }
 
   // Re-fetches /me — used after profile/photo/resume/education edits so the
@@ -144,6 +153,7 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider value={{
       user, loading, register, login, loginDirect, loginSuperAdmin, loginAdmin, loginUniversity, loginMentor,
+      authTransition, setAuthTransition,
       logout, hasFeature, unlockFeature, hasPermission, refreshUser,
     }}>
       {children}

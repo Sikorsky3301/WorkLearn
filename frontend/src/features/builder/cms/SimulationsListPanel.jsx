@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Search, Plus, Copy, Users } from 'lucide-react'
+import { openAuthedTab } from '../../../lib/tabHandoff'
+import { Search, Plus, Copy, Users, TriangleAlert } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
 import { useCmsBasePath } from '../../../hooks/useCmsBasePath'
 import { useAdminSimulations, usePublishSimulation, useUnpublishSimulation, useDeleteSimulation, useDuplicateSimulation, useUnenrollAllStudents, usePatchPublishScope } from '../../../hooks'
@@ -8,15 +8,19 @@ import NewSimulationDialog from './NewSimulationDialog'
 import PublishScopeModal from '../shared/PublishScopeModal'
 import TablePagination, { useClientPagination } from '../../../components/design-system/TablePagination'
 
-/** Simulations page inside the Admin portal — list/search/publish/delete.
- * The builder itself is a dedicated route (/admin/simulations/:id), not
- * nested here — see SimulationBuilder.jsx. */
+/** The simulations CATALOGUE inside the Admin portal — list, search, publish,
+ * unpublish, unenrol, duplicate, delete.
+ *
+ * Building a simulation is a different job and happens somewhere else: Edit
+ * opens the Sim Builder at /admin/content/sim-builder/:id in its own tab
+ * (features/builder/studio/), because it is a long working session that owns
+ * the whole viewport and an admin usually wants this list still sitting where
+ * they left it. */
 export default function SimulationsListPanel() {
-  const navigate = useNavigate()
   const cmsBase = useCmsBasePath()
   const [search, setSearch] = useState('')
   const [newDialogOpen, setNewDialogOpen] = useState(false)
-  const { data, isLoading } = useAdminSimulations()
+  const { data, isLoading, isError, error, refetch, isRefetching } = useAdminSimulations()
   const deleteSim = useDeleteSimulation()
 
   const sims = (data?.simulations ?? []).filter((s) =>
@@ -48,6 +52,28 @@ export default function SimulationsListPanel() {
 
       {isLoading ? (
         <div className="card shadow-sm"><div className="h-40 bg-surface-high rounded animate-pulse" /></div>
+      ) : isError ? (
+        // A failed request used to fall through to the SAME empty state as a
+        // genuinely empty list — "No simulations found." — so an admin
+        // hitting an expired session, a 403, or a dropped connection saw a
+        // platform with nothing published on it instead of being told what
+        // actually happened.
+        <div className="card shadow-sm flex items-start gap-3 border-red-200 bg-red-50 p-5">
+          <TriangleAlert className="h-5 w-5 shrink-0 text-red-500 mt-0.5" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-red-900">Could not load simulations</p>
+            <p className="text-xs text-red-700 mt-0.5">
+              {error?.message || 'The request failed.'} If this keeps happening, try signing out and back in.
+            </p>
+          </div>
+          <button
+            onClick={() => refetch()}
+            disabled={isRefetching}
+            className="shrink-0 text-xs font-semibold text-red-700 hover:underline cursor-pointer disabled:opacity-50"
+          >
+            {isRefetching ? 'Retrying…' : 'Retry'}
+          </button>
+        </div>
       ) : sims.length === 0 ? (
         <div className="card shadow-sm text-center py-12">
           <p className="text-sm text-on-surface-variant">No simulations found.</p>
@@ -66,8 +92,8 @@ export default function SimulationsListPanel() {
               {pageRows.map((s) => (
                 <SimRow
                   key={s.id} sim={s}
-                  onEdit={() => navigate(`${cmsBase}/simulations/${s.id}`)}
-                  onDuplicated={(newSim) => navigate(`${cmsBase}/simulations/${newSim.id}`)}
+                  onEdit={() => openAuthedTab(`${cmsBase}/content/sim-builder/${s.id}`)}
+                  onDuplicated={(newSim) => openAuthedTab(`${cmsBase}/content/sim-builder/${newSim.id}`)}
                   deleteSim={deleteSim}
                 />
               ))}

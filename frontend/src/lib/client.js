@@ -1,19 +1,68 @@
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
+// Empty means SAME ORIGIN: requests go to `/api/...` on whatever host the page
+// was loaded from, and the Vite dev server proxies them to the backend (see
+// vite.config.js). That is what makes the site work from a phone, a second
+// laptop, or a partner subdomain without touching any config — a hardcoded
+// `http://127.0.0.1:3001` only ever worked on the machine running the servers.
+//
+// A deployment that serves the API from a different host still sets
+// VITE_API_URL and this yields to it.
+const BASE_URL = import.meta.env.VITE_API_URL ?? ''
 
-// localStorage — one session for the whole origin (every tab, and after a
-// browser restart) until logout or JWT expiry. All tabs share the same
-// account; you cannot stay signed in as student in one tab and admin in
-// another.
+// ── The session store: per TAB, remembered across restarts ────────────────
+//
+// This used to be localStorage alone, which is one session for the whole
+// origin. Signing in as an admin in one tab therefore signed you OUT of your
+// student account in every other tab — testing the two side by side was
+// impossible, and worse, the switch happened silently mid-session.
+//
+// It is now sessionStorage first, localStorage second:
+//
+//   sessionStorage   is per tab. Once a tab has a token here it NEVER looks at
+//                    localStorage again, so a login in another tab cannot
+//                    reach in and change who this tab is.
+//   localStorage     is the "remember me" copy. A brand-new tab with no
+//                    session of its own adopts it, which is what keeps you
+//                    signed in after closing the browser.
+//
+// So: open a second tab, sign in as someone else, and both tabs keep their own
+// account. The most recent login is what a NEXT new tab will inherit, which is
+// the predictable behaviour and the one people expect.
+//
+// The old key is read once on first load so an existing signed-in session
+// survives this change instead of logging everybody out.
+const TOKEN_KEY = 'wl_token'
+
 export function getToken() {
-  return localStorage.getItem('wl_token')
+  try {
+    const own = sessionStorage.getItem(TOKEN_KEY)
+    if (own) return own
+    // No session in this tab yet — adopt the remembered one and claim it, so
+    // every later read is this tab's own copy.
+    const remembered = localStorage.getItem(TOKEN_KEY)
+    if (remembered) sessionStorage.setItem(TOKEN_KEY, remembered)
+    return remembered
+  } catch {
+    // Private mode or storage disabled. Unauthenticated is the safe answer.
+    return null
+  }
 }
 
 export function setToken(token) {
-  localStorage.setItem('wl_token', token)
+  try {
+    sessionStorage.setItem(TOKEN_KEY, token)
+    localStorage.setItem(TOKEN_KEY, token)
+  } catch { /* private mode — the session lives in memory for this page only */ }
 }
 
-export function clearToken() {
-  localStorage.removeItem('wl_token')
+/** Sign this tab out.
+ *
+ *  `everywhere` also drops the remembered copy, so new tabs start signed out.
+ *  That is what a real logout means; omit it to leave other tabs alone. */
+export function clearToken({ everywhere = true } = {}) {
+  try {
+    sessionStorage.removeItem(TOKEN_KEY)
+    if (everywhere) localStorage.removeItem(TOKEN_KEY)
+  } catch { /* nothing to clear */ }
 }
 
 async function request(path, options = {}) {

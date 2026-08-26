@@ -129,6 +129,139 @@
 }
 
 /* Subtle fade-in for panels/results appearing after an action */
+/* Stacked-cube loader, shown while a sandbox tab is opening.
+   Two clipped halves sharing one conic gradient, offset so the bevels meet and
+   read as a single 3D block; the second is delayed half a cycle so they
+   alternate rather than bounce together.
+
+   The negative margins are what join the two halves — `calc(var(--_d)/-2 - 1px)`
+   pulls each toward the seam, and the -1px closes the subpixel gap that a
+   fractional --_d otherwise leaves as a visible hairline.
+
+   Given as-is by the author of the design; kept verbatim apart from the class
+   name, which is namespaced so it cannot collide with anything else called
+   `.loader`. */
+.cube-loader {
+  --s: 25px;
+  --_d: calc(0.353 * var(--s));
+
+  width: calc(var(--s) + var(--_d));
+  aspect-ratio: 1;
+  display: flex;
+}
+
+.cube-loader::before,
+.cube-loader::after {
+  content: "";
+  flex: 1;
+  clip-path: polygon(
+    var(--_d) 0,
+    100% 0,
+    100% calc(100% - var(--_d)),
+    calc(100% - var(--_d)) 100%,
+    0 100%,
+    0 var(--_d)
+  );
+  background: conic-gradient(
+    from -90deg at calc(100% - var(--_d)) var(--_d),
+    #fff 135deg,
+    #666 0 270deg,
+    #aaa 0
+  );
+  animation: cubeLoader 1.2s infinite;
+}
+
+.cube-loader::before { margin-right: calc(var(--_d) / -2 - 1px); }
+.cube-loader::after  { margin-left:  calc(var(--_d) / -2 - 1px); animation-delay: 0.6s; }
+
+@keyframes cubeLoader {
+  0%     { transform: translateY(0); }
+  16.67% { transform: translateY(-10px); }
+  33.33% { transform: translateY(10px); }
+  50%,
+  100%   { transform: translateY(0); }
+}
+
+/* Respect a reduced-motion preference: the cubes stop travelling but the
+   loader stays visible, so the state is still communicated. */
+@media (prefers-reduced-motion: reduce) {
+  .cube-loader::before,
+  .cube-loader::after { animation: none; }
+}
+
+/* Sim Builder boot loader — two stacked isometric cubes sliding past each
+   other, shown while the builder opens in its own tab.
+
+   A DIFFERENT loader from .cube-loader above, deliberately. That one is two
+   cubes side by side travelling vertically and marks a sandbox container
+   starting; this one stacks them and travels horizontally. Two long waits with
+   two distinct signatures is worth more than one reused shape — after a couple
+   of uses you know which thing you are waiting for before you read a word.
+
+   Namespaced off the bare `.loader` it was supplied as: `.loader` is the kind
+   of class name that collides with a component two years from now. */
+.studio-loader {
+  --s: 25px;
+  --_d: calc(0.353 * var(--s));
+
+  width: calc(var(--s) + var(--_d));
+  aspect-ratio: 1;
+  display: grid;
+}
+
+.studio-loader::before,
+.studio-loader::after {
+  content: "";
+  clip-path: polygon(
+    var(--_d) 0,
+    100% 0,
+    100% calc(100% - var(--_d)),
+    calc(100% - var(--_d)) 100%,
+    0 100%,
+    0 var(--_d)
+  );
+  background: conic-gradient(
+    from -90deg at var(--s) var(--_d),
+    #fff 135deg,
+    #666 0 270deg,
+    #aaa 0
+  );
+  animation: studioLoader 1.2s infinite;
+}
+
+.studio-loader::before {
+  z-index: 1;
+  margin-bottom: calc(var(--_d) / -2 - 1px);
+}
+
+.studio-loader::after {
+  margin-top: calc(var(--_d) / -2 - 1px);
+  animation-delay: 0.6s;
+}
+
+@keyframes studioLoader {
+  0%     { transform: translate(0); }
+  16.67% { transform: translate(-10px); }
+  33.33% { transform: translate(10px); }
+  50%,
+  100%   { transform: translate(0); }
+}
+
+/* Same rule as the sandbox loader: stop the travel, keep the loader visible,
+   so the state is still communicated without motion. */
+@media (prefers-reduced-motion: reduce) {
+  .studio-loader::before,
+  .studio-loader::after { animation: none; }
+}
+
+/* Sandbox boot bar — a bead sweeping the track, used while a practice
+   sandbox opens. Indeterminate on purpose: nothing here knows a real
+   percentage, and a bar that claims one would be lying. */
+@keyframes boot {
+  0%   { transform: translateX(-110%); }
+  100% { transform: translateX(320%); }
+}
+
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: translateY(0); }
