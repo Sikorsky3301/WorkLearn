@@ -71,10 +71,11 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Unified tenant-aware sign-in (POST /api/auth/login). Host selects the
-  // university; account role selects the portal. Super Admin stays on
-  // loginSuperAdmin. Legacy loginAdmin / loginUniversity / loginMentor /
-  // loginDirect names remain as aliases so older call sites keep working.
+  // Unified tenant-aware sign-in (POST /api/auth/login) — everyone signs in
+  // here, including Super Admin; account role selects the portal
+  // post-login (see Login.jsx). Legacy loginAdmin / loginUniversity /
+  // loginMentor / loginDirect names remain as aliases so older call sites
+  // keep working.
   const login = async (email, password) => {
     try {
       const { token, user: u } = await api.post('/api/auth/login', { email, password })
@@ -90,17 +91,6 @@ export function AuthProvider({ children }) {
   const loginAdmin = login
   const loginUniversity = login
   const loginMentor = login
-
-  const loginSuperAdmin = async (email, password) => {
-    try {
-      const { token, user: u } = await api.post('/api/auth/login/superadmin', { email, password })
-      setToken(token)
-      setUser(u)
-      return { success: true, role: u.role }
-    } catch (e) {
-      return failure(e)
-    }
-  }
 
   const logout = () => {
     clearToken()
@@ -152,7 +142,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={{
-      user, loading, register, login, loginDirect, loginSuperAdmin, loginAdmin, loginUniversity, loginMentor,
+      user, loading, register, login, loginDirect, loginAdmin, loginUniversity, loginMentor,
       authTransition, setAuthTransition,
       logout, hasFeature, unlockFeature, hasPermission, refreshUser,
     }}>

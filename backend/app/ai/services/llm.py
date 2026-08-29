@@ -69,14 +69,14 @@ litellm.suppress_debug_info = True
 _GENERATE_MODEL = {
     "anthropic": "anthropic/claude-haiku-4-5-20251001",
     "gemini": "gemini/gemini-2.5-flash-lite",
-    "groq": "groq/llama-3.3-70b-versatile",
+    "groq": "groq/openai/gpt-oss-120b",
 }
 # Model used for streaming chat (AI Mentor, CRM-sim AI customer, generic
 # roleplay) — higher quality tier where the provider offers one.
 _STREAM_MODEL = {
     "anthropic": "anthropic/claude-sonnet-4-6",
     "gemini": "gemini/gemini-2.5-flash-lite",
-    "groq": "groq/llama-3.3-70b-versatile",
+    "groq": "groq/openai/gpt-oss-120b",
 }
 
 

@@ -118,14 +118,13 @@ def _require_partner(tenant: University) -> None:
 def _user_allowed_on_tenant(user: User, tenant: University) -> bool:
     """Host picks the tenant; account role must match that host's entry rules.
 
-    Academy (default): academy students (no roll_no) and platform admin.
+    Academy (default): academy students (no roll_no), admin, and super admin —
+    all three sign in on the same /login page/endpoint, routed post-login by
+    role (see frontend Login.jsx).
     Partner: students with roll_no, teachers, and university_admin for that org.
-    Super Admin stays on /login/superadmin only.
     """
-    if user.role == RoleSlug.SUPER_ADMIN:
-        return False
     if tenant.is_default:
-        if user.role == RoleSlug.ADMIN:
+        if user.role in (RoleSlug.SUPER_ADMIN, RoleSlug.ADMIN):
             return True
         if user.role == RoleSlug.STUDENT and not user.roll_no:
             if user.university_id and user.university_id != tenant.id:

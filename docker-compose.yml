@@ -35,7 +35,7 @@ services:
     volumes:
       - worklearn_db_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -49,11 +49,31 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "3001:3001"
+      - "127.0.0.1:3001:3001"
     env_file:
       - backend/.env
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/worklearn
+    volumes:
+      # The code-sandbox grader shells out to `docker run` for each submission
+      # (see app/services/sandbox_runners/docker_runner.py) — mounting the
+      # host's socket lets the backend container spawn sibling grading
+      # containers on the HOST's daemon. Security tradeoff worth knowing: this
+      # is equivalent to giving the backend container root on the host (anyone
+      # who can run arbitrary code in this container can control the whole
+      # Docker daemon, not just its own containers). Acceptable for a single
+      # trusted deployment; if this backend is ever exposed to less-trusted
+      # code paths, put a narrow broker service in front of the socket instead
+      # of mounting it directly.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Shared with the HOST at the same physical directory (see
+      # docker_runner.py's comment on -v path resolution above) — this
+      # container writes submission files under /sandbox-work, and passes
+      # the matching /worklearn/sandbox-work host path to `docker run -v` so
+      # the HOST daemon mounts the same directory into the grading sibling
+      # container. Matches settings.sandbox_shared_dir / sandbox_hostpath_dir
+      # in app/core/config.py.
+      - /worklearn/sandbox-work:/sandbox-work
 
   frontend:
     build: ./frontend
@@ -61,7 +81,7 @@ services:
     depends_on:
       - backend
     ports:
-      - "5173:5173"
+      - "127.0.0.1:5173:5173"
     environment:
       # The Vite process reads this to proxy /api and /static — never reaches
       # the browser, so the compose service name is correct here even though

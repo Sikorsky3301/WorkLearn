@@ -92,7 +92,14 @@ async def run_submission(
     output.* files from result.workdir and MUST clean up the workdir when
     done (see cleanup()).
     """
-    workdir = Path(tempfile.mkdtemp(prefix="sandbox_"))
+    workdir = Path(tempfile.mkdtemp(prefix="sandbox_", dir=settings.sandbox_shared_dir))
+    # mkdtemp defaults to 0700, owned by this (root) container's user. The
+    # grading container runs as a non-root, unrelated UID (sandboxuser/10001
+    # — see backend/sandboxes/*/Dockerfile), so it can't traverse into a
+    # root-only directory it doesn't own. World rwx is safe here: each
+    # submission gets its own freshly-created, randomly-named, short-lived
+    # directory — nothing else on the host is exposed by opening this one up.
+    workdir.chmod(0o777)
     try:
         (workdir / submission_filename).write_text(code, encoding="utf-8")
         for name, content in (input_files or {}).items():
@@ -110,7 +117,13 @@ async def run_submission(
             "--pids-limit=64",
             "--cap-drop=ALL",
             "--security-opt=no-new-privileges",
-            "-v", f"{workdir}:/workspace",
+            # `workdir` is this process's OWN view of the shared directory
+            # (bind-mounted at settings.sandbox_shared_dir). The docker CLI
+            # call below goes to the HOST's daemon via docker.sock — it
+            # resolves -v paths against the HOST filesystem, not this
+            # container's, so the mount source must be the host-side path to
+            # the same physical directory, not this container's path to it.
+            "-v", f"{settings.sandbox_hostpath_dir}/{workdir.name}:/workspace",
             image or settings.sandbox_image,
         ]
 

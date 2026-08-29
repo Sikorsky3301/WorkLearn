@@ -29,8 +29,9 @@ import BlogPage from '../../features/marketing/BlogPage'
 import NotFoundPage from '../../components/NotFound'
 
 // ── (auth) — unified /login (tenant from host, portal from role).
-// Legacy university/mentor paths redirect here. Super Admin stays on
-// /super-admin via RequireSuperAdmin → SuperAdminLogin. ─────────────────────
+// Legacy university/mentor paths redirect here. Super Admin signs in here
+// too — RequireSuperAdmin bounces an unauthenticated/wrong-role visitor to
+// /login same as every other portal guard. ──────────────────────────────
 import LoginPage from '../../features/auth/global/Login'
 
 // ── (dashboard) — everything behind authentication. SuperAdminPortal/

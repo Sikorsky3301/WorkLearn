@@ -34,6 +34,7 @@ from sqlalchemy import select
 
 from app.db.database import AsyncSessionLocal
 from app.models.cms import Simulation, SimulationTask, SimulationStatus
+from app.models import sim_builder as _models_sim_builder  # noqa: F401 — registers SimBuilder* tables so Simulation.sim_builder_project_id's FK resolves
 
 
 # ── da-job-sim ────────────────────────────────────────────────────────────────
