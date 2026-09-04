@@ -206,8 +206,14 @@ export default function EngineeringTaskPage() {
   const explainer = task.config?.explainer
   const stepCount = explainer?.steps?.length || task.what_to_do?.length || 0
   // A pass recorded on a previous visit still counts, so the gate doesn't
-  // re-run for work that has already been checked.
-  const assessmentPassed = hasPassedAssessment(assessmentScore, task.quizScore)
+  // re-run for work that has already been checked. A task with no
+  // assessment content at all (task.assessment_summary null — e.g.
+  // da-job-sim, which never authored per-task mini assessments) has
+  // nothing to pass, so it counts as already passed rather than
+  // permanently blocking "Next" — see hasPassedAssessment's hasAssessment
+  // param.
+  const hasAssessment = Boolean(task.assessment_summary)
+  const assessmentPassed = hasPassedAssessment(assessmentScore, task.quizScore, hasAssessment)
   const weekDone = weekCompletion(roadmap, index, assessmentScore)
 
   return (
@@ -317,7 +323,12 @@ export default function EngineeringTaskPage() {
             <ReferenceDataPanel referenceData={task.reference_data} />
 
             {/* ── The check that follows the work ── */}
-            {done && (
+            {/* Only for a task that actually has one — MiniAssessmentCard's
+                own GET 404s ("This task doesn't have an assessment") for a
+                task like da-job-sim's that never authored one, and showing
+                a "Mini assessment" button that always fails to open was a
+                bug, not a legitimate empty state. */}
+            {done && hasAssessment && (
               <MiniAssessmentCard
                 enrollmentId={enrollment.id}
                 taskIndex={task.task_index}

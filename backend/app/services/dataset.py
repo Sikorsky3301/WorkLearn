@@ -323,17 +323,35 @@ def _ref_ab(df: pd.DataFrame, cleaned: pd.DataFrame) -> dict:
     return {"mean_revenue_by_group": {k: float(v) for k, v in by_group.items()}}
 
 
-# task_index -> reference builder. Task 9 (text brief, LLM-judged) and task 10
-# (quiz) need no reference and are deliberately absent.
+# task_index -> reference builder.
+#
+# KEYED TO THE CURRENTLY-DEPLOYED da-job-sim, which is still the ORIGINAL
+# 5-task layout (1 Clean the Data, 2 Sales Report, 3 RFM Segmentation,
+# 4 A/B Test Analysis, 5 Executive Brief — see GRADER_REGISTRY's
+# da_job_sim.task1_cleaning..task5_brief keys, which are what's actually
+# seeded on each of those task_index values today).
+#
+# _ref_quality/_ref_channel_country/_ref_monthly/_ref_cohort below belong to
+# the NINE-task restructure (sync_da_content.py) — real code, but for
+# content that has never been applied to the database (that script has
+# never been run with --apply). Mapping them here anyway is what caused
+# task_index 2 to resolve to _ref_quality (a different question's reference
+# entirely, missing total_revenue/order_count/etc.) instead of _ref_kpis —
+# task2_report.py's grader then did `reference["total_revenue"]` against a
+# dict that only had `total_rows`/`duplicate_order_ids`/etc., which is the
+# exact KeyError that crashed every Task 2 submission with a 500.
+#
+# If sync_da_content.py --apply is ever actually run, THIS DICT MUST BE
+# UPDATED TO MATCH — task_index 2 becomes Data Quality Report (_ref_quality),
+# 3 becomes Sales Report/KPIs (_ref_kpis), etc. Until then, it has to mirror
+# whatever's actually seeded, not the migration that hasn't happened.
 TASK_REFERENCES = {
     1: _ref_cleaning,
-    2: _ref_quality,
-    3: _ref_kpis,
-    4: _ref_channel_country,
-    5: _ref_monthly,
-    6: _ref_rfm,
-    7: _ref_cohort,
-    8: _ref_ab,
+    2: _ref_kpis,
+    3: _ref_rfm,
+    4: _ref_ab,
+    # 5 (Executive Brief) needs no reference — task5_brief.py's grader is
+    # LLM-judged and never reads `reference` at all.
 }
 
 

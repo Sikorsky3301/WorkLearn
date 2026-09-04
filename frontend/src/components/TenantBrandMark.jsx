@@ -63,13 +63,13 @@ export default function TenantBrandMark({ size = 'sm', className = '' }) {
 
   if (!isPartner) {
     return (
-      <div className={`flex items-end gap-2 min-w-0 ${className}`}>
+      <div className={`flex items-center gap-2 min-w-0 ${className}`}>
         <img
           src={worklearnLogo}
           alt="WorkLearn"
-          className={`${size === 'md' || size === 'lg' ? 'w-10 h-10 rounded-xl' : 'w-8 h-8 rounded'} object-cover object-bottom shrink-0`}
+          className={`${size === 'md' || size === 'lg' ? 'w-10 h-10 rounded-xl' : 'w-8 h-8 rounded'} object-cover shrink-0`}
         />
-        <span className={`font-bold text-on-surface tracking-tight ${wordSize}`}>WorkLearn</span>
+        <span className={`font-bold text-on-surface tracking-tight leading-none ${wordSize}`}>WorkLearn</span>
       </div>
     )
   }

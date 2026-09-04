@@ -15,8 +15,18 @@ export const ASSESSMENT_PASS_MARK = 80
  * `live` is a score from an attempt made in the current tab; it wins over the
  * stored value so the gate opens the moment the student passes, without
  * waiting for the enrollment query to refetch. `stored` is
- * TaskCompletion.quiz_score, which is what makes a pass survive a reload. */
-export function hasPassedAssessment(live, stored) {
+ * TaskCompletion.quiz_score, which is what makes a pass survive a reload.
+ *
+ * `hasAssessment` defaults to true (most call sites pass it explicitly for a
+ * task that legitimately might not have one — see EngineeringTaskPage.jsx
+ * and weekCompletion below). When a task has NO assessment content at all
+ * (e.g. da-job-sim, which never authored per-task mini assessments —
+ * `quizScore` and `live` are then always null and this would sit at -1
+ * forever), there is nothing to pass, so it counts as already passed rather
+ * than permanently failing and blocking the "Next" button for the whole
+ * simulation. */
+export function hasPassedAssessment(live, stored, hasAssessment = true) {
+  if (!hasAssessment) return true
   return (live ?? stored ?? -1) >= ASSESSMENT_PASS_MARK
 }
 
@@ -48,8 +58,8 @@ export function weekCompletion(roadmap, taskIndex, liveScore) {
 
   const done = section.tasks.every((t) => {
     const passed = t.task_index === taskIndex
-      ? hasPassedAssessment(liveScore, t.quizScore)
-      : hasPassedAssessment(null, t.quizScore)
+      ? hasPassedAssessment(liveScore, t.quizScore, Boolean(t.assessment_summary))
+      : hasPassedAssessment(null, t.quizScore, Boolean(t.assessment_summary))
     return t.score != null && passed
   })
   if (!done) return null

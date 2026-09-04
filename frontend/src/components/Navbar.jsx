@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   User, GraduationCap, SlidersHorizontal, CreditCard, Receipt, Globe, LifeBuoy, LogOut,
+  Menu, X,
 } from 'lucide-react'
 import { useAuth } from '../features/auth/AuthContext'
 import { useSimulations, useMyAssignments } from '../hooks'
@@ -78,6 +79,11 @@ export default function Navbar() {
 
   const [profileOpen, setProfileOpen] = useState(false)
   const [simOpen,     setSimOpen]     = useState(false)
+  // Below `lg` there isn't room for all 7 top-level links plus the Learn
+  // mega-menu, the XP badge, notifications and the avatar in one row — it
+  // just overflows. This swaps the whole <nav> for a hamburger-toggled
+  // panel at those widths instead of trying to squeeze it.
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const profileRef        = useRef(null)
   const simCloseTimer      = useRef(null)
@@ -93,6 +99,13 @@ export default function Navbar() {
   // under today). Checking only the first left the black active pill dark
   // for every tab in the hub except by accident.
   const isSimActive = location.pathname.startsWith('/simulations') || location.pathname.startsWith('/learn')
+
+  // Belt-and-suspenders alongside each mobile link's own onClick: closes the
+  // panel on any route change, including ones triggered some other way
+  // (back/forward, a redirect) while it happened to be open.
+  useEffect(() => {
+    setMobileMenuOpen(false)
+  }, [location.pathname])
 
   // Profile dropdown: close on outside click
   useEffect(() => {
@@ -147,28 +160,32 @@ export default function Navbar() {
       isActive ? NAV_ACTIVE : NAV_IDLE
     }`
 
+  // Mobile panel's own link style — block/full-width with a bigger touch
+  // target, not the desktop pill (which reads fine in a horizontal row but
+  // looks cramped stacked vertically edge-to-edge in a narrow panel).
+  const mobileNavLink = ({ isActive }) =>
+    `block rounded-lg px-3.5 py-2.5 text-sm font-medium transition-colors ${
+      isActive ? NAV_ACTIVE : NAV_IDLE
+    }`
+
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-border">
-      {/* XP progress strip */}
-      <div className="h-0.5 bg-surface-high w-full">
-        <div className="h-full bg-primary transition-all" style={{ width: `${xpPct}%` }} />
-      </div>
-
       {/* Full-bleed — unlike the page content below (which stays capped at
           max-w-container), the header itself spans the entire viewport so
           the nav links sit flush against the left edge and the XP/avatar
           cluster sits flush against the right edge, instead of both being
           stranded inside a centered 1280px column with dead space on either
           side on wide screens. */}
-      <div className="w-full px-6 flex items-center gap-1 min-h-[52px] py-2">
+      <div className="w-full px-4 sm:px-6 flex items-center gap-1 min-h-[52px] py-2">
 
         {/* Logo — signed-in app chrome goes to the dashboard, not marketing `/home`. */}
         <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 shrink-0 mr-4" aria-label="Dashboard">
           <TenantBrandMark size="sm" />
         </button>
 
-        {/* Nav */}
-        <nav className="flex items-center gap-0.5">
+        {/* Nav — desktop only below; see the hamburger-toggled panel at the
+            bottom of this header for < lg. */}
+        <nav className="hidden lg:flex items-center gap-0.5">
           <NavLink to="/dashboard" className={navLink}>Dashboard</NavLink>
 
           {/* "Learn" hover dropdown — the nav label; the route (/simulations),
@@ -315,16 +332,19 @@ export default function Navbar() {
 
           <NotificationBell />
 
-          {/* XP badge */}
+          {/* XP badge. The bar+count portion is the first thing dropped on a
+              narrow phone (hidden below sm) — "Lv.3" alone still says
+              something at a glance; the full breakdown needs room the
+              hamburger-panel widths don't reliably have. */}
           <button
             onClick={() => navigate('/analytics')}
             className="flex items-center gap-1.5 bg-surface-low border border-border rounded-full px-2.5 py-1 hover:border-primary transition-colors"
           >
             <span className="text-xs font-bold text-primary">Lv.{level}</span>
-            <div className="w-16 h-1.5 bg-border rounded-full overflow-hidden">
+            <div className="hidden sm:block w-16 h-1.5 bg-border rounded-full overflow-hidden">
               <div className="h-full bg-primary rounded-full" style={{ width: `${xpPct}%` }} />
             </div>
-            <span className="text-xs text-on-surface-variant">{xp.toLocaleString()} XP</span>
+            <span className="hidden sm:inline text-xs text-on-surface-variant">{xp.toLocaleString()} XP</span>
           </button>
 
           {/* Avatar + profile dropdown — opens on hover (with a bridge
@@ -411,8 +431,39 @@ export default function Navbar() {
               </div>
             )}
           </div>
+
+          {/* Hamburger — only reason for existing is < lg, where the <nav>
+              above is hidden. */}
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((v) => !v)}
+            className="lg:hidden inline-flex items-center justify-center rounded-full p-2 text-on-surface-variant hover:bg-surface-low hover:text-on-surface transition-colors"
+            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={mobileMenuOpen}
+          >
+            {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
         </div>
       </div>
+
+      {/* Mobile nav panel — the < lg replacement for the desktop <nav>.
+          Plain link list, not a replica of the Learn mega-menu (there's no
+          hover on a phone to drive it, and a nested expandable submenu here
+          would be more chrome than the 6 remaining links are worth) — Learn
+          just goes straight to /learn like the desktop button's own onClick
+          does when you're not hovering it. */}
+      {mobileMenuOpen && (
+        <nav className="lg:hidden border-t border-border bg-white px-4 py-3 flex flex-col gap-1">
+          <NavLink to="/dashboard" className={mobileNavLink}>Dashboard</NavLink>
+          <NavLink to="/learn" className={mobileNavLink}>Learn</NavLink>
+          <NavLink to="/skill-gps" className={mobileNavLink}>Skill GPS</NavLink>
+          <NavLink to="/ai-mentor" className={mobileNavLink}>AI Mentor</NavLink>
+          <NavLink to="/mira" className={mobileNavLink}>MIRA</NavLink>
+          <NavLink to="/analytics" className={mobileNavLink}>Analytics</NavLink>
+          <NavLink to="/portfolio" className={mobileNavLink}>Portfolio</NavLink>
+          <NavLink to="/sandboxes" className={mobileNavLink}>Sandbox</NavLink>
+        </nav>
+      )}
     </header>
   )
 }

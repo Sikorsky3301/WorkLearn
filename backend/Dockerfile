@@ -19,6 +19,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app/ app/
 COPY seed.py migrate_legacy_sims.py ./
+# Seed manager/company photos referenced by migrate_legacy_sims.py
+# (e.g. static/seed/priya-sharma.jpg) live under static/ in the repo but were
+# never copied into the image — every manager avatar 404'd at runtime as a
+# result. Ships the whole directory, not just seed/, since static/uploads/
+# also has committed CMS-uploaded logos the app expects to find.
+COPY static/ static/
 
 EXPOSE 3001
 

@@ -65,29 +65,6 @@ const MONACO_LANGUAGE = {
   text: 'plaintext',
 }
 
-function SegmentedProgress({ tasks, currentIndex, onJump }) {
-  return (
-    <div className="flex items-center gap-1.5">
-      {tasks.map((t) => {
-        const done = t.status === 'complete'
-        const current = t.task_index === currentIndex
-        return (
-          <button
-            key={t.task_index}
-            onClick={() => onJump(t)}
-            title={`Task ${t.task_index}: ${t.title}`}
-            className={`h-1.5 w-10 rounded-full transition-colors ${
-              current ? 'bg-indigo-500' : done ? 'bg-emerald-500' : 'bg-slate-200 hover:bg-slate-300'
-            }`}
-          >
-            <span className="sr-only">Task {t.task_index}</span>
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
 export default function SandboxWorkbenchPage() {
   const { slug, taskIndex } = useParams()
   const navigate = useNavigate()
@@ -332,7 +309,12 @@ export default function SandboxWorkbenchPage() {
 
   // `task.quizScore` comes from the enrollment, so a pass earned on a previous
   // visit still counts and the gate doesn't re-run for work already checked.
-  const assessmentPassed = hasPassedAssessment(assessmentScore, task.quizScore)
+  // A task with no assessment content at all (task.assessment_summary null —
+  // e.g. da-job-sim, which never authored per-task mini assessments) has
+  // nothing to pass, so it counts as already passed rather than permanently
+  // blocking Next/Finish — see hasPassedAssessment's hasAssessment param.
+  const hasAssessment = Boolean(task.assessment_summary)
+  const assessmentPassed = hasPassedAssessment(assessmentScore, task.quizScore, hasAssessment)
 
   const goNext = () => {
     if (assessmentPassed) return advance()
@@ -591,13 +573,19 @@ export default function SandboxWorkbenchPage() {
         </div>
       </div>
 
-      {/* Bottom bar — progress, and the way forward once graded. */}
+      {/* Bottom bar — progress, and the way forward once graded.
+          Used to also have a row of clickable per-task pips here
+          (SegmentedProgress) that jumped straight to ANY task's sandbox —
+          including ones ahead of where the student had actually reached,
+          with no lock check at all. Removed: this bar isn't meant to be a
+          way to skip ahead, just to show where you are. Progress through
+          the simulation happens via the roadmap and the Next/Finish button
+          on the right, both of which DO respect completion/assessment
+          gating. */}
       <footer className="flex h-14 shrink-0 items-center justify-between gap-4 border-t border-slate-200 bg-white px-4">
-        <SegmentedProgress
-          tasks={allTasks}
-          currentIndex={index}
-          onJump={(t) => navigate(`/sandbox/${slug}/${t.task_index}`)}
-        />
+        <p className="text-xs font-semibold text-on-surface-variant">
+          Task {index} of {allTasks.length}
+        </p>
 
         {submitSandbox.isError && (
           <div className="flex min-w-0 items-start gap-2 text-rose-700">
@@ -623,7 +611,11 @@ export default function SandboxWorkbenchPage() {
           </div>
         )}
 
-        {graded && (
+        {/* Only offered when the task actually has one — opening it for a
+            task like da-job-sim's that never authored an assessment 404'd
+            with "This task doesn't have an assessment," a bug rather than a
+            legitimate empty state. */}
+        {graded && hasAssessment && (
           <button
             onClick={() => setAssessmentOpen(true)}
             className="inline-flex shrink-0 items-center gap-2 rounded-full border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-800 transition-colors hover:bg-emerald-100"
@@ -664,6 +656,7 @@ export default function SandboxWorkbenchPage() {
         taskTitle={task.title}
         passMark={ASSESSMENT_PASS_MARK}
         quizTaken={assessmentScore != null || task.quizScore != null}
+        hasAssessment={hasAssessment}
         onTakeQuiz={() => { setCompleteOpen(false); setAssessmentOpen(true) }}
         onClose={() => setCompleteOpen(false)}
       />

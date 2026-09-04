@@ -80,13 +80,16 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
+    # Host-side port unchanged (5173) so the VPS's nginx config doesn't need
+    # to change what it proxies to — only WHAT'S listening behind it changed,
+    # from Vite's dev server to nginx serving the production build (see
+    # frontend/Dockerfile). Container-side is 80 now, nginx's own default,
+    # not 5173 (Vite's default) — nothing in this image is Vite anymore.
+    # No BACKEND_ORIGIN here either — that was read by the Vite dev proxy,
+    # which no longer exists; /api and /static are now proxied straight to
+    # the backend by the HOST's nginx (see /etc/nginx/sites-available/worklearn).
     ports:
-      - "127.0.0.1:5173:5173"
-    environment:
-      # The Vite process reads this to proxy /api and /static — never reaches
-      # the browser, so the compose service name is correct here even though
-      # frontend/.env.local's own default (127.0.0.1) is not.
-      BACKEND_ORIGIN: http://backend:3001
+      - "127.0.0.1:5173:80"
 
   litellm-proxy-db:
     image: postgres:16

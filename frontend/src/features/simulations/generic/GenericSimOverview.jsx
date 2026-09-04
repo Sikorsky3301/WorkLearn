@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft, ArrowRight, Clock, ListChecks, BarChart3, Zap, CalendarClock,
-  Globe, Award, Layers,
+  Globe, Award, Layers, Sparkles,
   // Aliased: the icon is exported as `Infinity`, which would shadow the
   // JavaScript global of that name for the whole module.
   Infinity as InfinityIcon,
@@ -145,9 +145,59 @@ export default function GenericSimOverview() {
       {/* Near-black, not the old indigo gradient. The page's own accents are
           indigo (`primary`), so an indigo hero gave them nothing to sit
           against — everything blended into one violet wash. A neutral dark
-          ground lets the accent colour actually read as an accent. */}
-      <div className="bg-gradient-to-b from-[#0b0f14] via-[#0f1720] to-[#0b0f14] text-white">
-        <div className="max-w-container mx-auto px-6 pt-6 pb-16">
+          ground lets the accent colour actually read as an accent.
+          A faint grid sits on top, permanently, so the band doesn't read as
+          a flat void — and two fixed light pools sit on top of that (bottom
+          left, top right), each brightening the grid underneath it, same as
+          the cursor spotlight used to but always on rather than hover-only. */}
+      <div className="relative overflow-hidden bg-gradient-to-b from-[#0b0f14] via-[#0f1720] to-[#0b0f14] text-white">
+        {/* Base grid — always faintly visible. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0"
+          style={{
+            backgroundImage:
+              'linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px), ' +
+              'linear-gradient(to bottom, rgba(255,255,255,0.06) 1px, transparent 1px)',
+            backgroundSize: '42px 42px',
+          }}
+        />
+        {/* Bright grid — same pattern, revealed only inside the two fixed
+            light-pool circles below (bottom-left, top-right) via a
+            two-circle radial mask, so the grid itself visibly brightens in
+            those spots instead of just showing a glow on top of it. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0"
+          style={{
+            backgroundImage:
+              'linear-gradient(to right, rgba(165,180,252,0.55) 1px, transparent 1px), ' +
+              'linear-gradient(to bottom, rgba(165,180,252,0.55) 1px, transparent 1px)',
+            backgroundSize: '42px 42px',
+            WebkitMaskImage:
+              'radial-gradient(320px circle at 0% 100%, black, transparent 75%), ' +
+              'radial-gradient(320px circle at 100% 0%, black, transparent 75%)',
+            maskImage:
+              'radial-gradient(320px circle at 0% 100%, black, transparent 75%), ' +
+              'radial-gradient(320px circle at 100% 0%, black, transparent 75%)',
+            WebkitMaskComposite: 'source-over',
+            maskComposite: 'add',
+          }}
+        />
+        {/* The light pools themselves — bottom-left and top-right — give
+            the brightened grid patches an actual light source rather than
+            just being a brighter texture. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              'radial-gradient(640px circle at 0% 100%, rgba(99,102,241,0.20), transparent 45%), ' +
+              'radial-gradient(640px circle at 100% 0%, rgba(99,102,241,0.20), transparent 45%)',
+          }}
+        />
+
+        <div className="relative z-10 max-w-container mx-auto px-6 pt-6 pb-16">
           <button
             onClick={() => navigate('/learn/simulations')}
             className="flex items-center gap-1.5 text-sm text-white/60 hover:text-white transition-colors mb-7 cursor-pointer"
@@ -201,6 +251,14 @@ export default function GenericSimOverview() {
                 <Clock className="h-4 w-4 shrink-0" />
                 <span className="font-semibold text-white">{simulation.estimated_hours}</span>
               </span>
+              {/* Was empty visual space in this row before — every other stat
+                  here is a plain fact about the sim (task count, duration,
+                  difficulty, XP); this is the one that's actually a selling
+                  point, so it gets the accent treatment instead of blending
+                  in as a fifth identical icon+label pair. */}
+              <Badge className="gap-1 border-transparent bg-primary/25 text-white">
+                <Sparkles className="h-3 w-3" /> AI-Assisted
+              </Badge>
               <span className="flex items-center gap-2">
                 <BarChart3 className="h-4 w-4 shrink-0" />
                 <span className="font-semibold text-white">{simulation.difficulty}</span> difficulty
@@ -255,13 +313,29 @@ export default function GenericSimOverview() {
           firing on every frame. */}
       <div ref={setHeroEndRef} aria-hidden="true" className="h-px w-full" />
 
+      {/* Reserves room for StickyOverviewBar the instant it goes `position:
+          fixed` — without this, the bar drops in over whatever's sitting
+          right here (the rating/tasks/hours stat strip, pulled up into the
+          hero via -mt-8) and visually slices the top off its numbers, since
+          the bar has no footprint in normal flow to push that content down
+          on its own. Zero height until then, so nothing shifts before the
+          bar actually appears. */}
+      <div aria-hidden="true" style={{ height: scrolledPastHero ? STICKY_BAR_HEIGHT : 0 }} />
+
       {/* ── Body ── */}
       <div className="max-w-container mx-auto px-6 pb-16">
         <div className="grid lg:grid-cols-[1fr_360px] gap-10 items-start">
           <div className="min-w-0">
-            {/* Stat strip — straddles the hero's lower edge. */}
+            {/* Stat strip. Used to be pulled up (-mt-8) to straddle the
+                hero's lower edge — looked like a nice overlap in theory, but
+                in practice the card's top row (the numbers themselves) ended
+                up sitting right across the hero/body colour seam, and on
+                some widths the hero's own small-print row, both reading as
+                the stats being visually "cut" by the background change.
+                Plain positive margin instead: the whole card lives entirely
+                on the white body, no seam running through it. */}
             {simulation.rating != null && (
-              <div className="-mt-8 mb-10 rounded-xl border border-border bg-white shadow-lg px-6 py-5 flex flex-wrap items-center gap-x-10 gap-y-5">
+              <div className="mt-6 mb-10 rounded-xl border border-border bg-white shadow-lg px-6 py-5 flex flex-wrap items-center gap-x-10 gap-y-5">
                 <div>
                   <p className="text-2xl font-extrabold text-on-surface leading-none mb-1.5">
                     {simulation.rating.toFixed(1)}
@@ -282,6 +356,16 @@ export default function GenericSimOverview() {
                     {simulation.estimated_hours}
                   </p>
                   <p className="text-xs text-on-surface-variant">to complete</p>
+                </div>
+                {/* The one qualitative claim in a row of numbers — a pill
+                    instead of a number+label pair so it reads as a badge,
+                    not a fourth stat. Fills what was empty trailing space in
+                    this row on wider screens. */}
+                <div className="lg:border-l lg:border-border lg:pl-10 flex items-center">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary px-3 py-1.5 text-xs font-bold">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    AI-Assisted
+                  </span>
                 </div>
               </div>
             )}

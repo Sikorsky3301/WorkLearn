@@ -4,6 +4,7 @@ import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom'
 // ── Shared layout ────────────────────────────────────────────────────────────
 import Navbar from '../../components/Navbar'
 import Footer from '../../components/Footer'
+import RouteTransitionLoader from '../../components/RouteTransitionLoader'
 
 // ── guards ────────────────────────────────────────────────────────────────
 import ScrollToHash from './ScrollToHash'
@@ -100,6 +101,7 @@ function MainLayout() {
   const showFooter = !FOOTERLESS_ROUTES.includes(location.pathname) && !FOOTERLESS_PATTERN.test(location.pathname)
   return (
     <div className="min-h-screen bg-white flex flex-col">
+      <RouteTransitionLoader />
       <Navbar />
       <main className="flex-1"><Outlet /></main>
       {showFooter && <Footer />}

@@ -1,5 +1,6 @@
 import { Briefcase, Check, Mail } from 'lucide-react'
 import { SIM_BRANDING } from '../../../lib/simBranding'
+import { resolveMediaUrl } from '../../../lib/client'
 
 /** One manager/task summary for a single enrolled simulation — Dashboard
  * renders one of these per entry in useMyAssignments() so a student running
@@ -29,8 +30,12 @@ export default function AssignmentCard({ assignment, onGo }) {
       <div className={shell}>
         {simChip}
         <div className="flex items-center gap-2.5 mb-4">
-          {branding?.managerPhoto ? (
-            <img src={branding.managerPhoto} alt={assignment.manager.name} className="w-9 h-9 rounded-full object-cover shrink-0" />
+          {assignment.manager?.photo_url || branding?.managerPhoto ? (
+            <img
+              src={assignment.manager?.photo_url ? resolveMediaUrl(assignment.manager.photo_url) : branding.managerPhoto}
+              alt={assignment.manager.name}
+              className="w-9 h-9 rounded-full object-cover shrink-0"
+            />
           ) : (
             <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
               {assignment.manager.avatar}

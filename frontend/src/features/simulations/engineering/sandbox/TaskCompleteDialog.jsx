@@ -52,6 +52,12 @@ export default function TaskCompleteDialog({
   taskTitle,
   passMark = 80,
   quizTaken = false,
+  // Defaults true so every EXISTING caller (which always has a real
+  // assessment) keeps offering the button unchanged. Pass false explicitly
+  // for a task with no assessment content at all — offering "Take the
+  // quiz" there opens a runner that 404s with "This task doesn't have an
+  // assessment," which is a bug, not a legitimate empty state.
+  hasAssessment = true,
   onTakeQuiz,
   onClose,
 }) {
@@ -154,7 +160,7 @@ export default function TaskCompleteDialog({
         </div>
 
         <div className="flex flex-col gap-2 border-t border-border bg-surface-low/40 p-4">
-          {passed && (
+          {passed && hasAssessment && (
             <button
               onClick={onTakeQuiz}
               className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-on-surface px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-on-surface/90"
