@@ -142,6 +142,12 @@ def _log_and_reraise(exc: Exception, *, model: str, trace_name: str):
 # into a slightly slower first token.
 _CONNECT_RETRY_DELAYS = (1.0, 3.0)
 
+# See Settings.ai_max_concurrent_calls (app/core/config.py) for why this
+# exists. Held only around the actual outbound call, not the retry-delay
+# sleeps around it — a caller waiting out a connection-retry backoff isn't
+# occupying the provider, so it shouldn't occupy a concurrency slot either.
+_AI_SEMAPHORE = asyncio.Semaphore(settings.ai_max_concurrent_calls)
+
 
 def _is_transient_connection_error(exc: Exception) -> bool:
     """True for "never reached the model" failures, which are safe to retry.
@@ -171,7 +177,8 @@ async def _acompletion_with_retry(*, model: str, trace_name: str, **kwargs):
         if delay:
             await asyncio.sleep(delay)
         try:
-            return await litellm.acompletion(model=model, **kwargs)
+            async with _AI_SEMAPHORE:
+                return await litellm.acompletion(model=model, **kwargs)
         except Exception as exc:
             if not _is_transient_connection_error(exc):
                 raise
@@ -291,14 +298,15 @@ async def _resolve_tool_calls(
         for i in range(max_iterations):
             logger.debug("tool-resolution iteration %d/%d", i + 1, max_iterations)
             try:
-                resp = await litellm.acompletion(
-                    model=model,
-                    messages=msgs,
-                    tools=tools,
-                    tool_choice="auto",
-                    max_tokens=max_tokens,
-                    **_provider_kwargs(),
-                )
+                async with _AI_SEMAPHORE:
+                    resp = await litellm.acompletion(
+                        model=model,
+                        messages=msgs,
+                        tools=tools,
+                        tool_choice="auto",
+                        max_tokens=max_tokens,
+                        **_provider_kwargs(),
+                    )
             except Exception as exc:
                 _log_and_reraise(exc, model=model, trace_name=trace_name)
 

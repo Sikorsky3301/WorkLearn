@@ -48,6 +48,20 @@ class Settings(BaseSettings):
     # wouldn't recognize.
     litellm_master_key: str = ""
 
+    # Caps how many LLM calls (any AI_PROVIDER — Mentor chat, roleplay,
+    # sandbox hints, grading judges) are in flight to the provider AT ONCE,
+    # across every request the backend is currently serving. Without this, a
+    # burst of students hitting AI-backed endpoints at the same moment fans
+    # out one real provider request per request — easily past the provider's
+    # own per-account rate limit, and a rate-limited call fails immediately
+    # rather than retrying (see llm.py's _is_transient_connection_error).
+    # Requests past this cap simply wait their turn locally instead of all
+    # landing on the provider together. Start conservative; raise it once you
+    # know your actual provider/model's real RPM ceiling — Groq's varies by
+    # model and account tier, and if you're behind the LiteLLM Proxy this
+    # should stay well under whatever rpm_limit the virtual key carries.
+    ai_max_concurrent_calls: int = 8
+
     frontend_url: str = "http://localhost:5173"
     port: int = 3001
 
