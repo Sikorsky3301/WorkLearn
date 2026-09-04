@@ -18,7 +18,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app/ app/
-COPY seed.py migrate_legacy_sims.py ./
+COPY seed.py migrate_legacy_sims.py seed_simulations.py export_simulations.py ./
+COPY seed_data/ seed_data/
 # Seed manager/company photos referenced by migrate_legacy_sims.py
 # (e.g. static/seed/priya-sharma.jpg) live under static/ in the repo but were
 # never copied into the image — every manager avatar 404'd at runtime as a
