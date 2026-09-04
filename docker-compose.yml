@@ -74,6 +74,13 @@ services:
       # container. Matches settings.sandbox_shared_dir / sandbox_hostpath_dir
       # in app/core/config.py.
       - /worklearn/sandbox-work:/sandbox-work
+      # Chained-task artifacts (see app/services/artifacts.py) — one task's
+      # graded output becomes the next task's input, persisted under
+      # /app/data/artifacts/<enrollment_id>/. Without this mount it's ordinary
+      # container filesystem: it works, right up until the next `docker
+      # compose up -d --build backend`, which throws every student's
+      # in-progress chained-task data away along with the old container.
+      - /worklearn/backend-data:/app/data
 
   frontend:
     build: ./frontend

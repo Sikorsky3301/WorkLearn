@@ -23,3 +23,8 @@ backend/wvenv/
 .claude
 .vscode/
 backend/logs/
+
+# Runtime data — student-generated artifacts (app/services/artifacts.py),
+# not source. In production this is a Docker volume (see docker-compose.yml);
+# committing it here just meant every real submission grew the repo.
+backend/data/artifacts/
