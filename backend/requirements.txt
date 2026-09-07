@@ -32,3 +32,10 @@ pandas==2.2.3
 openpyxl==3.1.5
 numpy==2.1.3
 kubernetes>=31.0.0
+# Verifies Google Sign-In ID tokens server-side (app/api/v1/auth/auth.py's
+# /api/auth/google) — signature + issuer + audience, against Google's own
+# published keys. Deliberately not hand-rolled with python-jose (already a
+# dependency, used for our OWN JWTs): Google rotates its signing keys on its
+# own schedule, and this library handles fetching/caching/refreshing them
+# correctly, which a one-off JWKS implementation would get wrong eventually.
+google-auth==2.35.0

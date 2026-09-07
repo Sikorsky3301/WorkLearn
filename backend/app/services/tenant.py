@@ -4,7 +4,7 @@ from fastapi import Header, HTTPException, Request
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.database import get_db
-from app.models.university import University
+from app.models.university import University, UniversityDomain
 from fastapi import Depends
 
 # Labels that never map to a partner university (main / academy host)
@@ -15,19 +15,24 @@ RESERVED_SUBDOMAINS = frozenset({
 TENANT_HOST_HEADER = "X-WorkLearn-Host"
 
 
+def _strip_port(host: str) -> str:
+    """Lowercased host with any :port removed. An IPv6 literal keeps its
+    brackets here — naively splitting "[::1]:5173" on the first ":"
+    truncates it to "[", so the bracket form is handled before falling back
+    to a plain split. Shared by extract_partner_subdomain and the exact-
+    hostname domain-mapping lookup below, so the two never drift apart on
+    what counts as "the same host"."""
+    host = host.strip().lower()
+    if host.startswith("["):
+        return host.split("]")[0] + "]"
+    return host.split(":")[0]
+
+
 def extract_partner_subdomain(host: str | None) -> str | None:
     """Return partner subdomain label, or None for the teaching-academy (main) host."""
     if not host:
         return None
-    host = host.strip().lower()
-
-    # Strip the port. An IPv6 literal keeps its brackets here — naively
-    # splitting "[::1]:5173" on the first ":" truncates it to "[", so the
-    # bracket form is handled before falling back to a plain split.
-    if host.startswith("["):
-        host = host.split("]")[0] + "]"
-    else:
-        host = host.split(":")[0]
+    host = _strip_port(host)
 
     if not host or host in ("localhost", "127.0.0.1", "::1", "[::1]"):
         return None
@@ -106,10 +111,30 @@ async def get_partner_university(db: AsyncSession, subdomain: str) -> University
     return uni
 
 
+async def get_university_by_domain(db: AsyncSession, host: str) -> University | None:
+    """Exact-hostname lookup in university_domains — an explicit fact, not
+    a guess from how many dots the hostname has. Checked before the
+    subdomain-shape convention in resolve_tenant() below, so a hostname
+    that doesn't fit that convention (the academy itself reachable at
+    worklearn.upskillcampus.com, or a partner's own custom domain) still
+    resolves correctly instead of 404ing as an "unknown subdomain"."""
+    result = await db.execute(
+        select(University)
+        .join(UniversityDomain, UniversityDomain.university_id == University.id)
+        .where(func.lower(UniversityDomain.hostname) == host.lower())
+    )
+    return result.scalar_one_or_none()
+
+
 async def resolve_tenant(
     db: AsyncSession,
     host: str | None,
 ) -> University:
+    if host:
+        mapped = await get_university_by_domain(db, _strip_port(host))
+        if mapped is not None:
+            return mapped
+
     subdomain = extract_partner_subdomain(host)
     if subdomain is None:
         return await get_default_university(db)

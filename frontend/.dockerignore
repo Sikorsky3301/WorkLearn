@@ -1,4 +1,14 @@
 node_modules/
 dist/
-.env
-.env.local
+
+# .env is NOT excluded here (unlike a typical backend .dockerignore) — Vite
+# only ever exposes vars explicitly prefixed VITE_ to client code, so by
+# Vite's own design there is nothing secret to protect: a VITE_ var is
+# guaranteed to end up in the shipped JS bundle regardless of whether it's
+# read from this file or a --build-arg. Excluding it just breaks build-time
+# config like VITE_GOOGLE_CLIENT_ID silently (the value is undefined, not an
+# error) instead of protecting anything. It's also moot for image size/leak
+# concerns either way: the Dockerfile's final stage only ever COPYs `dist/`
+# out of the build stage, never the build stage's own filesystem, so this
+# file doesn't persist into the shipped image even if it did contain
+# something non-VITE_-prefixed.

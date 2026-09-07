@@ -92,6 +92,22 @@ export function AuthProvider({ children }) {
   const loginUniversity = login
   const loginMentor = login
 
+  // Google Sign-In. `credential` is the signed ID-token JWT Google's own
+  // Identity Services script hands back after the user picks an account —
+  // this function never sees or checks anything about it itself, just
+  // forwards it to the backend, which verifies the signature against
+  // Google's own keys before trusting any of it.
+  const loginWithGoogle = async (credential) => {
+    try {
+      const { token, user: u } = await api.post('/api/auth/google', { credential })
+      setToken(token)
+      setUser(u)
+      return { success: true, role: u.role }
+    } catch (e) {
+      return failure(e)
+    }
+  }
+
   const logout = () => {
     clearToken()
     setUser(null)
@@ -142,7 +158,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={{
-      user, loading, register, login, loginDirect, loginAdmin, loginUniversity, loginMentor,
+      user, loading, register, login, loginDirect, loginWithGoogle, loginAdmin, loginUniversity, loginMentor,
       authTransition, setAuthTransition,
       logout, hasFeature, unlockFeature, hasPermission, refreshUser,
     }}>

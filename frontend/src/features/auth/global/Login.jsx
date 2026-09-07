@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Eye, EyeOff } from 'lucide-react'
@@ -7,6 +7,30 @@ import { api } from '../../../lib/client'
 import { useAuth } from '../AuthContext'
 import TenantBrandMark from '../../../components/TenantBrandMark'
 import { ROLES } from '../../../rbac/roles'
+
+// Backend verifies the token's audience against its own GOOGLE_CLIENT_ID —
+// the two must match exactly (see backend/.env). Sign-in silently has
+// nothing to render if this is unset, rather than a broken button.
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
+
+// Loaded once and reused — mounting/unmounting Login (or switching signin/
+// signup mode, which remounts the button container) must not inject the
+// script tag again.
+let googleScriptPromise = null
+function loadGoogleScript() {
+  if (googleScriptPromise) return googleScriptPromise
+  googleScriptPromise = new Promise((resolve, reject) => {
+    if (window.google?.accounts?.id) { resolve(); return }
+    const script = document.createElement('script')
+    script.src = 'https://accounts.google.com/gsi/client'
+    script.async = true
+    script.defer = true
+    script.onload = resolve
+    script.onerror = () => reject(new Error('Failed to load Google sign-in'))
+    document.head.appendChild(script)
+  })
+  return googleScriptPromise
+}
 
 // Shown between a successful sign-in and the first authenticated screen. The
 // steps are not decoration: the same window is used to prefetch the queries
@@ -69,21 +93,16 @@ function helpFor(result, email) {
   }
 }
 
-function GoogleIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 48 48">
-      <path fill="#FFC107" d="M43.6 20.5H42V20.4H24v7.2h11.3C33.7 32 29.3 35 24 35c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.1 8 3.1l5.1-5.1C33.9 5.5 29.2 3.5 24 3.5 12.7 3.5 3.5 12.7 3.5 24S12.7 44.5 24 44.5 44.5 35.3 44.5 24c0-1.2-.1-2.4-.3-3.5Z" />
-      <path fill="#FF3D00" d="m6.3 14.7 5.9 4.3C13.7 15.6 18.5 12.5 24 12.5c3.1 0 5.9 1.1 8 3.1l5.1-5.1C33.9 6.5 29.2 4.5 24 4.5c-7.6 0-14.1 4.3-17.7 10.2Z" />
-      <path fill="#4CAF50" d="M24 44.5c5.1 0 9.8-1.9 13.3-5.1l-6.1-5.2c-2 1.5-4.6 2.4-7.2 2.4-5.3 0-9.7-3.4-11.3-8.1l-6.1 4.7C9.8 40.1 16.4 44.5 24 44.5Z" />
-      <path fill="#1976D2" d="M43.6 20.5H42V20.4H24v7.2h11.3c-.8 2.3-2.3 4.3-4.2 5.7l6.1 5.2C40.7 35.9 44.5 30.5 44.5 24c0-1.2-.1-2.4-.3-3.5Z" />
-    </svg>
-  )
-}
-
 export default function Login() {
   const navigate                  = useNavigate()
   const queryClient               = useQueryClient()
-  const { loginDirect, register, setAuthTransition } = useAuth()
+  const { loginDirect, loginWithGoogle, register, setAuthTransition } = useAuth()
+  const googleButtonRef           = useRef(null)
+  // Always points at the current handler, so the effect below can set up
+  // Google's button once per mode-switch (not on every keystroke) while
+  // still calling into fresh component state/props. Standard "latest ref"
+  // pattern for a callback an external, non-React script holds onto.
+  const handleGoogleCredentialRef = useRef(null)
 
   const [mode,     setMode]     = useState('signin') // 'signin' | 'signup'
   const [name,     setName]     = useState('')
@@ -122,6 +141,27 @@ export default function Login() {
     }
   }, [queryClient])
 
+  // The redirect half of a successful sign-in — shared by the password form
+  // and Google, so "which portal does this role land on" exists in exactly
+  // one place regardless of how someone authenticated.
+  const proceedAfterAuth = useCallback((role) => {
+    // Role picks the portal; host already picked the tenant via the API.
+    // Admins / mentors share none of the student dashboard queries — skip warmUp.
+    let to = '/dashboard'
+    if (role === ROLES.SUPER_ADMIN) to = '/super-admin'
+    else if (role === ROLES.ADMIN) to = '/admin'
+    else if (role === ROLES.UNIVERSITY_ADMIN) to = '/university-admin'
+    else if (role === ROLES.TEACHER) to = '/mentor'
+    else warmUp()
+
+    // Order matters. GuestOnlyRoute redirects a signed-in user away from this
+    // page, and by now `user` is already set — so the flag has to go up before
+    // the loader does, or the guard unmounts us first and the loader never
+    // renders. Cleared in the loader's onComplete, once we have navigated.
+    setAuthTransition(true)
+    setDestination(to)
+  }, [warmUp, setAuthTransition])
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError(''); setErrorHelp('')
@@ -138,23 +178,47 @@ export default function Login() {
       setErrorHelp(helpFor(result, email))
       return
     }
-
-    // Role picks the portal; host already picked the tenant via the API.
-    // Admins / mentors share none of the student dashboard queries — skip warmUp.
-    let to = '/dashboard'
-    if (result.role === ROLES.SUPER_ADMIN) to = '/super-admin'
-    else if (result.role === ROLES.ADMIN) to = '/admin'
-    else if (result.role === ROLES.UNIVERSITY_ADMIN) to = '/university-admin'
-    else if (result.role === ROLES.TEACHER) to = '/mentor'
-    else warmUp()
-
-    // Order matters. GuestOnlyRoute redirects a signed-in user away from this
-    // page, and by now `user` is already set — so the flag has to go up before
-    // the loader does, or the guard unmounts us first and the loader never
-    // renders. Cleared in the loader's onComplete, once we have navigated.
-    setAuthTransition(true)
-    setDestination(to)
+    proceedAfterAuth(result.role)
   }
+
+  // `response.credential` is Google's signed ID-token JWT — handed straight
+  // to the backend, which does the actual verification (signature, issuer,
+  // audience) against Google's own keys. Nothing here trusts it itself.
+  handleGoogleCredentialRef.current = async (response) => {
+    setError(''); setErrorHelp('')
+    const result = await loginWithGoogle(response.credential)
+    if (result.error) {
+      setError(result.error)
+      setErrorHelp(helpFor(result))
+      return
+    }
+    proceedAfterAuth(result.role)
+  }
+
+  // Sets up Google's own button once per signin/signup switch (the container
+  // it renders into is unmounted in signup mode) — not on every keystroke,
+  // since the ref indirection above means this never needs the latest
+  // email/password to fire the latest handler.
+  useEffect(() => {
+    if (mode !== 'signin' || !GOOGLE_CLIENT_ID || !googleButtonRef.current) return
+    let cancelled = false
+    loadGoogleScript()
+      .then(() => {
+        if (cancelled || !googleButtonRef.current) return
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: (response) => handleGoogleCredentialRef.current(response),
+        })
+        window.google.accounts.id.renderButton(googleButtonRef.current, {
+          theme: 'outline', size: 'large', shape: 'pill',
+          width: 344, text: 'signin_with', logo_alignment: 'center',
+        })
+      })
+      .catch(() => {
+        setNotice("Google sign-in couldn't load — please continue with email and password above.")
+      })
+    return () => { cancelled = true }
+  }, [mode])
 
   return (
     <div className="h-screen flex overflow-hidden">
@@ -287,7 +351,7 @@ export default function Login() {
             </button>
           </form>
 
-          {mode === 'signin' && (
+          {mode === 'signin' && GOOGLE_CLIENT_ID && (
             <>
               <div className="flex items-center gap-3 my-4">
                 <div className="flex-1 h-px bg-border" />
@@ -295,13 +359,13 @@ export default function Login() {
                 <div className="flex-1 h-px bg-border" />
               </div>
 
-              <button
-                type="button"
-                onClick={() => setNotice("Google sign-in isn't set up yet — please continue with email and password above.")}
-                className="btn-secondary w-full py-2.5 text-sm flex items-center justify-center gap-2.5 cursor-pointer"
-              >
-                <GoogleIcon /> Sign in with Google
-              </button>
+              {/* Google's own script renders the actual button here — see
+                  the useEffect above. Its styling (outline/pill) is the
+                  closest match Google's renderButton API allows to the rest
+                  of this form's buttons; it can't be a plain custom-styled
+                  button like the rest of the page, since Google requires
+                  their own script to own the click. */}
+              <div ref={googleButtonRef} className="flex justify-center" />
             </>
           )}
 

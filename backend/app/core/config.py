@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     groq_api_key: str = ""
     ai_provider: str = "anthropic"  # anthropic | gemini | groq | openai | litellm_proxy
+    # Google Sign-In (see app/api/v1/auth/auth.py's /api/auth/google). Must be
+    # the SAME client ID the frontend's VITE_GOOGLE_CLIENT_ID uses — the
+    # backend checks it as the token's audience, so a mismatch here rejects
+    # every sign-in with an "invalid audience" error rather than a helpful one.
+    google_client_id: str = ""
 
     # "openai" here means any OpenAI-Chat-Completions-compatible endpoint,
     # not necessarily api.openai.com — e.g. a self-hosted vLLM/ngrok server.

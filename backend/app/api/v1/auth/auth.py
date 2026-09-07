@@ -1,9 +1,13 @@
+import secrets
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from sqlalchemy.orm import selectinload
 from pydantic import BaseModel
 from datetime import datetime, timezone
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token as google_id_token
 from app.db.database import get_db
 from app.models import User, UnlockedFeature, UserBadge
 from app.models.roles import RoleSlug, ROLE_IDS
@@ -30,6 +34,14 @@ class RegisterBody(BaseModel):
     name: str
     email: str
     password: str
+
+
+class GoogleAuthBody(BaseModel):
+    # The ID token from Google Identity Services' credential response — a
+    # signed JWT, not a plain access token. Verified server-side below; the
+    # frontend never gets to assert who signed in, only Google's signature
+    # does.
+    credential: str
 
 
 def _university_dict(uni: University | None) -> dict | None:
@@ -220,6 +232,69 @@ async def register(
     db.add(user)
     await db.commit()
     user = await _load_user_by_id(db, user.id)
+    flags = await resolve_feature_flags(db, user)
+    return {
+        "token": create_token(user.id, user.role),
+        "user": {**_safe_user(user), "feature_flags": flags},
+    }
+
+
+@router.post("/google")
+async def google_login(
+    body: GoogleAuthBody,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    x_worklearn_host: str | None = Header(None, alias=TENANT_HOST_HEADER),
+):
+    """Sign in (or sign up, on first use) with a Google account.
+
+    Same tenant restriction as /register — academy host only, same as the
+    button it replaces on the login page. Google-only accounts get a random,
+    never-shown password_hash rather than a nullable column: the field is
+    NOT NULL, and a random hash correctly means "no password will ever match
+    this" instead of a nullable check scattered across every password-login
+    code path.
+    """
+    tenant = await _tenant_for_request(request, db, x_worklearn_host)
+    _require_academy(tenant)
+
+    if not settings.google_client_id:
+        raise HTTPException(500, "Google sign-in is not configured on the server.")
+
+    try:
+        idinfo = google_id_token.verify_oauth2_token(
+            body.credential, google_requests.Request(), settings.google_client_id,
+        )
+    except ValueError:
+        raise HTTPException(401, "Could not verify this Google sign-in — please try again.")
+
+    if not idinfo.get("email_verified"):
+        raise HTTPException(401, "Your Google account's email address isn't verified.")
+
+    email = idinfo["email"].lower().strip()
+    name = (idinfo.get("name") or email.split("@")[0]).strip()
+
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        university_id = await _get_default_university_id(db)
+        user = User(
+            name=name,
+            email=email,
+            password_hash=hash_password(secrets.token_urlsafe(32)),
+            role_id=ROLE_IDS[RoleSlug.STUDENT],
+            university_id=university_id,
+            avatar=name[:2].upper(),
+            photo_url=idinfo.get("picture"),
+        )
+        db.add(user)
+        await db.commit()
+        user = await _load_user_by_id(db, user.id)
+    elif not user.is_active:
+        raise HTTPException(403, "This account has been suspended.")
+
+    await _touch(db, user.id)
     flags = await resolve_feature_flags(db, user)
     return {
         "token": create_token(user.id, user.role),
