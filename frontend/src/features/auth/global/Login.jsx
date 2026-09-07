@@ -5,6 +5,7 @@ import { Eye, EyeOff } from 'lucide-react'
 import { MultiStepLoader } from '../../../components/ui/multi-step-loader'
 import { api } from '../../../lib/client'
 import { useAuth } from '../AuthContext'
+import { useTenant } from '../TenantContext'
 import TenantBrandMark from '../../../components/TenantBrandMark'
 import { ROLES } from '../../../rbac/roles'
 
@@ -97,6 +98,13 @@ export default function Login() {
   const navigate                  = useNavigate()
   const queryClient               = useQueryClient()
   const { loginDirect, loginWithGoogle, register, setAuthTransition } = useAuth()
+  // Google Sign-In is academy-only — the backend's /api/auth/google
+  // enforces this too (_require_academy, same restriction /register uses),
+  // so this isn't the only thing stopping a partner-tenant sign-in from
+  // working; it's what stops the button from being shown at all on a
+  // partner subdomain's /login, where clicking it could only ever end in a
+  // confusing 403 after a full Google auth round-trip.
+  const { isPartner } = useTenant()
   const googleButtonRef           = useRef(null)
   // Always points at the current handler, so the effect below can set up
   // Google's button once per mode-switch (not on every keystroke) while
@@ -200,7 +208,7 @@ export default function Login() {
   // since the ref indirection above means this never needs the latest
   // email/password to fire the latest handler.
   useEffect(() => {
-    if (mode !== 'signin' || !GOOGLE_CLIENT_ID || !googleButtonRef.current) return
+    if (mode !== 'signin' || !GOOGLE_CLIENT_ID || isPartner || !googleButtonRef.current) return
     let cancelled = false
     loadGoogleScript()
       .then(() => {
@@ -218,7 +226,7 @@ export default function Login() {
         setNotice("Google sign-in couldn't load — please continue with email and password above.")
       })
     return () => { cancelled = true }
-  }, [mode])
+  }, [mode, isPartner])
 
   return (
     <div className="h-screen flex overflow-hidden">
@@ -351,7 +359,7 @@ export default function Login() {
             </button>
           </form>
 
-          {mode === 'signin' && GOOGLE_CLIENT_ID && (
+          {mode === 'signin' && GOOGLE_CLIENT_ID && !isPartner && (
             <>
               <div className="flex items-center gap-3 my-4">
                 <div className="flex-1 h-px bg-border" />
