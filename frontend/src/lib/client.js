@@ -292,7 +292,7 @@ export async function downloadFile(path, filename) {
 // real failure. The final `message_id` the server sends right before
 // [DONE] is threaded through to `onDone(meta)` so the UI can attach
 // feedback (thumbs up/down) to the exact MentorChatMessage row.
-export async function streamChat({ message, conversationHistory, context, onChunk, onDone, signal }) {
+export async function streamChat({ message, conversationHistory, context, sessionId, onChunk, onDone, signal }) {
   const token = getToken()
   const res = await fetch(`${BASE_URL}/api/chat`, {
     method: 'POST',
@@ -300,7 +300,7 @@ export async function streamChat({ message, conversationHistory, context, onChun
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ message, conversation_history: conversationHistory, context }),
+    body: JSON.stringify({ message, conversation_history: conversationHistory, context, session_id: sessionId ?? null }),
     signal,
   })
 
@@ -309,6 +309,9 @@ export async function streamChat({ message, conversationHistory, context, onChun
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
   let messageId = null
+  // Echoes back either the sessionId we sent, or — for a brand-new chat
+  // (sessionId was null) — the id the server just lazily created for it.
+  let responseSessionId = sessionId ?? null
 
   while (true) {
     const { done, value } = await reader.read()
@@ -320,13 +323,14 @@ export async function streamChat({ message, conversationHistory, context, onChun
     for (const line of lines) {
       if (!line.startsWith('data: ')) continue
       const data = line.slice(6).trim()
-      if (data === '[DONE]') { onDone?.({ messageId }); return }
+      if (data === '[DONE]') { onDone?.({ messageId, sessionId: responseSessionId }); return }
       let parsed
       try { parsed = JSON.parse(data) } catch { continue }
       if (parsed.error) throw new Error(parsed.error)
       if (parsed.text) onChunk(parsed.text)
       if (parsed.message_id) messageId = parsed.message_id
+      if (parsed.session_id) responseSessionId = parsed.session_id
     }
   }
-  onDone?.({ messageId })
+  onDone?.({ messageId, sessionId: responseSessionId })
 }

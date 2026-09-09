@@ -36,7 +36,7 @@ class User(Base):
     year:            Mapped[str | None]    = mapped_column(String, nullable=True)
     avatar:          Mapped[str | None]    = mapped_column(String, nullable=True)
     xp:              Mapped[int]           = mapped_column(Integer, default=0)
-    target_role:     Mapped[str]           = mapped_column(String, default="junior_da")
+    target_role:     Mapped[str | None]    = mapped_column(String, nullable=True)
     last_seen_at:    Mapped[datetime]      = mapped_column(DateTime(timezone=True), default=utcnow)
     created_at:      Mapped[datetime]      = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -171,11 +171,25 @@ class UserBadge(Base):
     user: Mapped["User"] = relationship(back_populates="badges")
 
 
+class MentorChatSession(Base):
+    """One AI Mentor conversation thread. A student can have many — the
+    sidebar lists them, most recently active first (see `updated_at`, bumped
+    on every new message in the session, not just at creation)."""
+    __tablename__ = "mentor_chat_sessions"
+
+    id:         Mapped[int]           = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id:    Mapped[int]           = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    title:      Mapped[str | None]    = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime]      = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime]      = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
 class MentorChatMessage(Base):
     __tablename__ = "mentor_chat_messages"
 
     id:         Mapped[int]      = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id:    Mapped[int]      = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    session_id: Mapped[int]      = mapped_column(Integer, ForeignKey("mentor_chat_sessions.id", ondelete="CASCADE"), nullable=False)
     role:       Mapped[str]      = mapped_column(String, nullable=False)
     content:    Mapped[str]      = mapped_column(String, nullable=False)
     trace_id:   Mapped[str | None] = mapped_column(String, nullable=True)

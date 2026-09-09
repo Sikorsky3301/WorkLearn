@@ -27,7 +27,7 @@ export default function ChatMessage({ msg, onRetry, onFeedback }) {
     : null
 
   return (
-    <div className={`flex items-start gap-2.5 group ${isUser ? 'flex-row-reverse' : ''}`}>
+    <div className={`mentor-bubble-in flex items-start gap-2.5 group ${isUser ? 'flex-row-reverse' : ''}`}>
       {!isUser && (
         <div className={`w-7 h-7 rounded-lg overflow-hidden shrink-0 mt-0.5 ${isWaiting ? 'mentor-avatar-thinking' : ''}`}>
           <img src={aiMentorIcon} alt="" className="w-full h-full object-cover" />

@@ -5,7 +5,7 @@ export default function Settings() {
   const [pace, setPace] = useState('professional')
   const [standupTime, setStandupTime] = useState('08:00')
   const [darkMode, setDarkMode] = useState(false)
-  const [notifs, setNotifs] = useState({ morning: true, evening: true, mentorReminder: true, evaluations: true, cohortUpdates: false })
+  const [notifs, setNotifs] = useState({ morning: true, evening: true, evaluations: true, cohortUpdates: false })
   const [saved, setSaved] = useState(false)
   const [activeSection, setActiveSection] = useState('profile')
 
@@ -143,7 +143,6 @@ export default function Settings() {
                 {[
                   { key: 'morning', label: 'Task Reminder', desc: 'Daily Manager reminder of your pending task at your configured time.' },
                   { key: 'evening', label: 'Evening Review Reminder', desc: 'End-of-day progress review prompt at 9 PM.' },
-                  { key: 'mentorReminder', label: 'Mentor Session Reminders', desc: '30-minute reminder before scheduled AI Mentor sessions.' },
                   { key: 'evaluations', label: 'Evaluation Results', desc: 'Notify when AI Evaluator completes scoring your submissions.' },
                   { key: 'cohortUpdates', label: 'Cohort Activity', desc: 'Updates when peers in your cohort achieve milestones.' },
                 ].map(n => (
@@ -196,7 +195,6 @@ export default function Settings() {
               {[
                 { label: 'Public Portfolio', desc: 'Allow your portfolio to be viewed by employers and peers.', default: true },
                 { label: 'Show in Leaderboard', desc: 'Appear in cohort leaderboard rankings.', default: true },
-                { label: 'Share Progress with Mentor', desc: 'Let AI Mentor access your full simulation and quiz history.', default: true },
                 { label: 'Analytics Data Collection', desc: 'Allow WorkLearn to collect usage data to improve AI recommendations.', default: false },
               ].map((item, i) => (
                 <div key={i} className="flex items-center justify-between py-3 border-b border-border last:border-0">

@@ -62,6 +62,7 @@ import { EngineeringRoadmapRoute, EngineeringTaskRoute } from '../../features/si
 import SandboxWorkbenchPage from '../../features/simulations/engineering/sandbox/SandboxWorkbenchPage'
 import Portfolio            from '../../features/users/portfolio/Portfolio'
 import CareerTwin           from '../../features/ai-mentor/CareerTwin'
+import AiMentorSettings     from '../../features/ai-mentor/AiMentorSettings'
 import SkillGPS             from '../../features/skill-gps/SkillGPS'
 import Analytics            from '../../features/analytics/Analytics'
 import SandboxCatalogue    from '../../features/sandboxes/SandboxCatalogue'
@@ -252,7 +253,9 @@ export default function AppRouter() {
           <Route path="/simulations/:slug"          element={<GenericSimShell />} />
           <Route path="/portfolio"               element={<Portfolio />} />
           <Route path="/ai-mentor"               element={<CareerTwin />} />
+          <Route path="/ai-mentor/c/:sessionId"  element={<CareerTwin />} />
           <Route path="/ai-mentor/chat"          element={<Navigate to="/ai-mentor" replace />} />
+          <Route path="/ai-mentor/settings"      element={<AiMentorSettings />} />
           <Route path="/skill-gps"               element={<SkillGPS />} />
           <Route path="/analytics"               element={<Analytics />} />
           {/* Practice sandboxes — no task, no grading, nothing saved. The

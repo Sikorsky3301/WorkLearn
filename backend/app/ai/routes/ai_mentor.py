@@ -3,18 +3,20 @@ import json
 import logging
 import re
 from collections import OrderedDict
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func
 from pydantic import BaseModel
 from app.db.database import get_db, AsyncSessionLocal
 from app.core.auth import get_current_user, token_user_id
-from app.models import User, Enrollment, MentorChatMessage
+from app.core.config import ROLE_META
+from app.models import User, Enrollment, MentorChatMessage, MentorChatSession
 from app.models.cms import SimulationTask
 from app.services.simulation_lookup import get_simulation
 from app.services.skill_engine import (
-    compute_skill_gps, role_exists, recommended_role, role_catalog,
+    compute_skill_gps, role_exists, recommended_role, role_catalog, effective_target_role,
 )
 from app.ai.services.llm import stream_chat, generate, chat_with_tools
 from app.ai.services.langfuse_client import traced_observation, traced_context, get_current_trace_id, score_trace
@@ -101,6 +103,7 @@ class ChatBody(BaseModel):
     message: str
     conversation_history: list[dict] = []
     context: dict = {}
+    session_id: int | None = None  # None starts a new conversation thread
 
 
 class FeedbackBody(BaseModel):
@@ -134,7 +137,11 @@ async def chat(body: ChatBody, db: AsyncSession = Depends(get_db), token: dict =
     # stashed on the tool context so a `get_current_task` tool call within
     # this same request reuses it instead of re-querying.
     assignment = await _build_assignment(db, user_id, enrollment) if enrollment else None
-    target_role = (user.target_role or "junior_da").replace("_", " ").title()
+    # Explicit override (set from the Mentor Settings page) wins; otherwise
+    # derived from the student's actual enrollment domain — never a fixed
+    # default. See effective_target_role() for the precedence rule.
+    resolved_role, _is_override = await effective_target_role(db, user_id, user)
+    target_role_label = ROLE_META[resolved_role]["label"]
     # Total XP is a free read off the already-loaded `user` row (the
     # authoritative running total, not derived from the ledger) — worth
     # making always-on rather than tool-gated since "how much XP do I have"
@@ -142,7 +149,7 @@ async def chat(body: ChatBody, db: AsyncSession = Depends(get_db), token: dict =
     # capped recent-awards list from get_xp_ledger would otherwise undercount.
     context_block = f"""
 ## Current Context
-Student: {user.name} | Target role: {target_role} | Total XP: {user.xp}
+Student: {user.name} | Target role: {target_role_label} | Total XP: {user.xp}
 Current task: {_current_task_headline(assignment)}
 """
     # Persona is scoped to whatever simulation the student is actually
@@ -160,10 +167,31 @@ Current task: {_current_task_headline(assignment)}
         {"role": "user", "content": body.message},
     ]
 
-    # Save user message
+    # Resolve the conversation thread this message belongs to — creating one
+    # on the fly whenever the caller has no session_id yet, which is how the
+    # UI's "New Chat" button works: it just clears the session param
+    # client-side and lets the first message create the real session here,
+    # rather than creating an empty one up front. Either way, a still-titleless
+    # session is titled from this, its first message.
     async with AsyncSessionLocal() as save_db:
-        save_db.add(MentorChatMessage(user_id=user_id, role="user", content=body.message))
+        if body.session_id is not None:
+            chat_session = (await save_db.execute(
+                select(MentorChatSession).where(
+                    MentorChatSession.id == body.session_id, MentorChatSession.user_id == user_id,
+                )
+            )).scalar_one_or_none()
+            if not chat_session:
+                raise HTTPException(404, "Chat session not found")
+        else:
+            chat_session = MentorChatSession(user_id=user_id)
+            save_db.add(chat_session)
+            await save_db.flush()  # assigns chat_session.id
+        if not chat_session.title:
+            chat_session.title = body.message.strip()[:60]
+        chat_session.updated_at = datetime.now(timezone.utc)
+        save_db.add(MentorChatMessage(user_id=user_id, session_id=chat_session.id, role="user", content=body.message))
         await save_db.commit()
+        session_id = chat_session.id
 
     # Tool resolution needs the request-scoped `db` session, which FastAPI
     # closes right after this handler returns — it must run here, before
@@ -178,7 +206,7 @@ Current task: {_current_task_headline(assignment)}
     # "Something went wrong" report with no visible cause looks like.
     tool_ctx = MentorToolContext(db=db, user_id=user_id, user=user, enrollment=enrollment, cached_assignment=assignment)
     try:
-        with traced_context(user_id=user_id, session_id=f"mentor-{user_id}", tags=["ai-mentor", "tool-resolution"]):
+        with traced_context(user_id=user_id, session_id=f"mentor-{session_id}", tags=["ai-mentor", "tool-resolution"]):
             resolved_messages = await chat_with_tools(
                 system, messages, TOOL_SCHEMAS,
                 tool_executor=functools.partial(execute_tool, ctx=tool_ctx),
@@ -196,11 +224,10 @@ Current task: {_current_task_headline(assignment)}
         # after chat() has already returned, so a span opened in chat()
         # would already be closed before any chunk is produced.
         with traced_observation("span", "mentor-chat", input={"message": body.message}) as root_span:
-            # session_id groups this user's ongoing mentor conversation —
-            # there's no explicit chat-session boundary in the data model
-            # (MentorChatMessage rows are just one continuous per-user
-            # history), so the user's own id is the natural session key.
-            with traced_context(user_id=user_id, session_id=f"mentor-{user_id}", tags=["ai-mentor"]):
+            # Langfuse session_id groups every trace from this one conversation
+            # thread — keyed off the real MentorChatSession id now, so traces
+            # from two concurrent chats for the same student are never conflated.
+            with traced_context(user_id=user_id, session_id=f"mentor-{session_id}", tags=["ai-mentor"]):
                 # Captured while this trace is still active — the span
                 # itself will be closed by the time a feedback PATCH arrives
                 # later, so the id (not the span object) is what gets persisted.
@@ -216,7 +243,7 @@ Current task: {_current_task_headline(assignment)}
                     if full_response:
                         async with AsyncSessionLocal() as save_db:
                             msg = MentorChatMessage(
-                                user_id=user_id, role="assistant",
+                                user_id=user_id, session_id=session_id, role="assistant",
                                 content="".join(full_response), trace_id=trace_id,
                             )
                             save_db.add(msg)
@@ -224,11 +251,14 @@ Current task: {_current_task_headline(assignment)}
                             await save_db.refresh(msg)
                             message_id = msg.id
             root_span.update(output="".join(full_response))
-        # Sent once, right before [DONE] — lets the frontend attach this
-        # message's id to the just-finished bubble so a thumbs up/down click
-        # knows which MentorChatMessage row to PATCH.
-        if message_id:
-            yield f"data: {json.dumps({'message_id': message_id})}\n\n"
+        # Sent once, right before [DONE]. message_id lets the frontend attach
+        # this message's id to the just-finished bubble so a thumbs up/down
+        # click knows which MentorChatMessage row to PATCH. session_id is
+        # always sent (even if the stream failed before any chunk arrived) so
+        # a brand-new chat's lazily-created session reaches the frontend —
+        # otherwise a first message that errors out mid-stream would leave an
+        # orphaned session the sidebar never learns about until reload.
+        yield f"data: {json.dumps({'message_id': message_id, 'session_id': session_id})}\n\n"
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(
@@ -239,13 +269,21 @@ Current task: {_current_task_headline(assignment)}
 
 
 @router.get("/chat/history")
-async def chat_history(limit: int = 50, db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
+async def chat_history(
+    session_id: int, limit: int = 200,
+    db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user),
+):
     if token.get("sa"):
         return []
     user_id = token_user_id(token)
+    owns = (await db.execute(
+        select(MentorChatSession.id).where(MentorChatSession.id == session_id, MentorChatSession.user_id == user_id)
+    )).scalar_one_or_none()
+    if not owns:
+        raise HTTPException(404, "Chat session not found")
     result = await db.execute(
         select(MentorChatMessage)
-        .where(MentorChatMessage.user_id == user_id)
+        .where(MentorChatMessage.session_id == session_id)
         .order_by(MentorChatMessage.created_at.asc())
         .limit(limit)
     )
@@ -260,10 +298,77 @@ async def chat_history(limit: int = 50, db: AsyncSession = Depends(get_db), toke
 
 @router.delete("/chat/history")
 async def clear_chat_history(db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
+    """Wipes every conversation this student has — used by the "Clear
+    conversation history" control on the AI Mentor Settings page. Deleting
+    the sessions (rather than the messages directly) is what makes them
+    disappear from the sidebar too, via ON DELETE CASCADE."""
     if token.get("sa"):
         return {"ok": True}
-    await db.execute(delete(MentorChatMessage).where(MentorChatMessage.user_id == token_user_id(token)))
+    await db.execute(delete(MentorChatSession).where(MentorChatSession.user_id == token_user_id(token)))
     await db.commit()
+    return {"ok": True}
+
+
+@router.get("/mentor/sessions")
+async def list_mentor_sessions(db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
+    """The sidebar's conversation list — most recently active first."""
+    if token.get("sa"):
+        return []
+    user_id = token_user_id(token)
+    result = await db.execute(
+        select(MentorChatSession)
+        .where(MentorChatSession.user_id == user_id)
+        .order_by(MentorChatSession.updated_at.desc())
+    )
+    return [
+        {
+            "id": s.id,
+            "title": s.title or "New conversation",
+            "created_at": s.created_at.isoformat(),
+            "updated_at": s.updated_at.isoformat(),
+        }
+        for s in result.scalars().all()
+    ]
+
+
+class RenameSessionBody(BaseModel):
+    title: str
+
+
+@router.patch("/mentor/sessions/{session_id}")
+async def rename_mentor_session(
+    session_id: int, body: RenameSessionBody,
+    db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user),
+):
+    if token.get("sa"):
+        raise HTTPException(403, "Not available for admins.")
+    title = body.title.strip()
+    if not title:
+        raise HTTPException(400, "Title cannot be empty")
+    user_id = token_user_id(token)
+    chat_session = (await db.execute(
+        select(MentorChatSession).where(MentorChatSession.id == session_id, MentorChatSession.user_id == user_id)
+    )).scalar_one_or_none()
+    if not chat_session:
+        raise HTTPException(404, "Chat session not found")
+    chat_session.title = title[:120]
+    await db.commit()
+    return {"id": chat_session.id, "title": chat_session.title}
+
+
+@router.delete("/mentor/sessions/{session_id}")
+async def delete_mentor_session(
+    session_id: int, db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user),
+):
+    if token.get("sa"):
+        raise HTTPException(403, "Not available for admins.")
+    user_id = token_user_id(token)
+    result = await db.execute(
+        delete(MentorChatSession).where(MentorChatSession.id == session_id, MentorChatSession.user_id == user_id)
+    )
+    await db.commit()
+    if result.rowcount == 0:
+        raise HTTPException(404, "Chat session not found")
     return {"ok": True}
 
 
@@ -302,11 +407,11 @@ async def set_message_feedback(
 
 @router.get("/mentor/topics")
 async def mentor_topics(db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
-    """Domain-aware quick-topic chips for the Mentor sidebar — same domain
-    resolution as chat()'s persona lookup, so the chips always match
+    """Domain-aware quick-topic chips + starter questions for the Mentor UI —
+    same domain resolution as chat()'s persona lookup, so both always match
     whatever persona the student is actually talking to."""
     if token.get("sa"):
-        return {"domain": None, "topics": []}
+        return {"domain": None, "topics": [], "starters": []}
     user_id = token_user_id(token)
     enroll_res = await db.execute(
         select(Enrollment).where(Enrollment.user_id == user_id).order_by(Enrollment.enrolled_at.desc()).limit(1)
@@ -315,7 +420,67 @@ async def mentor_topics(db: AsyncSession = Depends(get_db), token: dict = Depend
     assignment = await _build_assignment(db, user_id, enrollment) if enrollment else None
     domain = assignment.get("domain") if assignment else None
     persona = get_persona(domain)
-    return {"domain": domain, "topics": persona.topics, "tagline": persona.tagline}
+
+    # The one starter no static persona list can write: the task they have
+    # open right now. Costs nothing extra — `assignment` is already loaded
+    # above for the domain lookup — and it is reliably the most useful thing
+    # on the welcome screen for a student who is mid-simulation.
+    starters = list(persona.starters)
+    if assignment and assignment.get("has_assignment") and assignment.get("task_name"):
+        starters.insert(0, f"Where should I start with \"{assignment['task_name']}\"?")
+
+    return {
+        "domain": domain,
+        "topics": persona.topics,
+        "starters": starters[:4],
+        "tagline": persona.tagline,
+    }
+
+
+class MentorSettingsBody(BaseModel):
+    target_role: str | None = None  # a valid ROLE_META key, or null to clear the override
+
+
+@router.get("/mentor/settings")
+async def get_mentor_settings(db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user)):
+    if token.get("sa"):
+        raise HTTPException(403, "Not available for admins.")
+    user_id = token_user_id(token)
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if not user:
+        raise HTTPException(404, "User not found")
+    role_key, is_override = await effective_target_role(db, user_id, user)
+    msg_count = (await db.execute(
+        select(func.count()).select_from(MentorChatMessage).where(MentorChatMessage.user_id == user_id)
+    )).scalar_one()
+    return {
+        "target_role": role_key,
+        "target_role_label": ROLE_META[role_key]["label"],
+        "is_override": is_override,
+        "message_count": msg_count,
+    }
+
+
+@router.patch("/mentor/settings")
+async def update_mentor_settings(
+    body: MentorSettingsBody, db: AsyncSession = Depends(get_db), token: dict = Depends(get_current_user),
+):
+    if token.get("sa"):
+        raise HTTPException(403, "Not available for admins.")
+    user_id = token_user_id(token)
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if not user:
+        raise HTTPException(404, "User not found")
+    if body.target_role is not None and not role_exists(body.target_role):
+        raise HTTPException(400, f"Unknown target role '{body.target_role}'.")
+    user.target_role = body.target_role  # None clears the override -> back to automatic
+    await db.commit()
+    role_key, is_override = await effective_target_role(db, user_id, user)
+    return {
+        "target_role": role_key,
+        "target_role_label": ROLE_META[role_key]["label"],
+        "is_override": is_override,
+    }
 
 
 @router.get("/skill-gps/roles")

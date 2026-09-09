@@ -1,30 +1,61 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Plus, MessageCircle, TrendingUp, Settings, LayoutDashboard, ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { Plus, MessageSquare, Settings, LayoutDashboard, ChevronsLeft, ChevronsRight, Trash2 } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
-import { useSkillGpsRoles, useSkillGPS } from '../../hooks'
+import { useMentorSessions, useDeleteMentorSession } from '../../hooks'
 
 /** Left nav shell for the AI Mentor page, matching the reference app-shell
- * layout (New Chat / Features nav / Settings & Help / profile card). Items
- * from the reference with no real equivalent here (Project, Library, Admin
- * Pages, Integration, upgrade banner) are intentionally left out rather than
- * faked — everything shown here does something. Collapsible to an icon-only
- * rail so the chat gets more width when the sidebar isn't needed. */
-export default function ChatSidebar({ onNewChat, hasMessages }) {
+ * layout (New Chat / recent conversations / Settings & Help / profile card).
+ * Items from the reference with no real equivalent here (Project, Library,
+ * Admin Pages, Integration, upgrade banner) are intentionally left out rather
+ * than faked — everything shown here does something. Collapsible to an
+ * icon-only rail so the chat gets more width when the sidebar isn't needed.
+ *
+ * Owns its own navigation (via the `:sessionId` route param) rather than
+ * taking callbacks from CareerTwin.jsx — the session list lives entirely
+ * here, so it can switch/delete conversations without the parent knowing
+ * anything about session ids beyond the one it's currently viewing.
+ *
+ * `hasMessages` (whether the CURRENTLY open chat has any messages yet) is the
+ * one thing it does take from the parent — purely so "New Chat" can no-op
+ * when you're already looking at an empty, unused chat instead of stacking
+ * up multiple blank conversations from repeated clicks. */
+export default function ChatSidebar({ hasMessages }) {
   const navigate = useNavigate()
+  const { sessionId: sessionIdParam } = useParams()
+  const activeSessionId = sessionIdParam ? Number(sessionIdParam) : null
   const { user } = useAuth()
-  // The role comes from the server's recommendation (driven by the simulation
-  // this student is enrolled in), not from `user.target_role`, which defaults
-  // to junior_da for everyone at signup — so an Engineering student's sidebar
-  // used to list Data Analytics gaps.
-  const { data: gpsRoles } = useSkillGpsRoles()
-  const { data: gpsData } = useSkillGPS(gpsRoles?.recommended)
+  const { data: sessions } = useMentorSessions()
+  const deleteSession = useDeleteMentorSession()
   const [collapsed, setCollapsed] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null)
 
-  const topGaps = gpsData?.top_gaps ?? []
   const avatarInitials = user?.name
     ? user.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
     : '?'
+
+  function handleNewChat() {
+    // Already on a blank, never-used chat — nothing to do. Without this,
+    // clicking "New Chat" twice in a row would leave a trail of empty
+    // "New conversation" entries in the list below.
+    if (!hasMessages) return
+    // No backend call here — a session only gets created once the student
+    // actually sends a first message (see useMentorChat's sendMessage /
+    // CareerTwin's handleMessageSaved). Creating one eagerly used to leave a
+    // phantom empty session behind every time, which then tripped the guard
+    // above on the very next click — "New Chat" would work once and then
+    // appear to do nothing until that phantom got a message or was deleted.
+    navigate('/ai-mentor')
+  }
+
+  async function handleDelete(id) {
+    try {
+      await deleteSession.mutateAsync(id)
+      if (id === activeSessionId) navigate('/ai-mentor')
+    } finally {
+      setConfirmDeleteId(null)
+    }
+  }
 
   return (
     <aside
@@ -44,57 +75,90 @@ export default function ChatSidebar({ onNewChat, hasMessages }) {
 
       <div className="p-3">
         <button
-          onClick={onNewChat}
-          disabled={!hasMessages}
-          title={hasMessages ? 'Start a fresh conversation' : 'Already a fresh chat'}
-          className={`w-full flex items-center gap-2 border border-border rounded-lg py-2 text-sm font-semibold text-on-surface hover:border-primary hover:bg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer bg-white ${
+          onClick={handleNewChat}
+          title="Start a new conversation"
+          className={`group/new w-full flex items-center gap-2 border border-border rounded-lg py-2 text-sm font-semibold text-on-surface bg-white cursor-pointer
+                      transition-all duration-200 hover:border-primary hover:shadow-sm hover:-translate-y-px active:translate-y-0 active:scale-[0.99] ${
             collapsed ? 'justify-center px-0' : 'px-3'
           }`}
         >
-          <Plus className="h-4 w-4 shrink-0" /> {!collapsed && 'New Chat'}
+          <Plus className="h-4 w-4 shrink-0 transition-transform duration-300 group-hover/new:rotate-90 group-hover/new:text-primary" />
+          {!collapsed && 'New Chat'}
         </button>
       </div>
 
-      <nav className="px-3">
-        {!collapsed && <p className="section-label px-1.5 mb-1.5">Mentor</p>}
-        <div
-          title="Chat"
-          className={`w-full flex items-center gap-2.5 py-1.5 rounded-lg text-sm font-medium text-primary bg-primary/10 ${
-            collapsed ? 'justify-center px-0' : 'px-2'
-          }`}
-        >
-          <MessageCircle className="h-4 w-4 shrink-0" /> {!collapsed && 'Chat'}
-        </div>
-      </nav>
-
-      {!collapsed && topGaps.length > 0 && (
-        <div className="px-4 mt-4">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-on-surface-variant mb-2 flex items-center gap-1">
-            <TrendingUp className="h-3 w-3" /> Biggest Skill Gaps
-          </p>
-          <div className="space-y-2.5">
-            {topGaps.slice(0, 3).map((gap) => {
-              const pct = gap.required ? Math.min(100, Math.round((gap.current / gap.required) * 100)) : 0
-              return (
-                <div key={gap.skill_key}>
-                  <div className="flex justify-between text-[10px] text-on-surface-variant mb-1">
-                    <span className="truncate pr-2">{gap.skill}</span>
-                    <span className="shrink-0 tabular-nums">{gap.current}/{gap.required}</span>
-                  </div>
-                  <div className="h-1.5 bg-surface-high rounded-full overflow-hidden">
-                    <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${pct}%` }} />
-                  </div>
+      {!collapsed && (
+        <div className="px-3 flex-1 min-h-0 overflow-y-auto">
+          <p className="section-label px-1.5 mb-1.5">Recent</p>
+          {sessions?.length ? (
+            <div className="space-y-0.5">
+              {sessions.map((s, i) => (
+                <div
+                  key={s.id}
+                  // Staggered one-shot reveal. Only fires for nodes as they
+                  // mount, so a react-query refetch doesn't replay it for
+                  // rows that were already on screen.
+                  style={{ animationDelay: `${Math.min(i, 8) * 30}ms` }}
+                  className={`mentor-rise group relative flex items-center rounded-lg transition-colors duration-150 ${
+                    s.id === activeSessionId
+                      ? 'bg-primary/10 before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:rounded-full before:bg-primary'
+                      : 'hover:bg-white'
+                  }`}
+                >
+                  {confirmDeleteId === s.id ? (
+                    <div className="flex items-center gap-1.5 px-2 py-1.5 w-full">
+                      <span className="text-[11px] text-red-600 font-medium flex-1">Delete this chat?</span>
+                      <button
+                        onClick={() => handleDelete(s.id)}
+                        disabled={deleteSession.isPending}
+                        className="text-[11px] font-semibold text-white bg-red-500 hover:bg-red-600 rounded px-1.5 py-0.5 cursor-pointer disabled:opacity-50"
+                      >
+                        Yes
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="text-[11px] text-on-surface-variant hover:text-on-surface cursor-pointer"
+                      >
+                        No
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => navigate(`/ai-mentor/c/${s.id}`)}
+                        title={s.title}
+                        className={`flex-1 min-w-0 flex items-center gap-2 px-2 py-1.5 text-left text-sm truncate cursor-pointer ${
+                          s.id === activeSessionId ? 'text-primary font-medium' : 'text-on-surface-variant hover:text-on-surface'
+                        }`}
+                      >
+                        <MessageSquare className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{s.title}</span>
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteId(s.id)}
+                        title="Delete conversation"
+                        className="shrink-0 p-1 mr-1 rounded text-on-surface-variant opacity-0 group-hover:opacity-100 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </>
+                  )}
                 </div>
-              )
-            })}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <p className="px-1.5 text-xs text-on-surface-variant">No conversations yet.</p>
+          )}
         </div>
       )}
 
-      <div className="mt-auto px-3 pb-3">
-        {!collapsed && <p className="section-label px-1.5 mb-1.5">Settings &amp; Help</p>}
+      {/* `mt-auto` keeps this pinned to the bottom in the collapsed rail too,
+          where the scrolling conversation list above it isn't rendered and
+          nothing else claims the leftover height. */}
+      <div className="mt-auto shrink-0 px-3 pb-3">
+        {!collapsed && <p className="section-label px-1.5 mb-1.5 mt-3">Settings &amp; Help</p>}
         <button
-          onClick={() => navigate('/settings')}
+          onClick={() => navigate('/ai-mentor/settings')}
           title="Settings"
           className={`w-full flex items-center gap-2.5 py-1.5 rounded-lg text-sm text-on-surface-variant hover:text-on-surface hover:bg-white transition-colors cursor-pointer ${
             collapsed ? 'justify-center px-0' : 'px-2'
@@ -113,7 +177,7 @@ export default function ChatSidebar({ onNewChat, hasMessages }) {
         </button>
 
         <button
-          onClick={() => navigate('/settings')}
+          onClick={() => navigate('/ai-mentor/settings')}
           title={user?.name || 'Profile'}
           className={`w-full flex items-center gap-2.5 mt-3 pt-3 border-t border-border py-1.5 hover:bg-white rounded-lg transition-colors cursor-pointer text-left ${
             collapsed ? 'justify-center px-0' : 'px-1.5'

@@ -20,6 +20,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app/ app/
 COPY seed.py migrate_legacy_sims.py seed_simulations.py export_simulations.py ./
 COPY seed_data/ seed_data/
+# Numbered ALTER-TABLE scripts (see migrations/run.py) — never shipped in the
+# image before, so `python -m migrations.run` inside the container had
+# nothing to import and every schema change had to be applied by hand
+# against the DB instead.
+COPY migrations/ migrations/
 # Seed manager/company photos referenced by migrate_legacy_sims.py
 # (e.g. static/seed/priya-sharma.jpg) live under static/ in the repo but were
 # never copied into the image — every manager avatar 404'd at runtime as a

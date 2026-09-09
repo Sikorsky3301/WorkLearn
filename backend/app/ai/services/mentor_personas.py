@@ -34,6 +34,13 @@ class MentorPersona:
     # so the display text stays purpose-written for a small chip instead of
     # truncated from a full sentence.
     topics: list[str]
+    # Full questions for the empty-conversation starter cards. Deliberately
+    # NOT generated from `topics`: the welcome screen used to send "Can you
+    # help me with {topic}?", which guardrail 7 below is written to refuse to
+    # answer ("name the 3-4 sub-areas and ask which one they want") — so every
+    # starter card bounced straight back with a clarifying question instead of
+    # helping. These are narrow enough to earn a real answer on the first click.
+    starters: list[str]
 
 
 DEFAULT_PERSONA = MentorPersona(
@@ -52,6 +59,12 @@ DEFAULT_PERSONA = MentorPersona(
     off_scope_examples="topics unrelated to careers or learning, politics, entertainment, personal life, creative writing, etc.",
     refusal_line="I'm your WorkAlearn mentor and I'm only set up to help with your simulations, career development, and learning strategies. What can I help you with on that front?",
     topics=["Getting Started", "Career Guidance", "Simulation Help"],
+    starters=[
+        "Which simulation should I start with?",
+        "How do XP and skill scores actually work here?",
+        "How do I write a resume with no work experience yet?",
+        "What should I focus on this week?",
+    ],
 )
 
 MENTOR_PERSONAS: dict[str, MentorPersona] = {
@@ -73,6 +86,12 @@ MENTOR_PERSONAS: dict[str, MentorPersona] = {
         off_scope_examples="general coding unrelated to data, politics, entertainment, personal life, other career fields, creative writing, etc.",
         refusal_line="I'm your data analytics mentor and I'm only set up to help with data analysis, SQL, Python, career guidance for data roles, and your WorkAlearn simulations. What can I help you with on that front?",
         topics=["SQL", "Python & Pandas", "Statistics", "Career Guidance"],
+        starters=[
+            "What's the difference between a LEFT JOIN and an INNER JOIN?",
+            "How do I pick the right chart for the data I have?",
+            "What does a p-value actually tell me?",
+            "What gets asked in a junior data analyst interview?",
+        ],
     ),
     "Engineering": MentorPersona(
         tagline="for aspiring frontend engineers",
@@ -92,6 +111,12 @@ MENTOR_PERSONAS: dict[str, MentorPersona] = {
         off_scope_examples="topics unrelated to frontend engineering, politics, entertainment, personal life, other career fields, creative writing, etc.",
         refusal_line="I'm your frontend engineering mentor and I'm only set up to help with HTML/CSS/JavaScript/React, career guidance for engineering roles, and your WorkAlearn simulations. What can I help you with on that front?",
         topics=["React", "JavaScript", "Accessibility", "Career Guidance"],
+        starters=[
+            "When should I reach for useEffect instead of useMemo?",
+            "Why does my React state look one render behind?",
+            "What makes a component usable with only a keyboard?",
+            "What should a frontend portfolio actually contain?",
+        ],
     ),
     "Sales": MentorPersona(
         tagline="for aspiring sales professionals",
@@ -111,6 +136,12 @@ MENTOR_PERSONAS: dict[str, MentorPersona] = {
         off_scope_examples="topics unrelated to sales, politics, entertainment, personal life, other career fields, creative writing, etc.",
         refusal_line="I'm your sales mentor and I'm only set up to help with discovery, objection handling, negotiation, closing, CRM skills, career guidance for sales roles, and your WorkAlearn simulations. What can I help you with on that front?",
         topics=["Objection Handling", "Discovery Calls", "CRM Skills", "Career Guidance"],
+        starters=[
+            "How do I respond to \"your price is too high\"?",
+            "What should I ask on a first discovery call?",
+            "How do I write a cold email that actually gets replies?",
+            "What does a strong answer in a sales interview sound like?",
+        ],
     ),
     "Customer Support": MentorPersona(
         tagline="for aspiring customer support specialists",
@@ -130,6 +161,12 @@ MENTOR_PERSONAS: dict[str, MentorPersona] = {
         off_scope_examples="topics unrelated to customer support, politics, entertainment, personal life, other career fields, creative writing, etc.",
         refusal_line="I'm your customer support mentor and I'm only set up to help with ticket triage, support communication, troubleshooting, career guidance for support roles, and your WorkAlearn simulations. What can I help you with on that front?",
         topics=["Ticket Triage", "Empathetic Replies", "Escalation", "Career Guidance"],
+        starters=[
+            "How do I decide when a ticket needs escalating?",
+            "How do I tell a customer no without losing them?",
+            "What separates a good support macro from a robotic one?",
+            "How do I prepare for a customer support interview?",
+        ],
     ),
     "Marketing": MentorPersona(
         tagline="for aspiring marketers",
@@ -149,6 +186,12 @@ MENTOR_PERSONAS: dict[str, MentorPersona] = {
         off_scope_examples="topics unrelated to marketing, politics, entertainment, personal life, other career fields, unrelated creative writing, etc.",
         refusal_line="I'm your marketing mentor and I'm only set up to help with copywriting, campaign strategy, content planning, career guidance for marketing roles, and your WorkAlearn simulations. What can I help you with on that front?",
         topics=["Copywriting", "Campaign Strategy", "Analytics", "Career Guidance"],
+        starters=[
+            "How do I write a headline people actually click?",
+            "How do I choose the right channel for a campaign?",
+            "Which metrics tell me a content campaign is working?",
+            "What should go in a marketing portfolio?",
+        ],
     ),
     "Finance": MentorPersona(
         tagline="for aspiring finance & accounting professionals",
@@ -168,6 +211,12 @@ MENTOR_PERSONAS: dict[str, MentorPersona] = {
         off_scope_examples="topics unrelated to finance/accounting, politics, entertainment, personal life, other career fields, creative writing, etc.",
         refusal_line="I'm your finance mentor and I'm only set up to help with accounting, reconciliation, financial statements, career guidance for finance roles, and your WorkAlearn simulations. What can I help you with on that front?",
         topics=["Reconciliation", "Financial Statements", "Budgeting", "Career Guidance"],
+        starters=[
+            "How do the three financial statements connect to each other?",
+            "What's the step-by-step for a bank reconciliation?",
+            "How do I track down an error in a ledger?",
+            "What do entry-level finance interviews test?",
+        ],
     ),
     "HR & Recruiting": MentorPersona(
         tagline="for aspiring HR & recruiting professionals",
@@ -187,6 +236,12 @@ MENTOR_PERSONAS: dict[str, MentorPersona] = {
         off_scope_examples="topics unrelated to HR/recruiting, politics, entertainment, personal life, other career fields, creative writing, etc.",
         refusal_line="I'm your HR & recruiting mentor and I'm only set up to help with candidate screening, interviewing, hiring processes, career guidance for HR roles, and your WorkAlearn simulations. What can I help you with on that front?",
         topics=["Candidate Screening", "Interviewing", "Job Descriptions", "Career Guidance"],
+        starters=[
+            "What do I look for when screening a resume quickly?",
+            "Why is a structured interview better than a casual chat?",
+            "How do I write a job description good candidates reply to?",
+            "How should I handle an offer negotiation?",
+        ],
     ),
     "Product Management": MentorPersona(
         tagline="for aspiring product managers",
@@ -206,6 +261,12 @@ MENTOR_PERSONAS: dict[str, MentorPersona] = {
         off_scope_examples="topics unrelated to product management, politics, entertainment, personal life, other career fields, creative writing, etc.",
         refusal_line="I'm your product management mentor and I'm only set up to help with prioritization, roadmapping, specs, career guidance for product roles, and your WorkAlearn simulations. What can I help you with on that front?",
         topics=["Prioritization", "Roadmapping", "Writing Specs", "Career Guidance"],
+        starters=[
+            "How do I prioritise when everything is marked urgent?",
+            "What belongs in a PRD, and what doesn't?",
+            "Which metrics should I track for a brand-new feature?",
+            "How do I answer a product sense interview question?",
+        ],
     ),
     "Healthcare Administration": MentorPersona(
         tagline="for aspiring healthcare administrators",
@@ -225,6 +286,12 @@ MENTOR_PERSONAS: dict[str, MentorPersona] = {
         off_scope_examples="clinical/medical diagnosis advice, topics unrelated to healthcare administration, politics, entertainment, personal life, other career fields, etc.",
         refusal_line="I'm your healthcare administration mentor and I'm only set up to help with patient scheduling, records and compliance workflows, career guidance for healthcare admin roles, and your WorkAlearn simulations — not medical or clinical advice. What can I help you with on that front?",
         topics=["Patient Scheduling", "Compliance", "Records/Billing", "Career Guidance"],
+        starters=[
+            "What makes a patient schedule run smoothly?",
+            "Which HIPAA basics do I need to know day to day?",
+            "How does an insurance claim move from visit to payment?",
+            "What do healthcare admin interviews focus on?",
+        ],
     ),
     "IT & Engineering": MentorPersona(
         tagline="for aspiring IT & engineering professionals",
@@ -244,6 +311,12 @@ MENTOR_PERSONAS: dict[str, MentorPersona] = {
         off_scope_examples="topics unrelated to IT/engineering, politics, entertainment, personal life, other career fields, creative writing, etc.",
         refusal_line="I'm your IT & engineering mentor and I'm only set up to help with troubleshooting, incident response, technical skills, career guidance for IT/engineering roles, and your WorkAlearn simulations. What can I help you with on that front?",
         topics=["Troubleshooting", "Networking", "Incident Response", "Career Guidance"],
+        starters=[
+            "How do I troubleshoot systematically instead of guessing?",
+            "What do I check first when an incident comes in?",
+            "How do I read a log file to find a root cause?",
+            "Which IT certifications are actually worth it?",
+        ],
     ),
 }
 

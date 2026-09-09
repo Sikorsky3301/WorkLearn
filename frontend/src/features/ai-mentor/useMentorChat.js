@@ -1,24 +1,34 @@
 import { useCallback, useRef, useState } from 'react'
 import { streamChat, api } from '../../lib/client'
 
-/** Owns all AI Mentor chat state/logic — message list, streaming, stop,
- * retry, clear, and per-message feedback — so CareerTwin.jsx stays a thin
- * presentational shell. Extracted once the UI grew past a single-file
- * amount of behavior (markdown, stop button, retry, feedback all added at
- * once — see the "implement every suggested UI feature" pass). */
-export function useMentorChat() {
+/** Owns all AI Mentor chat state/logic for ONE conversation thread — message
+ * list, streaming, stop, retry, and per-message feedback — so CareerTwin.jsx
+ * stays a thin presentational shell. Extracted once the UI grew past a
+ * single-file amount of behavior (markdown, stop button, retry, feedback all
+ * added at once — see the "implement every suggested UI feature" pass).
+ *
+ * `sessionId` is null for a fresh, not-yet-persisted chat — sendMessage()
+ * lazily creates the real session server-side on the first message and
+ * reports its id back via `onMessageSaved`, rather than this hook creating
+ * one up front (see hooks/mentor.js's useMentorSessions comment for why). */
+export function useMentorChat(sessionId, { onMessageSaved } = {}) {
   const [messages, setMessages] = useState([])
   const [historyLoading, setHistoryLoading] = useState(true)
   const [streaming, setStreaming] = useState(false)
   const abortRef = useRef(null)
 
   const loadHistory = useCallback(() => {
+    if (!sessionId) {
+      setMessages([])
+      setHistoryLoading(false)
+      return Promise.resolve()
+    }
     setHistoryLoading(true)
-    return api.get('/api/chat/history')
+    return api.get(`/api/chat/history?session_id=${sessionId}`)
       .then((data) => setMessages(data.map((m) => ({ ...m, createdAt: m.created_at }))))
       .catch(() => {})
       .finally(() => setHistoryLoading(false))
-  }, [])
+  }, [sessionId])
 
   const sendMessage = useCallback(async (userText) => {
     if (!userText.trim() || streaming) return
@@ -39,6 +49,7 @@ export function useMentorChat() {
         message: userText,
         conversationHistory: history,
         context: {},
+        sessionId,
         signal: controller.signal,
         onChunk: (chunk) => {
           setMessages((prev) => {
@@ -48,7 +59,7 @@ export function useMentorChat() {
             return updated
           })
         },
-        onDone: ({ messageId }) => {
+        onDone: ({ messageId, sessionId: returnedSessionId }) => {
           setMessages((prev) => {
             const updated = [...prev]
             updated[updated.length - 1] = {
@@ -57,6 +68,7 @@ export function useMentorChat() {
             return updated
           })
           setStreaming(false)
+          onMessageSaved?.(returnedSessionId)
         },
       })
     } catch (err) {
@@ -88,7 +100,7 @@ export function useMentorChat() {
     } finally {
       abortRef.current = null
     }
-  }, [messages, streaming])
+  }, [messages, streaming, sessionId, onMessageSaved])
 
   function stopStreaming() {
     abortRef.current?.abort()
@@ -100,8 +112,9 @@ export function useMentorChat() {
     sendMessage(userText)
   }
 
-  async function clearChat() {
-    await api.del('/api/chat/history')
+  // Local-only reset — used both for "New Chat" (before any session exists)
+  // and right after deleting the currently-open session.
+  function resetToNewChat() {
     setMessages([])
   }
 
@@ -117,6 +130,6 @@ export function useMentorChat() {
 
   return {
     messages, historyLoading, streaming,
-    loadHistory, sendMessage, stopStreaming, retry, clearChat, submitFeedback,
+    loadHistory, sendMessage, stopStreaming, retry, resetToNewChat, submitFeedback,
   }
 }

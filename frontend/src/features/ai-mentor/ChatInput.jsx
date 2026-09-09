@@ -28,7 +28,8 @@ export default function ChatInput({ streaming, onSend, onStop, quickTopics = [] 
                 key={topic}
                 onClick={() => handleQuickTopic(topic)}
                 disabled={streaming}
-                className="text-[11px] font-medium text-primary bg-primary/5 hover:bg-primary/10 border border-primary/15 px-2.5 py-1 rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                className="text-[11px] font-medium text-primary bg-primary/5 hover:bg-primary/10 hover:border-primary/40 border border-primary/15 px-2.5 py-1 rounded-full cursor-pointer
+                           transition-all duration-150 hover:-translate-y-px active:translate-y-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0"
               >
                 {topic}
               </button>
@@ -36,7 +37,8 @@ export default function ChatInput({ streaming, onSend, onStop, quickTopics = [] 
           </div>
         )}
 
-        <div className="flex items-center gap-2.5 border border-border rounded-2xl px-4 py-3 focus-within:border-primary transition-colors bg-white shadow-sm">
+        <div className="flex items-center gap-2.5 border border-border rounded-2xl px-4 py-3 bg-white shadow-sm
+                        transition-all duration-200 focus-within:border-primary focus-within:shadow-md focus-within:ring-4 focus-within:ring-primary/5">
           <Sparkles className="h-4 w-4 text-primary/50 shrink-0" />
           <input
             type="text"
@@ -60,7 +62,9 @@ export default function ChatInput({ streaming, onSend, onStop, quickTopics = [] 
               <button
                 onClick={handleSend}
                 disabled={!input.trim()}
-                className="w-8 h-8 bg-primary rounded-full flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-50 cursor-pointer"
+                className="w-8 h-8 bg-primary rounded-full flex items-center justify-center cursor-pointer
+                           transition-all duration-150 hover:opacity-90 hover:scale-105 active:scale-95
+                           disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed"
               >
                 <SendIcon />
               </button>

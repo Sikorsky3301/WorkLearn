@@ -213,6 +213,24 @@ async def recommended_role(db: AsyncSession, user_id: int) -> str:
     return profile_role if role_exists(profile_role or "") else DEFAULT_TARGET_ROLE
 
 
+async def effective_target_role(
+    db: AsyncSession, user_id: int, user: User | None = None,
+) -> tuple[str, bool]:
+    """(role_key, is_explicit_override) for the AI Mentor and its settings page.
+
+    An explicit choice from the Mentor Settings page always wins over the
+    enrollment-derived recommendation — that is the whole point of letting a
+    student set it. A stale override (a role since removed from ROLE_META) is
+    treated as unset rather than erroring, matching recommended_role()'s own
+    "fall back rather than break" style.
+    """
+    if user is None:
+        user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if user and user.target_role and role_exists(user.target_role):
+        return user.target_role, True
+    return await recommended_role(db, user_id), False
+
+
 def role_catalog(recommended: str) -> dict:
     """The full set of roles a student can benchmark against, grouped by track.
 
